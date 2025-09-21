@@ -6,19 +6,19 @@ CREATE DATABASE IF NOT EXISTS hms_db;
 \c hms_db;
 
 -- Create application user with limited privileges
-CREATE USER IF NOT EXISTS hms_app WITH ENCRYPTED PASSWORD 'hms_password';
+CREATE USER IF NOT EXISTS hms_app WITH ENCRYPTED PASSWORD 'hmsadmin';
 GRANT CONNECT ON DATABASE hms_db TO hms_app;
 
 -- Create readonly user for reporting
-CREATE USER IF NOT EXISTS hms_readonly WITH ENCRYPTED PASSWORD 'readonly_password';
+CREATE USER IF NOT EXISTS hms_readonly WITH ENCRYPTED PASSWORD 'hmsadmin';
 GRANT CONNECT ON DATABASE hms_db TO hms_readonly;
 
 -- Create admin user for maintenance
-CREATE USER IF NOT EXISTS hms_admin WITH ENCRYPTED PASSWORD 'admin_password';
+CREATE USER IF NOT EXISTS hms_admin WITH ENCRYPTED PASSWORD 'hmsadmin';
 GRANT ALL PRIVILEGES ON DATABASE hms_db TO hms_admin;
 
 -- Create monitoring user for Prometheus
-CREATE USER IF NOT EXISTS hms_monitor WITH ENCRYPTED PASSWORD 'monitor_password';
+CREATE USER IF NOT EXISTS hms_monitor WITH ENCRYPTED PASSWORD 'hmsadmin';
 GRANT pg_monitor TO hms_monitor;
 GRANT CONNECT ON DATABASE hms_db TO hms_monitor;
 

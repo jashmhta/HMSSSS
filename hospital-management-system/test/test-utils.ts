@@ -48,7 +48,7 @@ export class TestUtils {
     const userData = {
       id: `user-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       email: `test-${Date.now()}@example.com`,
-      password: 'hashedpassword',
+       password: 'hmsadmin',
       firstName: 'Test',
       lastName: 'User',
       phone: '+1234567890',
