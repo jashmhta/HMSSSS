@@ -165,3 +165,7 @@ playwright-report/
 # Local development
 .local
 .dev
+
+# Istio binaries (download separately)
+istio-*/bin/
+istio-*/tools/_istioctl
