@@ -1,0 +1,310 @@
+---
+# Ultimate HMS - Kubernetes Cluster Setup
+# This file contains the complete Kubernetes cluster configuration
+# for the Ultimate Hospital Management System
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ultimate-hms
+  labels:
+    name: ultimate-hms
+    app: hospital-management-system
+
+---
+# Service Account for cluster operations
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: hms-admin
+  namespace: ultimate-hms
+  labels:
+    app: hospital-management-system
+
+---
+# Cluster Role for admin operations
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: hms-admin-role
+  labels:
+    app: hospital-management-system
+rules:
+- apiGroups: [""]
+  resources: ["pods", "services", "endpoints", "persistentvolumes", "persistentvolumeclaims", "events", "configmaps", "secrets"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["apps"]
+  resources: ["deployments", "daemonsets", "replicasets", "statefulsets"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["networking.k8s.io"]
+  resources: ["networkpolicies", "ingresses"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["batch"]
+  resources: ["jobs", "cronjobs"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+---
+# Cluster Role Binding
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: hms-admin-binding
+  labels:
+    app: hospital-management-system
+subjects:
+- kind: ServiceAccount
+  name: hms-admin
+  namespace: ultimate-hms
+roleRef:
+  kind: ClusterRole
+  name: hms-admin-role
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# ConfigMap for cluster-wide settings
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: hms-config
+  namespace: ultimate-hms
+  labels:
+    app: hospital-management-system
+data:
+  CLUSTER_NAME: "ultimate-hms-cluster"
+  ENVIRONMENT: "production"
+  LOG_LEVEL: "INFO"
+  MONITORING_ENABLED: "true"
+  SECURITY_ENABLED: "true"
+  BACKUP_ENABLED: "true"
+
+---
+# Resource Quotas for namespace
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: hms-resource-quota
+  namespace: ultimate-hms
+  labels:
+    app: hospital-management-system
+spec:
+  hard:
+    requests.cpu: "20"
+    requests.memory: "40Gi"
+    limits.cpu: "40"
+    limits.memory: "80Gi"
+    persistentvolumeclaims: "50"
+    pods: "100"
+    services: "50"
+    secrets: "50"
+    configmaps: "50"
+
+---
+# Limit Ranges for pods
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: hms-limit-range
+  namespace: ultimate-hms
+  labels:
+    app: hospital-management-system
+spec:
+  limits:
+  - default:
+      cpu: "2"
+      memory: "4Gi"
+    defaultRequest:
+      cpu: "100m"
+      memory: "256Mi"
+    type: Container
+
+---
+# Network Policy for security
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: hms-network-policy
+  namespace: ultimate-hms
+  labels:
+    app: hospital-management-system
+spec:
+   podSelector: {}
+   policyTypes:
+   - Ingress
+   - Egress
+   ingress:
+   - from:
+     - namespaceSelector:
+         matchLabels:
+           name: istio-system
+     - namespaceSelector:
+           matchLabels:
+             name: kube-system
+     - namespaceSelector:
+           matchLabels:
+             name: ultimate-hms
+     - podSelector: {}
+     ports:
+     - protocol: TCP
+       port: 8080
+     - protocol: TCP
+       port: 8443
+     - protocol: TCP
+       port: 9090
+     - protocol: TCP
+       port: 9200
+     - protocol: TCP
+       port: 9300
+     - protocol: TCP
+       port: 5432
+     - protocol: TCP
+       port: 27017
+     - protocol: TCP
+       port: 9092
+     - protocol: TCP
+       port: 5601
+     - protocol: TCP
+       port: 5044
+     - protocol: TCP
+       port: 8000
+     - protocol: TCP
+       port: 8001
+     - protocol: TCP
+       port: 2181
+     - protocol: TCP
+       port: 2379
+     - protocol: TCP
+       port: 2380
+     - protocol: TCP
+       port: 9114
+      - protocol: TCP
+        port: 9216
+   egress:
+   - to:
+     - namespaceSelector:
+         matchLabels:
+           name: istio-system
+     - namespaceSelector:
+         matchLabels:
+           name: kube-system
+     - namespaceSelector:
+         matchLabels:
+           name: ultimate-hms
+     - namespaceSelector:
+         matchLabels:
+           name: monitoring
+     - podSelector: {}
+     ports:
+     - protocol: TCP
+       port: 53
+     - protocol: UDP
+       port: 53
+   - to: []
+     ports:
+     - protocol: TCP
+       port: 443
+     - protocol: TCP
+       port: 80
+     - protocol: TCP
+       port: 9200
+     - protocol: TCP
+       port: 9300
+     - protocol: TCP
+       port: 5432
+     - protocol: TCP
+       port: 27017
+     - protocol: TCP
+       port: 9092
+     - protocol: TCP
+       port: 5601
+     - protocol: TCP
+       port: 5044
+     - protocol: TCP
+       port: 8000
+     - protocol: TCP
+       port: 8001
+     - protocol: TCP
+       port: 2181
+     - protocol: TCP
+       port: 2379
+     - protocol: TCP
+       port: 2380
+     - protocol: TCP
+       port: 9114
+     - protocol: TCP
+       port: 9216
+     - protocol: TCP
+       port: 9090
+     - protocol: TCP
+       port: 3000
+
+---
+# Priority Class for critical services
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: hms-critical
+  labels:
+    app: hospital-management-system
+value: 1000000
+globalDefault: false
+description: "Priority class for critical HMS services"
+
+---
+# Priority Class for important services
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: hms-important
+  labels:
+    app: hospital-management-system
+value: 500000
+globalDefault: false
+description: "Priority class for important HMS services"
+
+---
+# Pod Disruption Budget for critical services
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: hms-critical-pdb
+  namespace: ultimate-hms
+  labels:
+    app: hospital-management-system
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      tier: critical
+      app: hospital-management-system
+
+---
+# Pod Security Standards
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: hms-pod-security
+  namespace: ultimate-hms
+  labels:
+    app: hospital-management-system
+data:
+  security-context.yaml: |
+    apiVersion: v1
+    kind: Pod
+    metadata:
+      name: secure-pod-example
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      containers:
+      - name: app
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 1000
+          capabilities:
+            drop:
+            - ALL

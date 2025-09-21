@@ -1,0 +1,250 @@
+---
+# Apache Kafka for HMS Event Streaming
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kafka-config
+  namespace: ultimate-hms
+  labels:
+    app: hospital-management-system
+    component: messaging
+data:
+  server.properties: |
+    broker.id=0
+    listeners=PLAINTEXT://0.0.0.0:9092
+    advertised.listeners=PLAINTEXT://kafka-hms:9092
+    zookeeper.connect=zookeeper-hms:2181
+    log.dirs=/var/lib/kafka/data
+    num.partitions=3
+    default.replication.factor=1
+    offsets.topic.replication.factor=1
+    transaction.state.log.replication.factor=1
+    transaction.state.log.min.isr=1
+    group.initial.rebalance.delay.ms=0
+    auto.create.topics.enable=true
+    # Single node configuration
+    min.insync.replicas=1
+    unclean.leader.election.enable=true
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: zookeeper-config
+  namespace: ultimate-hms
+  labels:
+    app: hospital-management-system
+    component: messaging
+data:
+  zoo.cfg: |
+    tickTime=2000
+    initLimit=10
+    syncLimit=5
+    dataDir=/data
+    clientPort=2181
+    autopurge.snapRetainCount=3
+    autopurge.purgeInterval=1
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: zookeeper
+  namespace: ultimate-hms
+  labels:
+    app: hospital-management-system
+    component: messaging
+    system: zookeeper
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hospital-management-system
+      component: messaging
+      system: zookeeper
+  template:
+    metadata:
+      labels:
+        app: hospital-management-system
+        component: messaging
+        system: zookeeper
+    spec:
+      serviceAccountName: hms-admin
+      containers:
+      - name: zookeeper
+        image: confluentinc/cp-zookeeper:7.4.0
+        ports:
+        - containerPort: 2181
+          name: client
+        env:
+        - name: ZOOKEEPER_CLIENT_PORT
+          value: "2181"
+        - name: ZOOKEEPER_TICK_TIME
+          value: "2000"
+        volumeMounts:
+        - name: zookeeper-data
+          mountPath: /data
+        - name: zookeeper-config
+          mountPath: /etc/kafka/zoo.cfg
+          subPath: zoo.cfg
+        resources:
+          requests:
+            cpu: 200m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        livenessProbe:
+          exec:
+            command:
+            - sh
+            - -c
+            - "echo ruok | nc localhost 2181"
+          initialDelaySeconds: 30
+          periodSeconds: 30
+        readinessProbe:
+          exec:
+            command:
+            - sh
+            - -c
+            - "echo ruok | nc localhost 2181"
+          initialDelaySeconds: 5
+          periodSeconds: 10
+      volumes:
+      - name: zookeeper-data
+        emptyDir: {}
+      - name: zookeeper-config
+        configMap:
+          name: zookeeper-config
+          items:
+          - key: zoo.cfg
+            path: zoo.cfg
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: zookeeper-hms
+  namespace: ultimate-hms
+  labels:
+    app: hospital-management-system
+    component: messaging
+    system: zookeeper
+spec:
+  selector:
+    app: hospital-management-system
+    component: messaging
+    system: zookeeper
+  ports:
+  - name: client
+    port: 2181
+    targetPort: 2181
+  type: ClusterIP
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kafka
+  namespace: ultimate-hms
+  labels:
+    app: hospital-management-system
+    component: messaging
+    system: kafka
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hospital-management-system
+      component: messaging
+      system: kafka
+  template:
+    metadata:
+      labels:
+        app: hospital-management-system
+        component: messaging
+        system: kafka
+    spec:
+      serviceAccountName: hms-admin
+      containers:
+      - name: kafka
+        image: confluentinc/cp-kafka:7.4.0
+        ports:
+        - containerPort: 9092
+          name: kafka
+        env:
+        - name: KAFKA_BROKER_ID
+          value: "0"
+        - name: KAFKA_ZOOKEEPER_CONNECT
+          value: "zookeeper-hms:2181"
+        - name: KAFKA_LISTENERS
+          value: "PLAINTEXT://:9092"
+        - name: KAFKA_ADVERTISED_LISTENERS
+          value: "PLAINTEXT://kafka-hms:9092"
+        - name: KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR
+          value: "1"
+        - name: KAFKA_TRANSACTION_STATE_LOG_MIN_ISR
+          value: "1"
+        - name: KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR
+          value: "1"
+        - name: KAFKA_AUTO_CREATE_TOPICS_ENABLE
+          value: "true"
+        volumeMounts:
+        - name: kafka-data
+          mountPath: /var/lib/kafka/data
+        - name: kafka-config
+          mountPath: /etc/kafka/server.properties
+          subPath: server.properties
+        resources:
+          requests:
+            cpu: 500m
+            memory: 1Gi
+          limits:
+            cpu: 1000m
+            memory: 2Gi
+        livenessProbe:
+          exec:
+            command:
+            - kafka-broker-api-versions
+            - --bootstrap-server
+            - localhost:9092
+          initialDelaySeconds: 60
+          periodSeconds: 30
+        readinessProbe:
+          exec:
+            command:
+            - kafka-broker-api-versions
+            - --bootstrap-server
+            - localhost:9092
+          initialDelaySeconds: 30
+          periodSeconds: 10
+      volumes:
+      - name: kafka-data
+        emptyDir: {}
+      - name: kafka-config
+        configMap:
+          name: kafka-config
+          items:
+          - key: server.properties
+            path: server.properties
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kafka-hms
+  namespace: ultimate-hms
+  labels:
+    app: hospital-management-system
+    component: messaging
+    system: kafka
+spec:
+  selector:
+    app: hospital-management-system
+    component: messaging
+    system: kafka
+  ports:
+  - name: kafka
+    port: 9092
+    targetPort: 9092
+  type: ClusterIP

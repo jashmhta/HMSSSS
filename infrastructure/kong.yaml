@@ -1,0 +1,231 @@
+---
+# Kong API Gateway for HMS
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kong-config
+  namespace: ultimate-hms
+  labels:
+    app: hospital-management-system
+    component: gateway
+data:
+  kong.yml: |
+    _format_version: "3.0"
+    services:
+    - name: hms-backend
+      url: http://backend-service.ultimate-hms.svc.cluster.local:3000
+      routes:
+      - name: hms-backend-route
+        paths:
+        - /api/v1
+        methods:
+        - GET
+        - POST
+        - PUT
+        - DELETE
+        - PATCH
+        plugins:
+        - name: cors
+          config:
+            origins:
+            - "*"
+            methods:
+            - GET
+            - POST
+            - PUT
+            - DELETE
+            - PATCH
+            headers:
+            - Authorization
+            - Content-Type
+            credentials: true
+        - name: rate-limiting
+          config:
+            minute: 100
+            hour: 1000
+        - name: request-transformer
+          config:
+            add:
+              headers:
+              - "X-API-Version:v1"
+
+    - name: hms-frontend
+      url: http://frontend-service.ultimate-hms.svc.cluster.local:3000
+      routes:
+      - name: hms-frontend-route
+        paths:
+        - /
+        methods:
+        - GET
+        plugins:
+        - name: cors
+          config:
+            origins:
+            - "*"
+
+    consumers:
+    - username: hms-admin
+      custom_id: admin-user
+    - username: hms-doctor
+      custom_id: doctor-user
+    - username: hms-nurse
+      custom_id: nurse-user
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kong
+  namespace: ultimate-hms
+  labels:
+    app: hospital-management-system
+    component: gateway
+    system: kong
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: hospital-management-system
+      component: gateway
+      system: kong
+  template:
+    metadata:
+      labels:
+        app: hospital-management-system
+        component: gateway
+        system: kong
+    spec:
+      serviceAccountName: hms-admin
+      containers:
+      - name: kong
+        image: kong:3.4
+        ports:
+        - containerPort: 8000
+          name: proxy
+        - containerPort: 8443
+          name: proxy-ssl
+        - containerPort: 8001
+          name: admin
+        - containerPort: 8444
+          name: admin-ssl
+        env:
+        - name: KONG_DATABASE
+          value: "off"
+        - name: KONG_DECLARATIVE_CONFIG
+          value: "/etc/kong/kong.yml"
+        - name: KONG_PROXY_ACCESS_LOG
+          value: "/dev/stdout"
+        - name: KONG_ADMIN_ACCESS_LOG
+          value: "/dev/stdout"
+        - name: KONG_PROXY_ERROR_LOG
+          value: "/dev/stderr"
+        - name: KONG_ADMIN_ERROR_LOG
+          value: "/dev/stderr"
+        - name: KONG_ADMIN_LISTEN
+          value: "0.0.0.0:8001"
+        - name: KONG_PROXY_LISTEN
+          value: "0.0.0.0:8000"
+        volumeMounts:
+        - name: kong-config
+          mountPath: /etc/kong/kong.yml
+          subPath: kong.yml
+        resources:
+          requests:
+            cpu: 200m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        livenessProbe:
+          httpGet:
+            path: /status
+            port: 8001
+          initialDelaySeconds: 30
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /status
+            port: 8001
+          initialDelaySeconds: 5
+          periodSeconds: 10
+      volumes:
+      - name: kong-config
+        configMap:
+          name: kong-config
+          items:
+          - key: kong.yml
+            path: kong.yml
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kong-proxy
+  namespace: ultimate-hms
+  labels:
+    app: hospital-management-system
+    component: gateway
+    system: kong
+spec:
+  selector:
+    app: hospital-management-system
+    component: gateway
+    system: kong
+  ports:
+  - name: proxy
+    port: 8000
+    targetPort: 8000
+  - name: proxy-ssl
+    port: 8443
+    targetPort: 8443
+  type: ClusterIP
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kong-admin
+  namespace: ultimate-hms
+  labels:
+    app: hospital-management-system
+    component: gateway
+    system: kong
+spec:
+  selector:
+    app: hospital-management-system
+    component: gateway
+    system: kong
+  ports:
+  - name: admin
+    port: 8001
+    targetPort: 8001
+  - name: admin-ssl
+    port: 8444
+    targetPort: 8444
+  type: ClusterIP
+
+---
+# Kong Ingress
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: kong-ingress
+  namespace: ultimate-hms
+  labels:
+    app: hospital-management-system
+    component: gateway
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: api.hms.local
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: kong-proxy
+            port:
+              number: 8000

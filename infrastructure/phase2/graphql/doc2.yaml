@@ -1,0 +1,23 @@
+---
+# GraphQL Secrets
+apiVersion: v1
+kind: Secret
+metadata:
+  name: graphql-secrets
+  namespace: graphql-system
+  labels:
+    app: hospital-management-system
+    component: api
+    system: graphql
+type: Opaque
+data:
+  # Base64 encoded credentials
+  openmrs-username: YWRtaW4=     # admin
+  openmrs-password: YWRtaW5fcGFzc3cwcmQ=  # admin_passw0rd
+  metasfresh-username: YWRtaW4=   # admin
+  metasfresh-password: YWRtaW5fcGFzc3cwcmQ= # admin_passw0rd
+  jwt-secret: Z3JhcGhxbC1hcGktand0LXNlY3JldC1rZXk= # graphql-api-jwt-secret-key
+  redis-password: cmVkaXNfcGFzc3cwcmQ=   # redis_passw0rd
+  db-username: aG1zX3VzZXI=     # hms_user
+  db-password: aG1zX3VzZXJfcGFzc3cwcmQ=  # hms_user_password
+

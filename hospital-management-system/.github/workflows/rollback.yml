@@ -1,0 +1,137 @@
+name: Emergency Rollback
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to rollback'
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+      target_version:
+        description: 'Target version to rollback to (leave empty for previous version)'
+        required: false
+        type: string
+
+jobs:
+  rollback:
+    name: Rollback Deployment
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.8.0
+        with:
+          ssh-private-key: ${{ secrets[${{ github.event.inputs.environment }}_SSH_PRIVATE_KEY] }}
+
+      - name: Determine rollback version
+        id: version
+        run: |
+          if [ -n "${{ github.event.inputs.target_version }}" ]; then
+            echo "version=${{ github.event.inputs.target_version }}" >> $GITHUB_OUTPUT
+          else
+            # Get previous version from git tags
+            PREVIOUS_VERSION=$(git tag --sort=-version:refname | sed -n '2p')
+            echo "version=$PREVIOUS_VERSION" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Execute rollback
+        run: |
+          TARGET_VERSION=${{ steps.version.outputs.version }}
+          ENVIRONMENT=${{ github.event.inputs.environment }}
+          HOST_VAR="${ENVIRONMENT^^}_HOST"
+          USER_VAR="${ENVIRONMENT^^}_USER"
+
+          echo "Rolling back $ENVIRONMENT to version $TARGET_VERSION"
+
+          ssh -o StrictHostKeyChecking=no ${{ secrets[$USER_VAR] }}@${{ secrets[$HOST_VAR] }} << EOF
+            cd /opt/hms
+
+            # Stop current deployment
+            ./deploy.sh stop
+
+            # Checkout target version
+            git checkout $TARGET_VERSION
+
+            # Restore environment file
+            cp .env.$ENVIRONMENT .env.prod
+
+            # Start services with previous version
+            ./deploy.sh
+
+            # Wait for services to be healthy
+            sleep 60
+
+            # Run health checks
+            curl -f https://api.hms.local/health || exit 1
+            curl -f https://hms.local || exit 1
+
+            echo "Rollback to $TARGET_VERSION completed successfully"
+          EOF
+
+      - name: Verify rollback
+        run: |
+          sleep 30
+
+          # Run smoke tests
+          if curl -f https://api.hms.local/health && curl -f https://hms.local; then
+            echo "Rollback verification successful"
+          else
+            echo "Rollback verification failed"
+            exit 1
+          fi
+
+      - name: Notify rollback success
+        if: success()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: success
+          text: "🔄 HMS ${{ github.event.inputs.environment }} rolled back to ${{ steps.version.outputs.version }}"
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Notify rollback failure
+        if: failure()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: failure
+          text: "❌ HMS ${{ github.event.inputs.environment }} rollback failed"
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Create rollback issue
+        if: failure()
+        uses: actions/github-script@v6
+        with:
+          script: |
+            github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `🚨 Rollback Failed: ${{ github.event.inputs.environment }}`,
+              body: `
+            ## Rollback Failure Alert
+
+            **Environment:** ${{ github.event.inputs.environment }}
+            **Target Version:** ${{ steps.version.outputs.version }}
+            **Timestamp:** ${new Date().toISOString()}
+
+            The automated rollback process has failed. Manual intervention required.
+
+            ### Next Steps:
+            1. Check deployment logs
+            2. Verify database integrity
+            3. Manually restore from backup if necessary
+            4. Investigate root cause
+
+            ### Contact:
+            - DevOps Team
+            - System Administrator
+            `,
+              labels: ['rollback-failure', 'urgent', 'incident']
+            })

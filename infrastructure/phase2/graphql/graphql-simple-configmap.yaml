@@ -1,0 +1,254 @@
+---
+# Simple GraphQL API - JavaScript version for quick deployment
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: graphql-simple-code
+  namespace: graphql-system
+  labels:
+    app: hospital-management-system
+    component: api
+    system: graphql
+data:
+  package-json: |
+    {
+      "name": "hms-graphql-api",
+      "version": "1.0.0",
+      "description": "Unified GraphQL API for Ultimate HMS",
+      "main": "index.js",
+      "scripts": {
+        "start": "node index.js"
+      },
+      "dependencies": {
+        "apollo-server": "^3.12.0",
+        "graphql": "^16.6.0",
+        "axios": "^1.4.0",
+        "express": "^4.18.2",
+        "pg": "^8.11.0"
+      }
+    }
+
+   index-js: |
+    const { ApolloServer, gql } = require('apollo-server');
+    const axios = require('axios');
+    const express = require('express');
+    const { Pool } = require('pg');
+
+    // Database connection pool
+    const pool = new Pool({
+      host: process.env.DATABASE_HOST || 'postgresql-hms.ultimate-hms.svc.cluster.local',
+      port: process.env.DATABASE_PORT || 5432,
+      database: process.env.DATABASE_NAME || 'hms_db',
+      user: process.env.DATABASE_USERNAME || 'hms_user',
+      password: process.env.DATABASE_PASSWORD || 'hms_user_password',
+      max: 20,
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 2000,
+    });
+
+    // Tenant context middleware
+    const getTenantFromRequest = (req) => {
+      // Check X-Tenant-ID header first
+      const tenantId = req.headers['x-tenant-id'] ||
+                      req.headers['x-tenantid'] ||
+                      'default';
+
+      // Map tenant IDs to schema names
+      const tenantSchemas = {
+        'hospital-a': 'tenant_hospital_a',
+        'hospital-b': 'tenant_hospital_b',
+        'clinic-c': 'tenant_clinic_c',
+        'default': 'public'
+      };
+
+      return {
+        tenantId,
+        schema: tenantSchemas[tenantId] || tenantSchemas['default']
+      };
+    };
+
+    // Health check endpoint
+    const app = express();
+    app.get('/health', (req, res) => {
+      res.status(200).json({ status: 'healthy', timestamp: new Date().toISOString() });
+    });
+    app.get('/', (req, res) => {
+      const tenant = getTenantFromRequest(req);
+      res.status(200).json({
+        status: 'GraphQL API is running',
+        tenant: tenant.tenantId,
+        schema: tenant.schema
+      });
+    });
+
+    // GraphQL Schema
+    const typeDefs = gql`
+      type Query {
+        patients(limit: Int, offset: Int): [Patient!]!
+        patient(uuid: ID!): Patient
+        systemStatus: String!
+      }
+
+      type Patient {
+        uuid: ID!
+        identifiers: [PatientIdentifier!]!
+        person: Person!
+      }
+
+      type Person {
+        uuid: ID!
+        names: [PersonName!]!
+        gender: String
+        birthdate: String
+      }
+
+      type PersonName {
+        givenName: String!
+        familyName: String!
+      }
+
+      type PatientIdentifier {
+        identifier: String!
+        identifierType: IdentifierType!
+      }
+
+      type IdentifierType {
+        uuid: ID!
+        name: String!
+      }
+    `;
+
+    // Resolvers
+    const resolvers = {
+      Query: {
+        patients: async (_, { limit = 10, offset = 0 }, context) => {
+          try {
+            const { schema } = context.tenant;
+
+            // Try tenant-specific data first, fallback to OpenMRS
+            const client = await pool.connect();
+            try {
+              await client.query(`SET search_path TO ${schema}`);
+              const result = await client.query(
+                'SELECT * FROM patients ORDER BY created_at DESC LIMIT $1 OFFSET $2',
+                [limit, offset]
+              );
+
+              if (result.rows.length > 0) {
+                return result.rows.map(row => ({
+                  uuid: row.patient_id,
+                  identifiers: [{
+                    identifier: row.medical_record_number || row.patient_id,
+                    identifierType: { uuid: 'mrn', name: 'Medical Record Number' }
+                  }],
+                  person: {
+                    uuid: row.patient_id,
+                    names: [{
+                      givenName: row.first_name,
+                      familyName: row.last_name
+                    }],
+                    gender: row.gender,
+                    birthdate: row.date_of_birth?.toISOString().split('T')[0]
+                  }
+                }));
+              }
+            } finally {
+              client.release();
+            }
+
+            // Fallback to OpenMRS API
+            const response = await axios.get(
+              `http://openmrs.openmrs-system.svc.cluster.local/openmrs/ws/rest/v1/patient?limit=${limit}&startIndex=${offset}`,
+              {
+                auth: {
+                  username: process.env.OPENMRS_USERNAME || 'admin',
+                  password: process.env.OPENMRS_PASSWORD || 'admin_passw0rd'
+                }
+              }
+            );
+            return response.data.results || [];
+          } catch (error) {
+            console.error('Error fetching patients:', error.message);
+            return [];
+          }
+        },
+
+        patient: async (_, { uuid }, context) => {
+          try {
+            const { schema } = context.tenant;
+
+            // Try tenant-specific data first
+            const client = await pool.connect();
+            try {
+              await client.query(`SET search_path TO ${schema}`);
+              const result = await client.query(
+                'SELECT * FROM patients WHERE patient_id = $1',
+                [uuid]
+              );
+
+              if (result.rows.length > 0) {
+                const row = result.rows[0];
+                return {
+                  uuid: row.patient_id,
+                  identifiers: [{
+                    identifier: row.medical_record_number || row.patient_id,
+                    identifierType: { uuid: 'mrn', name: 'Medical Record Number' }
+                  }],
+                  person: {
+                    uuid: row.patient_id,
+                    names: [{
+                      givenName: row.first_name,
+                      familyName: row.last_name
+                    }],
+                    gender: row.gender,
+                    birthdate: row.date_of_birth?.toISOString().split('T')[0]
+                  }
+                };
+              }
+            } finally {
+              client.release();
+            }
+
+            // Fallback to OpenMRS API
+            const response = await axios.get(
+              `http://openmrs.openmrs-system.svc.cluster.local/openmrs/ws/rest/v1/patient/${uuid}`,
+              {
+                auth: {
+                  username: process.env.OPENMRS_USERNAME || 'admin',
+                  password: process.env.OPENMRS_PASSWORD || 'admin_passw0rd'
+                }
+              }
+            );
+            return response.data;
+          } catch (error) {
+            console.error('Error fetching patient:', error.message);
+            return null;
+          }
+        },
+
+        systemStatus: (_, __, context) => {
+          const { tenantId, schema } = context.tenant;
+          return `GraphQL API is operational - Tenant: ${tenantId}, Schema: ${schema}`;
+        }
+      }
+    };
+
+    // Create Apollo Server
+    const server = new ApolloServer({
+      typeDefs,
+      resolvers,
+      introspection: true,
+      playground: true,
+      context: ({ req }) => {
+        const tenant = getTenantFromRequest(req);
+        return { tenant };
+      }
+    });
+
+    // Start server
+    const PORT = process.env.PORT || 4000;
+
+    server.listen({ port: PORT }).then(({ url }) => {
+      console.log(`🚀 GraphQL API ready at ${url}`);
+      console.log(`📊 System status available via GraphQL query`);
+    }).catch(console.error);

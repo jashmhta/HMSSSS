@@ -1,0 +1,64 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kibana
+  namespace: ultimate-hms
+  labels:
+    app: hospital-management-system
+    component: logging
+    system: kibana
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hospital-management-system
+      component: logging
+      system: kibana
+  template:
+    metadata:
+      labels:
+        app: hospital-management-system
+        component: logging
+        system: kibana
+    spec:
+      serviceAccountName: hms-admin
+      containers:
+      - name: kibana
+        image: docker.elastic.co/kibana/kibana:8.11.0
+        ports:
+        - containerPort: 5601
+          name: http
+        env:
+        - name: ELASTICSEARCH_HOSTS
+          value: "http://elasticsearch-hms:9200"
+        - name: NODE_OPTIONS
+          value: "--max-old-space-size=1024"
+        volumeMounts:
+        - name: kibana-config
+          mountPath: /usr/share/kibana/config/kibana.yml
+          subPath: kibana.yml
+        resources:
+          requests:
+            cpu: 500m
+            memory: 1Gi
+          limits:
+            cpu: 1000m
+            memory: 2Gi
+        livenessProbe:
+           httpGet:
+             path: /login
+             port: 5601
+             scheme: HTTP
+           initialDelaySeconds: 60
+           periodSeconds: 30
+           timeoutSeconds: 10
+           failureThreshold: 3
+
+      volumes:
+      - name: kibana-config
+        configMap:
+          name: kibana-config-new
+          items:
+          - key: kibana.yml
+            path: kibana.yml

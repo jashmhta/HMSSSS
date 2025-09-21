@@ -1,0 +1,534 @@
+---
+# Data Synchronization Service Code
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sync-code-config
+  namespace: data-sync-system
+  labels:
+    app: hospital-management-system
+    component: sync
+    system: data-sync
+data:
+  package-json: |
+    {
+      "name": "hms-data-sync",
+      "version": "1.0.0",
+      "description": "Real-time data synchronization service for Ultimate HMS",
+      "main": "index.js",
+      "scripts": {
+        "start": "node index.js"
+      },
+      "dependencies": {
+        "amqplib": "^0.10.3",
+        "redis": "^4.6.7",
+        "@elastic/elasticsearch": "^8.8.0",
+        "axios": "^1.4.0",
+        "express": "^4.18.2",
+        "prom-client": "^14.2.0",
+        "winston": "^3.8.2",
+        "uuid": "^9.0.0"
+      }
+    }
+
+  index-js: |
+const amqp = require('amqplib');
+const { createClient } = require('redis');
+const fetch = require('node-fetch');
+const promClient = require('prom-client');
+    const { Client: ElasticsearchClient } = require('@elastic/elasticsearch');
+    const axios = require('axios');
+    const express = require('express');
+    const promClient = require('prom-client');
+    const winston = require('winston');
+    const { v4: uuidv4 } = require('uuid');
+
+    // Logger setup
+    const logger = winston.createLogger({
+      level: 'info',
+      format: winston.format.combine(
+        winston.format.timestamp(),
+        winston.format.errors({ stack: true }),
+        winston.format.json()
+      ),
+      transports: [
+        new winston.transports.Console(),
+      ],
+    });
+
+    // Metrics setup
+    const register = new promClient.Registry();
+    promClient.collectDefaultMetrics({ register });
+
+    const syncEventsProcessed = new promClient.Counter({
+      name: 'sync_events_processed_total',
+      help: 'Total number of sync events processed',
+      labelNames: ['type', 'status'],
+      registers: [register],
+    });
+
+    const syncLatency = new promClient.Histogram({
+      name: 'sync_event_duration_seconds',
+      help: 'Duration of sync event processing',
+      labelNames: ['type'],
+      buckets: [0.1, 0.5, 1, 2, 5, 10],
+      registers: [register],
+    });
+
+    class DataSyncService {
+      constructor() {
+        this.rabbitmqConnection = null;
+        this.redisClient = null;
+        this.elasticsearchClient = null;
+        this.openmrsClient = null;
+        this.metasfreshClient = null;
+        this.channels = {};
+      }
+
+      async initialize() {
+        try {
+          logger.info('Initializing Data Sync Service...');
+
+          // Initialize clients
+          await this.initializeClients();
+
+          // Setup message queues
+          await this.setupMessageQueues();
+
+          // Start sync workers
+          await this.startSyncWorkers();
+
+          // Start health check server
+          this.startHealthServer();
+
+          logger.info('Data Sync Service initialized successfully');
+        } catch (error) {
+          logger.error('Failed to initialize Data Sync Service', error);
+          throw error;
+        }
+      }
+
+      async initializeClients() {
+        // RabbitMQ connection
+        this.rabbitmqConnection = await amqp.connect(process.env.RABBITMQ_URL);
+        logger.info('Connected to RabbitMQ');
+
+        // Redis client
+        this.redisClient = createClient({
+          url: process.env.REDIS_URL,
+          password: process.env.REDIS_PASSWORD
+        });
+        await this.redisClient.connect();
+        logger.info('Connected to Redis');
+
+        // Elasticsearch client
+        this.elasticsearchClient = new ElasticsearchClient({
+          node: process.env.ELASTICSEARCH_URL
+        });
+        logger.info('Connected to Elasticsearch');
+
+        // OpenMRS client
+        this.openmrsClient = axios.create({
+          baseURL: process.env.OPENMRS_API_URL,
+          auth: {
+            username: process.env.OPENMRS_USERNAME,
+            password: process.env.OPENMRS_PASSWORD
+          }
+        });
+
+        // Metasfresh client
+        this.metasfreshClient = axios.create({
+          baseURL: process.env.METASFRESH_API_URL,
+          auth: {
+            username: process.env.METASFRESH_USERNAME,
+            password: process.env.METASFRESH_PASSWORD
+          }
+        });
+      }
+
+      async setupMessageQueues() {
+        const channel = await this.rabbitmqConnection.createChannel();
+
+        // Declare exchanges
+        await channel.assertExchange('sync.patient', 'topic', { durable: true });
+        await channel.assertExchange('sync.encounter', 'topic', { durable: true });
+        await channel.assertExchange('sync.businesspartner', 'topic', { durable: true });
+        await channel.assertExchange('sync.product', 'topic', { durable: true });
+        await channel.assertExchange('sync.dlx', 'topic', { durable: true });
+
+        // Declare queues
+        await channel.assertQueue('sync.patient.openmrs', { durable: true });
+        await channel.assertQueue('sync.patient.metasfresh', { durable: true });
+        await channel.assertQueue('sync.encounter.openmrs', { durable: true });
+        await channel.assertQueue('sync.businesspartner.metasfresh', { durable: true });
+        await channel.assertQueue('sync.product.metasfresh', { durable: true });
+        await channel.assertQueue('sync.dead.letter', { durable: true });
+
+        this.channels.main = channel;
+        logger.info('Message queues setup completed');
+      }
+
+      async startSyncWorkers() {
+        // Patient sync workers
+        this.startPatientSyncWorker();
+        this.startEncounterSyncWorker();
+        this.startBusinessPartnerSyncWorker();
+        this.startProductSyncWorker();
+
+        // Periodic sync worker
+        this.startPeriodicSyncWorker();
+      }
+
+      async startPatientSyncWorker() {
+        const channel = await this.rabbitmqConnection.createChannel();
+        await channel.prefetch(10);
+
+        await channel.consume('sync.patient.openmrs', async (msg) => {
+          if (!msg) return;
+
+          const endTimer = syncLatency.startTimer({ type: 'patient' });
+          try {
+            const event = JSON.parse(msg.content.toString());
+            logger.info('Processing patient sync event', { eventId: event.id, type: event.type });
+
+            await this.syncPatientToMetasfresh(event);
+            await channel.ack(msg);
+
+            syncEventsProcessed.inc({ type: 'patient', status: 'success' });
+            endTimer();
+          } catch (error) {
+            logger.error('Failed to sync patient', error);
+            syncEventsProcessed.inc({ type: 'patient', status: 'error' });
+
+            // Send to dead letter queue after retries
+            if (msg.properties.headers && msg.properties.headers['x-death']) {
+              await this.sendToDeadLetterQueue(channel, msg, 'patient');
+            } else {
+              await channel.nack(msg, false, true);
+            }
+            endTimer();
+          }
+        });
+
+        logger.info('Patient sync worker started');
+      }
+
+      async startEncounterSyncWorker() {
+        const channel = await this.rabbitmqConnection.createChannel();
+        await channel.prefetch(10);
+
+        await channel.consume('sync.encounter.openmrs', async (msg) => {
+          if (!msg) return;
+
+          const endTimer = syncLatency.startTimer({ type: 'encounter' });
+          try {
+            const event = JSON.parse(msg.content.toString());
+            logger.info('Processing encounter sync event', { eventId: event.id, type: event.type });
+
+            await this.syncEncounterData(event);
+            await channel.ack(msg);
+
+            syncEventsProcessed.inc({ type: 'encounter', status: 'success' });
+            endTimer();
+          } catch (error) {
+            logger.error('Failed to sync encounter', error);
+            syncEventsProcessed.inc({ type: 'encounter', status: 'error' });
+            await channel.nack(msg, false, true);
+            endTimer();
+          }
+        });
+
+        logger.info('Encounter sync worker started');
+      }
+
+      async startBusinessPartnerSyncWorker() {
+        const channel = await this.rabbitmqConnection.createChannel();
+        await channel.prefetch(10);
+
+        await channel.consume('sync.businesspartner.metasfresh', async (msg) => {
+          if (!msg) return;
+
+          const endTimer = syncLatency.startTimer({ type: 'businesspartner' });
+          try {
+            const event = JSON.parse(msg.content.toString());
+            logger.info('Processing business partner sync event', { eventId: event.id, type: event.type });
+
+            await this.syncBusinessPartnerToOpenMRS(event);
+            await channel.ack(msg);
+
+            syncEventsProcessed.inc({ type: 'businesspartner', status: 'success' });
+            endTimer();
+          } catch (error) {
+            logger.error('Failed to sync business partner', error);
+            syncEventsProcessed.inc({ type: 'businesspartner', status: 'error' });
+            await channel.nack(msg, false, true);
+            endTimer();
+          }
+        });
+
+        logger.info('Business partner sync worker started');
+      }
+
+      async startProductSyncWorker() {
+        const channel = await this.rabbitmqConnection.createChannel();
+        await channel.prefetch(10);
+
+        await channel.consume('sync.product.metasfresh', async (msg) => {
+          if (!msg) return;
+
+          const endTimer = syncLatency.startTimer({ type: 'product' });
+          try {
+            const event = JSON.parse(msg.content.toString());
+            logger.info('Processing product sync event', { eventId: event.id, type: event.type });
+
+            await this.syncProductData(event);
+            await channel.ack(msg);
+
+            syncEventsProcessed.inc({ type: 'product', status: 'success' });
+            endTimer();
+          } catch (error) {
+            logger.error('Failed to sync product', error);
+            syncEventsProcessed.inc({ type: 'product', status: 'error' });
+            await channel.nack(msg, false, true);
+            endTimer();
+          }
+        });
+
+        logger.info('Product sync worker started');
+      }
+
+      async startPeriodicSyncWorker() {
+        const syncInterval = parseInt(process.env.SYNC_INTERVAL) || 30;
+
+        setInterval(async () => {
+          try {
+            logger.info('Running periodic data sync');
+            await this.performPeriodicSync();
+          } catch (error) {
+            logger.error('Periodic sync failed', error);
+          }
+        }, syncInterval * 1000);
+
+        logger.info(`Periodic sync worker started (interval: ${syncInterval}s)`);
+      }
+
+      async syncPatientToMetasfresh(event) {
+        const { patientUuid, action } = event;
+
+        // Get patient data from OpenMRS
+        const patientResponse = await this.openmrsClient.get(`/openmrs/ws/rest/v1/patient/${patientUuid}`);
+        const patient = patientResponse.data;
+
+        // Transform to Metasfresh business partner format
+        const businessPartner = {
+          name: `${patient.person.names[0].givenName} ${patient.person.names[0].familyName}`,
+          value: patient.identifiers[0]?.identifier || patientUuid,
+          addresses: [{
+            address1: patient.person.addresses[0]?.address1 || '',
+            city: patient.person.addresses[0]?.cityVillage || '',
+            postal: patient.person.addresses[0]?.postalCode || '',
+            countryCode: 'US'
+          }],
+          contacts: [{
+            name: patient.person.names[0].givenName,
+            email: '' // Could be extended to include email if available
+          }]
+        };
+
+        // Sync to Metasfresh
+        if (action === 'created') {
+          await this.metasfreshClient.post('/api/business-partners', businessPartner);
+        } else if (action === 'updated') {
+          // Find existing business partner by value
+          const searchResponse = await this.metasfreshClient.get('/api/business-partners', {
+            params: { value: businessPartner.value }
+          });
+          if (searchResponse.data.length > 0) {
+            const existingId = searchResponse.data[0].id;
+            await this.metasfreshClient.put(`/api/business-partners/${existingId}`, businessPartner);
+          }
+        }
+
+        // Index in Elasticsearch
+        await this.elasticsearchClient.index({
+          index: 'patients',
+          id: patientUuid,
+          body: {
+            ...patient,
+            synced_at: new Date().toISOString(),
+            source: 'openmrs'
+          }
+        });
+
+        logger.info(`Patient ${action} sync completed`, { patientUuid });
+      }
+
+      async syncEncounterData(event) {
+        const { encounterUuid, action } = event;
+
+        // Get encounter data from OpenMRS
+        const encounterResponse = await this.openmrsClient.get(`/openmrs/ws/rest/v1/encounter/${encounterUuid}`);
+        const encounter = encounterResponse.data;
+
+        // Store encounter data in Redis for quick access
+        const key = `encounter:${encounterUuid}`;
+        await this.redisClient.setEx(key, 86400, JSON.stringify(encounter)); // 24 hour expiry
+
+        // Index in Elasticsearch
+        await this.elasticsearchClient.index({
+          index: 'encounters',
+          id: encounterUuid,
+          body: {
+            ...encounter,
+            synced_at: new Date().toISOString(),
+            source: 'openmrs'
+          }
+        });
+
+        logger.info(`Encounter ${action} sync completed`, { encounterUuid });
+      }
+
+      async syncBusinessPartnerToOpenMRS(event) {
+        // This would sync business partner data back to OpenMRS if needed
+        // Implementation depends on specific requirements
+        logger.info('Business partner sync to OpenMRS', { event: event.id });
+      }
+
+      async syncProductData(event) {
+        const { productId, action } = event;
+
+        // Get product data from Metasfresh
+        const productResponse = await this.metasfreshClient.get(`/api/products/${productId}`);
+        const product = productResponse.data;
+
+        // Store in Redis cache
+        const key = `product:${productId}`;
+        await this.redisClient.setEx(key, 3600, JSON.stringify(product)); // 1 hour expiry
+
+        // Index in Elasticsearch
+        await this.elasticsearchClient.index({
+          index: 'products',
+          id: productId,
+          body: {
+            ...product,
+            synced_at: new Date().toISOString(),
+            source: 'metasfresh'
+          }
+        });
+
+        logger.info(`Product ${action} sync completed`, { productId });
+      }
+
+      async performPeriodicSync() {
+        try {
+          // Sync any pending changes that might have been missed
+          const pendingPatients = await this.redisClient.keys('pending:sync:patient:*');
+          for (const key of pendingPatients) {
+            const event = JSON.parse(await this.redisClient.get(key));
+            await this.syncPatientToMetasfresh(event);
+            await this.redisClient.del(key);
+          }
+
+          logger.info('Periodic sync completed', { pendingItems: pendingPatients.length });
+        } catch (error) {
+          logger.error('Periodic sync failed', error);
+        }
+      }
+
+      async sendToDeadLetterQueue(channel, msg, type) {
+        try {
+          await channel.publish('sync.dlx', `${type}.failed`, msg.content, {
+            persistent: true,
+            headers: {
+              'x-original-exchange': msg.fields.exchange,
+              'x-original-routing-key': msg.fields.routingKey,
+              'x-death-reason': 'error'
+            }
+          });
+        } catch (error) {
+          logger.error('Failed to send to dead letter queue', error);
+        }
+      }
+
+      startHealthServer() {
+        const app = express();
+
+        app.get('/health', (req, res) => {
+          res.status(200).json({
+            status: 'healthy',
+            timestamp: new Date().toISOString(),
+            version: '1.0.0'
+          });
+        });
+
+        app.get('/metrics', async (req, res) => {
+          try {
+            res.set('Content-Type', register.contentType);
+            res.end(await register.metrics());
+          } catch (error) {
+            res.status(500).end(error);
+          }
+        });
+
+        app.listen(3000, () => {
+          logger.info('Health server started on port 3000');
+        });
+      }
+
+      async publishEvent(exchange, routingKey, data) {
+        try {
+          const event = {
+            id: uuidv4(),
+            timestamp: new Date().toISOString(),
+            ...data
+          };
+
+          await this.channels.main.publish(
+            exchange,
+            routingKey,
+            Buffer.from(JSON.stringify(event)),
+            { persistent: true }
+          );
+
+          logger.info('Event published', { exchange, routingKey, eventId: event.id });
+        } catch (error) {
+          logger.error('Failed to publish event', error);
+          throw error;
+        }
+      }
+
+      async close() {
+        if (this.rabbitmqConnection) {
+          await this.rabbitmqConnection.close();
+        }
+        if (this.redisClient) {
+          await this.redisClient.disconnect();
+        }
+      }
+    }
+
+    // Graceful shutdown
+    process.on('SIGTERM', async () => {
+      logger.info('Received SIGTERM, shutting down gracefully...');
+      if (global.syncService) {
+        await global.syncService.close();
+      }
+      process.exit(0);
+    });
+
+    process.on('SIGINT', async () => {
+      logger.info('Received SIGINT, shutting down gracefully...');
+      if (global.syncService) {
+        await global.syncService.close();
+      }
+      process.exit(0);
+    });
+
+    // Start the service
+    const syncService = new DataSyncService();
+    global.syncService = syncService;
+
+    syncService.initialize().catch((error) => {
+      logger.error('Failed to start Data Sync Service', error);
+      process.exit(1);
+    });

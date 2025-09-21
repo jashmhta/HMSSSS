@@ -1,0 +1,186 @@
+---
+# GraphQL API Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: graphql-api
+  namespace: graphql-system
+  labels:
+    app: hospital-management-system
+    component: api
+    system: graphql
+    service: api
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: hospital-management-system
+      component: api
+      system: graphql
+      service: api
+  template:
+    metadata:
+      labels:
+        app: hospital-management-system
+        component: api
+        system: graphql
+        service: api
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "4000"
+        prometheus.io/path: "/graphql"
+    spec:
+      serviceAccountName: hms-admin
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      initContainers:
+       - name: init-code
+         image: busybox
+         command:
+         - /bin/sh
+         - -c
+         - |
+           mkdir -p /app
+           cp /code/package-json /app/package.json
+           cp /code/index-js /app/index.js
+         volumeMounts:
+         - name: graphql-code
+           mountPath: /code
+           readOnly: true
+         - name: app-code
+           mountPath: /app
+      containers:
+      - name: graphql-api
+        image: node:18-alpine
+        ports:
+        - containerPort: 4000
+          name: graphql
+        env:
+        - name: NODE_ENV
+          value: "production"
+        - name: PORT
+          value: "4000"
+        - name: OPENMRS_API_URL
+          valueFrom:
+            configMapKeyRef:
+              name: graphql-config
+              key: OPENMRS_API_URL
+        - name: METASFRESH_API_URL
+          valueFrom:
+            configMapKeyRef:
+              name: graphql-config
+              key: METASFRESH_API_URL
+        - name: REDIS_URL
+          valueFrom:
+            configMapKeyRef:
+              name: graphql-config
+              key: REDIS_URL
+        - name: ELASTICSEARCH_URL
+          valueFrom:
+            configMapKeyRef:
+              name: graphql-config
+              key: ELASTICSEARCH_URL
+        - name: OPENMRS_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: graphql-secrets
+              key: openmrs-username
+        - name: OPENMRS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: graphql-secrets
+              key: openmrs-password
+        - name: METASFRESH_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: graphql-secrets
+              key: metasfresh-username
+        - name: METASFRESH_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: graphql-secrets
+              key: metasfresh-password
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: graphql-secrets
+              key: jwt-secret
+         - name: REDIS_PASSWORD
+           valueFrom:
+             secretKeyRef:
+               name: graphql-secrets
+               key: redis-password
+         - name: DATABASE_HOST
+           valueFrom:
+             configMapKeyRef:
+               name: graphql-config
+               key: DATABASE_HOST
+         - name: DATABASE_PORT
+           valueFrom:
+             configMapKeyRef:
+               name: graphql-config
+               key: DATABASE_PORT
+         - name: DATABASE_NAME
+           valueFrom:
+             configMapKeyRef:
+               name: graphql-config
+               key: DATABASE_NAME
+         - name: DATABASE_USERNAME
+           valueFrom:
+             secretKeyRef:
+               name: graphql-secrets
+               key: db-username
+         - name: DATABASE_PASSWORD
+           valueFrom:
+             secretKeyRef:
+               name: graphql-secrets
+               key: db-password
+         workingDir: /app
+        command:
+        - /bin/sh
+        - -c
+        - |
+          cd /app
+          npm install
+          npm start
+        volumeMounts:
+        - name: app-code
+          mountPath: /app
+        resources:
+          requests:
+            cpu: 500m
+            memory: 1Gi
+          limits:
+            cpu: 1000m
+            memory: 2Gi
+        livenessProbe:
+          httpGet:
+            path: /graphql
+            port: 4000
+            scheme: HTTP
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          tcpSocket:
+            port: 4000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+      volumes:
+      - name: graphql-code
+        configMap:
+          name: graphql-simple-code
+          defaultMode: 493
+      - name: app-code
+        emptyDir: {}
+

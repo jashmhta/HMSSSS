@@ -1,0 +1,72 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: openmrs-simple-tests
+  namespace: openmrs-system
+  labels:
+    app: hospital-management-system
+    component: clinical
+    system: openmrs
+    test-type: integration
+spec:
+  template:
+    spec:
+      serviceAccountName: hms-admin
+      restartPolicy: Never
+      containers:
+      - name: simple-tests
+        image: curlimages/curl:latest
+        command:
+        - /bin/sh
+        - -c
+        - |
+          set -e
+          echo "🚀 Starting OpenMRS Simple Tests"
+
+          # Wait for OpenMRS to be ready
+          echo "⏳ Waiting for OpenMRS to be ready..."
+          for i in {1..60}; do
+            if curl -s -f http://openmrs.openmrs-system.svc.cluster.local/openmrs/ > /dev/null 2>&1; then
+              echo "✅ OpenMRS is ready"
+              break
+            fi
+            if [ $i -eq 60 ]; then
+              echo "❌ OpenMRS failed to become ready within 5 minutes"
+              exit 1
+            fi
+            sleep 5
+          done
+
+          # Test basic connectivity
+          echo "🌐 Testing Basic Connectivity..."
+          RESPONSE=$(curl -s -w "\n%{http_code}" http://openmrs.openmrs-system.svc.cluster.local/openmrs/)
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+
+          if [ "$HTTP_CODE" -eq 200 ] || [ "$HTTP_CODE" -eq 302 ]; then
+            echo "✅ Basic connectivity test PASSED (HTTP $HTTP_CODE)"
+          else
+            echo "❌ Basic connectivity test FAILED (HTTP $HTTP_CODE)"
+            exit 1
+          fi
+
+          # Test API endpoint (may require authentication)
+          echo "🔗 Testing API Endpoint..."
+          API_RESPONSE=$(curl -s -w "\n%{http_code}" http://openmrs.openmrs-system.svc.cluster.local/openmrs/ws/rest/v1/session)
+          API_CODE=$(echo "$API_RESPONSE" | tail -n1)
+
+          if [ "$API_CODE" -eq 200 ] || [ "$API_CODE" -eq 401 ] || [ "$API_CODE" -eq 302 ]; then
+            echo "✅ API endpoint test PASSED (HTTP $API_CODE)"
+          else
+            echo "❌ API endpoint test FAILED (HTTP $API_CODE)"
+            exit 1
+          fi
+
+          echo "🎉 All OpenMRS simple tests PASSED!"
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi

@@ -1,0 +1,75 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  scrape_timeout: 10s
+
+rule_files:
+  - "alert_rules.yml"
+
+scrape_configs:
+  # The job name is added as a label `job=<job_name>` to any timeseries scraped from this config.
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # HMS Backend API
+  - job_name: 'hms-backend'
+    static_configs:
+      - targets: ['backend:3000']
+    scrape_interval: 10s
+    metrics_path: '/metrics'
+    params:
+      format: ['prometheus']
+
+  # HMS Frontend
+  - job_name: 'hms-frontend'
+    static_configs:
+      - targets: ['frontend:3000']
+    scrape_interval: 30s
+
+  # PostgreSQL Database
+  - job_name: 'postgres'
+    static_configs:
+      - targets: ['postgres-exporter:9187']
+    scrape_interval: 30s
+
+  # Redis Cache
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis-exporter:9121']
+    scrape_interval: 30s
+
+  # Node Exporter
+  - job_name: 'node'
+    static_configs:
+      - targets: ['node-exporter:9100']
+    scrape_interval: 15s
+
+  # Nginx
+  - job_name: 'nginx'
+    static_configs:
+      - targets: ['nginx:9113']
+    scrape_interval: 30s
+
+  # Elasticsearch
+  - job_name: 'elasticsearch'
+    static_configs:
+      - targets: ['elasticsearch:9200']
+    scrape_interval: 30s
+    metrics_path: '/_prometheus/metrics'
+
+  # Logstash
+  - job_name: 'logstash'
+    static_configs:
+      - targets: ['logstash:9600']
+    scrape_interval: 30s
+    metrics_path: '/_node/stats'
+    params:
+      format: ['json']
+
+# Alerting configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          # - alertmanager:9093

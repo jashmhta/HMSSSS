@@ -1,0 +1,205 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: dicom-system
+  labels:
+    app: hospital-management-system
+    component: imaging
+    system: dicom
+    phase: phase2
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: orthanc-config
+  namespace: dicom-system
+  labels:
+    app: hospital-management-system
+    component: imaging
+    system: dicom
+data:
+  orthanc.json: |
+    {
+      "Name": "Ultimate HMS DICOM Server",
+      "StorageDirectory": "/var/lib/orthanc/db",
+      "IndexDirectory": "/var/lib/orthanc/db",
+      "HttpServerEnabled": true,
+      "HttpPort": 8042,
+      "DicomServerEnabled": true,
+      "DicomPort": 4242,
+      "DicomAet": "ULTIMATEHMS",
+      "DicomAlwaysAllowEcho": true,
+      "DicomAlwaysAllowStore": true,
+      "DicomAlwaysAllowFind": true,
+      "DicomAlwaysAllowMove": true,
+      "DicomAlwaysAllowGet": true,
+      "AuthenticationEnabled": false,
+      "RemoteAccessAllowed": true,
+      "LogLevel": "info"
+    }
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: orthanc-secrets
+  namespace: dicom-system
+  labels:
+    app: hospital-management-system
+    component: imaging
+    system: dicom
+type: Opaque
+data:
+  # Orthanc admin credentials
+  orthanc-username: "b3J0aGFuYw=="  # orthanc
+  orthanc-password: "b3J0aGFuY19wYXNzdzByZA=="  # orthanc_passw0rd
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: orthanc-server
+  namespace: dicom-system
+  labels:
+    app: hospital-management-system
+    component: imaging
+    system: dicom
+    service: orthanc
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hospital-management-system
+      component: imaging
+      system: dicom
+      service: orthanc
+  template:
+    metadata:
+      labels:
+        app: hospital-management-system
+        component: imaging
+        system: dicom
+        service: orthanc
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8042"
+        prometheus.io/path: "/statistics"
+    spec:
+      containers:
+      - name: dicom-server
+        image: jodogne/orthanc:latest
+        ports:
+        - containerPort: 8080
+          name: http
+        - containerPort: 11112
+          name: dicom
+        env:
+        - name: DCM4CHEE_ARC_DEVICE_NAME
+          value: "dcm4chee-arc"
+        - name: WILDFLY_CHOWN
+          value: "/opt/wildfly/standalone /opt/wildfly/domain"
+        - name: WILDFLY_WAIT_FOR
+          value: "postgresql:5432"
+        volumeMounts:
+        - name: dicom-storage
+          mountPath: /opt/wildfly/standalone/data
+        resources:
+          requests:
+            cpu: 200m
+            memory: 512Mi
+          limits:
+            cpu: 1000m
+            memory: 2Gi
+        livenessProbe:
+          httpGet:
+            path: /system
+            port: 8042
+            scheme: HTTP
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /system
+            port: 8042
+            scheme: HTTP
+          initialDelaySeconds: 15
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+      volumes:
+      - name: orthanc-config
+        configMap:
+          name: orthanc-config
+          items:
+          - key: orthanc.json
+            path: orthanc.json
+      - name: dicom-storage
+        persistentVolumeClaim:
+          claimName: dicom-storage-pvc
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: orthanc-server
+  namespace: dicom-system
+  labels:
+    app: hospital-management-system
+    component: imaging
+    system: dicom
+    service: orthanc
+spec:
+  selector:
+    app: hospital-management-system
+    component: imaging
+    system: dicom
+    service: orthanc
+  ports:
+  - name: http
+    port: 8080
+    targetPort: 8080
+    protocol: TCP
+  - name: dicom
+    port: 11112
+    targetPort: 11112
+    protocol: TCP
+  type: ClusterIP
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: dicom-storage-pvc
+  namespace: dicom-system
+  labels:
+    app: hospital-management-system
+    component: imaging
+    system: dicom
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 20Gi
+
+---
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: dicom-server-routing
+  namespace: dicom-system
+spec:
+  hosts:
+  - "dicom.hms.local"
+  http:
+  - match:
+    - uri:
+        prefix: "/dcm4chee-arc"
+    route:
+    - destination:
+        host: dicom-server.dicom-system.svc.cluster.local
+        port:
+          number: 8080

@@ -1,0 +1,345 @@
+---
+# Simplified ELK Stack for HMS
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: logstash-config
+  namespace: ultimate-hms
+  labels:
+    app: hospital-management-system
+    component: logging
+data:
+  logstash.yml: |
+    http.host: "0.0.0.0"
+    path.config: /usr/share/logstash/pipeline
+    path.logs: /var/log/logstash
+
+  pipelines.yml: |
+    - pipeline.id: hms-logs
+      path.config: "/usr/share/logstash/pipeline/hms-logs.conf"
+
+  hms-logs.conf: |
+    input {
+      beats {
+        port => 5044
+      }
+      http {
+        port => 8080
+        codec => json
+      }
+    }
+
+    filter {
+      mutate {
+        add_field => {
+          "source" => "hms"
+          "timestamp" => "%{@timestamp}"
+        }
+      }
+    }
+
+    output {
+      elasticsearch {
+        hosts => ["http://elasticsearch-hms:9200"]
+        index => "hms-logs-%{+YYYY.MM.dd}"
+      }
+      stdout {
+        codec => rubydebug
+      }
+    }
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: logstash
+  namespace: ultimate-hms
+  labels:
+    app: hospital-management-system
+    component: logging
+    system: logstash
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hospital-management-system
+      component: logging
+      system: logstash
+  template:
+    metadata:
+      labels:
+        app: hospital-management-system
+        component: logging
+        system: logstash
+    spec:
+      serviceAccountName: hms-admin
+      containers:
+      - name: logstash
+        image: docker.elastic.co/logstash/logstash:8.11.0
+        ports:
+        - containerPort: 5044
+          name: beats
+        - containerPort: 8080
+          name: http
+        env:
+        - name: LS_JAVA_OPTS
+          value: "-Xmx1g -Xms1g"
+        volumeMounts:
+        - name: logstash-config
+          mountPath: /usr/share/logstash/config/logstash.yml
+          subPath: logstash.yml
+        - name: pipelines-config
+          mountPath: /usr/share/logstash/config/pipelines.yml
+          subPath: pipelines.yml
+        - name: pipeline-config
+          mountPath: /usr/share/logstash/pipeline/hms-logs.conf
+          subPath: hms-logs.conf
+        resources:
+          requests:
+            cpu: 500m
+            memory: 2Gi
+          limits:
+            cpu: 1000m
+            memory: 4Gi
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 8080
+          initialDelaySeconds: 60
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+      volumes:
+      - name: logstash-config
+        configMap:
+          name: logstash-config
+          items:
+          - key: logstash.yml
+            path: logstash.yml
+      - name: pipelines-config
+        configMap:
+          name: logstash-config
+          items:
+          - key: pipelines.yml
+            path: pipelines.yml
+      - name: pipeline-config
+        configMap:
+          name: logstash-config
+          items:
+          - key: hms-logs.conf
+            path: hms-logs.conf
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: logstash
+  namespace: ultimate-hms
+  labels:
+    app: hospital-management-system
+    component: logging
+    system: logstash
+spec:
+  selector:
+    app: hospital-management-system
+    component: logging
+    system: logstash
+  ports:
+  - name: beats
+    port: 5044
+    targetPort: 5044
+  - name: http
+    port: 8080
+    targetPort: 8080
+  type: ClusterIP
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kibana
+  namespace: ultimate-hms
+  labels:
+    app: hospital-management-system
+    component: logging
+    system: kibana
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hospital-management-system
+      component: logging
+      system: kibana
+  template:
+    metadata:
+      labels:
+        app: hospital-management-system
+        component: logging
+        system: kibana
+    spec:
+      serviceAccountName: hms-admin
+      containers:
+      - name: kibana
+        image: docker.elastic.co/kibana/kibana:8.11.0
+        ports:
+        - containerPort: 5601
+          name: http
+        env:
+        - name: ELASTICSEARCH_HOSTS
+          value: "http://elasticsearch-hms:9200"
+        volumeMounts:
+        - name: kibana-config
+          mountPath: /usr/share/kibana/config/kibana.yml
+          subPath: kibana.yml
+        resources:
+          requests:
+            cpu: 500m
+            memory: 1Gi
+          limits:
+            cpu: 1000m
+            memory: 2Gi
+        livenessProbe:
+          httpGet:
+            path: /login
+            port: 5601
+          initialDelaySeconds: 60
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /login
+            port: 5601
+          initialDelaySeconds: 30
+          periodSeconds: 10
+      volumes:
+      - name: kibana-config
+        configMap:
+          name: kibana-config
+          items:
+          - key: kibana.yml
+            path: kibana.yml
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kibana-config
+  namespace: ultimate-hms
+  labels:
+    app: hospital-management-system
+    component: logging
+data:
+  kibana.yml: |
+    server.name: kibana
+    server.host: "0.0.0.0"
+    elasticsearch.hosts: ["http://elasticsearch-hms:9200"]
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kibana
+  namespace: ultimate-hms
+  labels:
+    app: hospital-management-system
+    component: logging
+    system: kibana
+spec:
+  selector:
+    app: hospital-management-system
+    component: logging
+    system: kibana
+  ports:
+  - name: http
+    port: 5601
+    targetPort: 5601
+  type: ClusterIP
+
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: filebeat
+  namespace: ultimate-hms
+  labels:
+    app: hospital-management-system
+    component: logging
+    system: filebeat
+spec:
+  selector:
+    matchLabels:
+      app: hospital-management-system
+      component: logging
+      system: filebeat
+  template:
+    metadata:
+      labels:
+        app: hospital-management-system
+        component: logging
+        system: filebeat
+    spec:
+      serviceAccountName: hms-admin
+      securityContext:
+        runAsUser: 0
+      containers:
+      - name: filebeat
+        image: docker.elastic.co/beats/filebeat:8.11.0
+        args: [
+          "-c", "/etc/filebeat.yml",
+          "-e",
+        ]
+        volumeMounts:
+        - name: filebeat-config
+          mountPath: /etc/filebeat.yml
+          subPath: filebeat.yml
+        - name: varlogcontainers
+          mountPath: /var/log/containers
+        - name: varlogpods
+          mountPath: /var/log/pods
+        resources:
+          requests:
+            cpu: 100m
+            memory: 100Mi
+          limits:
+            cpu: 1000m
+            memory: 200Mi
+      volumes:
+      - name: filebeat-config
+        configMap:
+          name: filebeat-config
+      - name: varlogcontainers
+        hostPath:
+          path: /var/log/containers
+      - name: varlogpods
+        hostPath:
+          path: /var/log/pods
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: filebeat-config
+  namespace: ultimate-hms
+  labels:
+    app: hospital-management-system
+    component: logging
+data:
+  filebeat.yml: |
+    filebeat.inputs:
+    - type: container
+      paths:
+        - /var/log/containers/*.log
+      processors:
+        - add_kubernetes_metadata:
+            host: ${NODE_NAME}
+            matchers:
+            - logs_path:
+                logs_path: "/var/log/containers/"
+
+    output.logstash:
+      hosts: ["logstash:5044"]
+
+    logging.level: info

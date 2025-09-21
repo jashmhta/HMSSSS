@@ -1,0 +1,407 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: '18'
+  POSTGRES_DB: hms_test
+  POSTGRES_USER: postgres
+  POSTGRES_PASSWORD: postgres
+  REDIS_URL: redis://localhost:6379
+
+jobs:
+  # Quality Checks
+  quality-check:
+    name: Code Quality & Security
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm run install:all
+
+      - name: Run linting
+        run: npm run lint:all
+
+      - name: Run type checking
+        run: npm run typecheck:all
+
+      - name: Security audit
+        run: npm audit --audit-level=moderate
+
+      - name: Check formatting
+        run: npm run format:check
+
+  # Unit Tests
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: ${{ env.POSTGRES_DB }}
+          POSTGRES_USER: ${{ env.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: --health-cmd "redis-cli ping" --health-interval 10s --health-timeout 5s --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm run install:all
+
+      - name: Setup database
+        run: |
+          npm run db:push
+          npm run db:seed:test
+        working-directory: ./backend
+
+      - name: Run backend unit tests
+        run: npm run test:unit
+        working-directory: ./backend
+
+      - name: Run frontend unit tests
+        run: npm run test:unit
+        working-directory: ./frontend
+
+      - name: Run mobile unit tests
+        run: npm run test:unit
+        working-directory: ./mobile
+
+      - name: Upload coverage reports
+        uses: codecov/codecov-action@v3
+        with:
+          directory: ./coverage
+          flags: unit-tests
+          name: Unit Tests Coverage
+
+  # Integration Tests
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: ${{ env.POSTGRES_DB }}
+          POSTGRES_USER: ${{ env.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: --health-cmd "redis-cli ping" --health-interval 10s --health-timeout 5s --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm run install:all
+
+      - name: Setup database
+        run: |
+          npm run db:push
+          npm run db:seed:test
+        working-directory: ./backend
+
+      - name: Run backend integration tests
+        run: npm run test:integration
+        working-directory: ./backend
+
+      - name: Run frontend integration tests
+        run: npm run test:integration
+        working-directory: ./frontend
+
+  # E2E Tests
+  e2e-tests:
+    name: End-to-End Tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: ${{ env.POSTGRES_DB }}
+          POSTGRES_USER: ${{ env.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: --health-cmd "redis-cli ping" --health-interval 10s --health-timeout 5s --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm run install:all
+
+      - name: Setup database
+        run: |
+          npm run db:push
+          npm run db:seed:test
+        working-directory: ./backend
+
+      - name: Build backend
+        run: npm run build
+        working-directory: ./backend
+
+      - name: Build frontend
+        run: npm run build
+        working-directory: ./frontend
+
+      - name: Run E2E tests
+        run: npm run test:e2e
+        working-directory: ./frontend
+
+  # Performance Tests
+  performance-tests:
+    name: Performance Tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: ${{ env.POSTGRES_DB }}
+          POSTGRES_USER: ${{ env.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: --health-cmd "redis-cli ping" --health-interval 10s --health-timeout 5s --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm run install:all
+
+      - name: Setup database
+        run: |
+          npm run db:push
+          npm run db:seed:test
+        working-directory: ./backend
+
+      - name: Build applications
+        run: npm run build:all
+
+      - name: Run performance tests
+        run: npm run test:performance
+
+  # Security Tests
+  security-tests:
+    name: Security Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm run install:all
+
+      - name: Run security tests
+        run: npm run test:security
+
+      - name: Run dependency vulnerability scan
+        run: npm audit --audit-level=high
+
+      - name: CodeQL Analysis
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+
+  # Build & Deploy (only on main branch)
+  build-and-deploy:
+    name: Build & Deploy
+    runs-on: ubuntu-latest
+    needs: [quality-check, unit-tests, integration-tests, e2e-tests, performance-tests, security-tests]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment: production
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm run install:all
+
+      - name: Build backend
+        run: npm run build
+        working-directory: ./backend
+
+      - name: Build frontend
+        run: npm run build
+        working-directory: ./frontend
+
+      - name: Build mobile
+        run: npm run build
+        working-directory: ./mobile
+
+      - name: Run Docker build
+        run: docker-compose build
+
+      - name: Push to Docker Registry
+        run: |
+          echo ${{ secrets.DOCKER_PASSWORD }} | docker login -u ${{ secrets.DOCKER_USERNAME }} --password-stdin
+          docker-compose push
+
+      - name: Deploy to production
+        run: |
+          echo "Deploying to production environment"
+          # Add your deployment commands here
+          # Example: kubectl apply -f infrastructure/kubernetes/
+          # Example: docker-compose up -d
+
+  # Release (only on tagged releases)
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    needs: [build-and-deploy]
+    if: github.event_name == 'push' && contains(github.ref, 'refs/tags/v')
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          echo "Generating changelog for ${{ github.ref_name }}"
+          # Add changelog generation logic here
+
+      - name: Create GitHub Release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref_name }}
+          release_name: Release ${{ github.ref_name }}
+          body: |
+            ## Changes in this release
+            ${{ steps.changelog.outputs.content }}
+
+            ## Deployment
+            - Docker images pushed to registry
+            - Production deployment completed
+          draft: false
+          prerelease: false
+
+  # Documentation
+  docs:
+    name: Build Documentation
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm run install:all
+
+      - name: Build API documentation
+        run: npm run docs:build
+        working-directory: ./backend
+
+      - name: Deploy documentation
+        uses: peaceiris/actions-gh-pages@v3
+        if: github.ref == 'refs/heads/main'
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./docs/build
+          cname: docs.hms-system.com

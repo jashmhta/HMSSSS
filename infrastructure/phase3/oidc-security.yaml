@@ -1,0 +1,843 @@
+---
+# Advanced Security - OIDC and RBAC - Phase 3
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: security-system
+  labels:
+    app: hospital-management-system
+    component: security
+    system: security
+    phase: phase3
+
+---
+# Keycloak Deployment for OIDC
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: keycloak
+  namespace: security-system
+  labels:
+    app: hospital-management-system
+    component: security
+    system: keycloak
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hospital-management-system
+      component: security
+      system: keycloak
+  template:
+    metadata:
+      labels:
+        app: hospital-management-system
+        component: security
+        system: keycloak
+    spec:
+      containers:
+      - name: keycloak
+        image: quay.io/keycloak/keycloak:22.0
+        ports:
+        - containerPort: 8080
+          name: http
+        env:
+        - name: KEYCLOAK_ADMIN
+          value: "admin"
+        - name: KEYCLOAK_ADMIN_PASSWORD
+          value: "admin_passw0rd"
+        - name: KC_DB
+          value: "postgres"
+        - name: KC_DB_URL
+          value: "jdbc:postgresql://postgresql-hms.ultimate-hms.svc.cluster.local:5432/keycloak"
+        - name: KC_DB_USERNAME
+          value: "hms_user"
+        - name: KC_DB_PASSWORD
+          value: "hms_user_password"
+        - name: KC_HOSTNAME
+          value: "auth.hms.local"
+        command:
+        - /opt/keycloak/bin/kc.sh
+        - start-dev
+        resources:
+          requests:
+            cpu: 500m
+            memory: 1Gi
+          limits:
+            cpu: 1000m
+            memory: 2Gi
+        livenessProbe:
+          httpGet:
+            path: /health/ready
+            port: 8080
+          initialDelaySeconds: 60
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /health/ready
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: keycloak
+  namespace: security-system
+  labels:
+    app: hospital-management-system
+    component: security
+    system: keycloak
+spec:
+  selector:
+    app: hospital-management-system
+    component: security
+    system: keycloak
+  ports:
+  - name: http
+    port: 80
+    targetPort: 8080
+    protocol: TCP
+  type: ClusterIP
+
+---
+# Keycloak Ingress
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: keycloak-ingress
+  namespace: security-system
+  labels:
+    app: hospital-management-system
+    component: security
+    system: keycloak
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - auth.hms.local
+    secretName: keycloak-tls
+  rules:
+  - host: auth.hms.local
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: keycloak
+            port:
+              number: 80
+
+---
+# RBAC Service for Advanced Authorization
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rbac-service
+  namespace: security-system
+  labels:
+    app: hospital-management-system
+    component: security
+    system: rbac
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: hospital-management-system
+      component: security
+      system: rbac
+  template:
+    metadata:
+      labels:
+        app: hospital-management-system
+        component: security
+        system: rbac
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "3003"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: default
+      initContainers:
+      - name: init-rbac-code
+        image: node:18-alpine
+        command:
+        - /bin/sh
+        - -c
+        - |
+          mkdir -p /app
+          cd /app
+          cat > package.json << 'EOF'
+          {
+            "name": "hms-rbac-service",
+            "version": "1.0.0",
+            "description": "RBAC Service for Ultimate HMS",
+            "main": "index.js",
+            "scripts": {
+              "start": "node index.js"
+            },
+            "dependencies": {
+              "express": "^4.18.2",
+              "pg": "^8.11.0",
+              "redis": "^4.6.0",
+              "jsonwebtoken": "^9.0.0",
+              "casbin": "^5.24.0",
+              "axios": "^1.4.0"
+            }
+          }
+          EOF
+
+          cat > index.js << 'EOF'
+          const express = require('express');
+          const { Pool } = require('pg');
+          const { createClient } = require('redis');
+          const jwt = require('jsonwebtoken');
+          const { newEnforcer, StringAdapter } = require('casbin');
+
+          const app = express();
+          app.use(express.json());
+
+          // Database connections
+          const pool = new Pool({
+            host: process.env.DATABASE_HOST,
+            port: process.env.DATABASE_PORT,
+            database: process.env.DATABASE_NAME,
+            user: process.env.DATABASE_USERNAME,
+            password: process.env.DATABASE_PASSWORD,
+            max: 20
+          });
+
+          const redis = createClient({
+            url: process.env.REDIS_URL,
+            password: process.env.REDIS_PASSWORD
+          });
+
+          // Casbin enforcer for RBAC
+          let enforcer;
+
+          async function initCasbin() {
+            // RBAC model
+            const model = `
+            [request_definition]
+            r = sub, obj, act
+
+            [policy_definition]
+            p = sub, obj, act
+
+            [role_definition]
+            g = _, _
+
+            [policy_effect]
+            e = some(where (p.eft == allow))
+
+            [matchers]
+            m = g(r.sub, p.sub) && r.obj == p.obj && r.act == p.act
+            `;
+
+            enforcer = await newEnforcer(StringAdapter.newAdapter(model));
+
+            // Add default policies
+            await enforcer.addPolicy('admin', '*', '*');
+            await enforcer.addPolicy('doctor', 'patient', 'read');
+            await enforcer.addPolicy('doctor', 'patient', 'write');
+            await enforcer.addPolicy('doctor', 'appointment', '*');
+            await enforcer.addPolicy('patient', 'patient', 'read');
+            await enforcer.addPolicy('patient', 'appointment', 'read');
+            await enforcer.addPolicy('nurse', 'patient', 'read');
+            await enforcer.addPolicy('nurse', 'appointment', 'write');
+
+            // Add role assignments
+            await enforcer.addGroupingPolicy('user-admin', 'admin');
+            await enforcer.addGroupingPolicy('user-doctor', 'doctor');
+            await enforcer.addGroupingPolicy('user-patient', 'patient');
+            await enforcer.addGroupingPolicy('user-nurse', 'nurse');
+
+            console.log('Casbin RBAC initialized');
+          }
+
+          // Authentication middleware
+          const authenticateToken = (req, res, next) => {
+            const authHeader = req.headers['authorization'];
+            const token = authHeader && authHeader.split(' ')[1];
+
+            if (!token) return res.sendStatus(401);
+
+            jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
+              if (err) return res.sendStatus(403);
+              req.user = user;
+              next();
+            });
+          };
+
+          // Authorization middleware
+          const authorize = (resource, action) => {
+            return async (req, res, next) => {
+              try {
+                const userRole = req.user.role;
+                const allowed = await enforcer.enforce(userRole, resource, action);
+
+                if (!allowed) {
+                  return res.status(403).json({ error: 'Access denied' });
+                }
+
+                next();
+              } catch (error) {
+                console.error('Authorization error:', error);
+                res.status(500).json({ error: 'Authorization failed' });
+              }
+            };
+          };
+
+          // Health checks
+          app.get('/health', (req, res) => {
+            res.json({ status: 'healthy', service: 'rbac' });
+          });
+
+          app.get('/ready', (req, res) => {
+            res.json({ status: 'ready', service: 'rbac' });
+          });
+
+          // RBAC APIs
+          app.get('/api/v1/rbac/check', authenticateToken, async (req, res) => {
+            try {
+              const { resource, action } = req.query;
+              const allowed = await enforcer.enforce(req.user.role, resource, action);
+              res.json({ allowed });
+            } catch (error) {
+              console.error('RBAC check error:', error);
+              res.status(500).json({ error: 'RBAC check failed' });
+            }
+          });
+
+          app.post('/api/v1/rbac/policies', authenticateToken, authorize('rbac', 'write'), async (req, res) => {
+            try {
+              const { subject, object, action } = req.body;
+              await enforcer.addPolicy(subject, object, action);
+              res.json({ success: true });
+            } catch (error) {
+              console.error('Add policy error:', error);
+              res.status(500).json({ error: 'Failed to add policy' });
+            }
+          });
+
+          app.get('/api/v1/rbac/policies', authenticateToken, authorize('rbac', 'read'), async (req, res) => {
+            try {
+              const policies = await enforcer.getPolicy();
+              res.json(policies);
+            } catch (error) {
+              console.error('Get policies error:', error);
+              res.status(500).json({ error: 'Failed to get policies' });
+            }
+          });
+
+          app.post('/api/v1/rbac/roles', authenticateToken, authorize('rbac', 'write'), async (req, res) => {
+            try {
+              const { user, role } = req.body;
+              await enforcer.addGroupingPolicy(user, role);
+              res.json({ success: true });
+            } catch (error) {
+              console.error('Add role error:', error);
+              res.status(500).json({ error: 'Failed to assign role' });
+            }
+          });
+
+          // Tenant-aware user management
+          app.get('/api/v1/users', authenticateToken, authorize('user', 'read'), async (req, res) => {
+            try {
+              const tenantId = req.headers['x-tenant-id'] || 'default';
+              const schema = tenantId === 'default' ? 'public' : `tenant_${tenantId.replace('-', '_')}`;
+
+              const client = await pool.connect();
+              try {
+                await client.query(`SET search_path TO ${schema}`);
+
+                const result = await client.query(`
+                  SELECT id, email, first_name, last_name, role, created_at
+                  FROM users
+                  ORDER BY created_at DESC
+                `);
+
+                res.json(result.rows);
+              } finally {
+                client.release();
+              }
+            } catch (error) {
+              console.error('Get users error:', error);
+              res.status(500).json({ error: 'Failed to fetch users' });
+            }
+          });
+
+          // Initialize Casbin on startup
+          initCasbin().then(() => {
+            const PORT = process.env.PORT || 3003;
+            app.listen(PORT, () => {
+              console.log(`🚀 RBAC service running on port ${PORT}`);
+            });
+          }).catch(console.error);
+          EOF
+        volumeMounts:
+        - name: app-code
+          mountPath: /app
+      containers:
+      - name: rbac-service
+        image: node:18-alpine
+        ports:
+        - containerPort: 3003
+          name: http
+        env:
+        - name: NODE_ENV
+          value: "production"
+        - name: PORT
+          value: "3003"
+        - name: DATABASE_HOST
+          value: "postgresql-hms.ultimate-hms.svc.cluster.local"
+        - name: DATABASE_PORT
+          value: "5432"
+        - name: DATABASE_NAME
+          value: "hms_db"
+        - name: DATABASE_USERNAME
+          value: "hms_user"
+        - name: DATABASE_PASSWORD
+          value: "hms_user_password"
+        - name: REDIS_URL
+          value: "redis://redis.graphql-system.svc.cluster.local:6379"
+        - name: REDIS_PASSWORD
+          value: "redis_passw0rd"
+        - name: JWT_SECRET
+          value: "cmJhYy1qd3Qtc2VjcmV0LWtleQ=="
+        workingDir: /app
+        command:
+        - /bin/sh
+        - -c
+        - |
+          cd /app
+          npm install
+          npm start
+        volumeMounts:
+        - name: app-code
+          mountPath: /app
+        resources:
+          requests:
+            cpu: 200m
+            memory: 512Mi
+          limits:
+            cpu: 500m
+            memory: 1Gi
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3003
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 3003
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+      volumes:
+      - name: app-code
+        emptyDir: {}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rbac-service
+  namespace: security-system
+  labels:
+    app: hospital-management-system
+    component: security
+    system: rbac
+spec:
+  selector:
+    app: hospital-management-system
+    component: security
+    system: rbac
+  ports:
+  - name: http
+    port: 80
+    targetPort: 3003
+    protocol: TCP
+  type: ClusterIP
+
+---
+# Security Audit Service
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: security-audit
+  namespace: security-system
+  labels:
+    app: hospital-management-system
+    component: security
+    system: audit
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hospital-management-system
+      component: security
+      system: audit
+  template:
+    metadata:
+      labels:
+        app: hospital-management-system
+        component: security
+        system: audit
+    spec:
+      serviceAccountName: default
+      initContainers:
+      - name: init-audit-code
+        image: node:18-alpine
+        command:
+        - /bin/sh
+        - -c
+        - |
+          mkdir -p /app
+          cd /app
+          cat > package.json << 'EOF'
+          {
+            "name": "hms-security-audit",
+            "version": "1.0.0",
+            "description": "Security Audit Service for Ultimate HMS",
+            "main": "index.js",
+            "scripts": {
+              "start": "node index.js"
+            },
+            "dependencies": {
+              "express": "^4.18.2",
+              "pg": "^8.11.0",
+              "redis": "^4.6.0",
+              "axios": "^1.4.0",
+              "node-cron": "^3.0.2"
+            }
+          }
+          EOF
+
+          cat > index.js << 'EOF'
+          const express = require('express');
+          const { Pool } = require('pg');
+          const { createClient } = require('redis');
+          const axios = require('axios');
+          const cron = require('node-cron');
+
+          const app = express();
+          app.use(express.json());
+
+          // Database connections
+          const pool = new Pool({
+            host: process.env.DATABASE_HOST,
+            port: process.env.DATABASE_PORT,
+            database: process.env.DATABASE_NAME,
+            user: process.env.DATABASE_USERNAME,
+            password: process.env.DATABASE_PASSWORD,
+            max: 20
+          });
+
+          const redis = createClient({
+            url: process.env.REDIS_URL,
+            password: process.env.REDIS_PASSWORD
+          });
+
+          // Health checks
+          app.get('/health', (req, res) => {
+            res.json({ status: 'healthy', service: 'security-audit' });
+          });
+
+          app.get('/ready', (req, res) => {
+            res.json({ status: 'ready', service: 'security-audit' });
+          });
+
+          // Audit logging
+          app.use(async (req, res, next) => {
+            const start = Date.now();
+
+            res.on('finish', async () => {
+              try {
+                const auditLog = {
+                  timestamp: new Date().toISOString(),
+                  method: req.method,
+                  url: req.url,
+                  userAgent: req.get('User-Agent'),
+                  ip: req.ip,
+                  userId: req.user?.id || 'anonymous',
+                  tenantId: req.headers['x-tenant-id'] || 'default',
+                  statusCode: res.statusCode,
+                  responseTime: Date.now() - start,
+                  userRole: req.user?.role || 'unknown'
+                };
+
+                // Store in database
+                const client = await pool.connect();
+                try {
+                  await client.query(`
+                    INSERT INTO audit_logs (
+                      timestamp, method, url, user_agent, ip_address,
+                      user_id, tenant_id, status_code, response_time, user_role
+                    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+                  `, [
+                    auditLog.timestamp, auditLog.method, auditLog.url, auditLog.userAgent,
+                    auditLog.ip, auditLog.userId, auditLog.tenantId, auditLog.statusCode,
+                    auditLog.responseTime, auditLog.userRole
+                  ]);
+                } finally {
+                  client.release();
+                }
+
+                // Store in Redis for quick access
+                await redis.lpush('audit_logs', JSON.stringify(auditLog));
+                await redis.ltrim('audit_logs', 0, 999); // Keep last 1000 entries
+
+              } catch (error) {
+                console.error('Audit logging error:', error);
+              }
+            });
+
+            next();
+          });
+
+          // Security monitoring endpoints
+          app.get('/api/v1/audit/logs', async (req, res) => {
+            try {
+              const { limit = 100, tenantId } = req.query;
+
+              let query = `
+                SELECT * FROM audit_logs
+                WHERE 1=1
+              `;
+              const params = [];
+              let paramIndex = 1;
+
+              if (tenantId) {
+                query += ` AND tenant_id = $${paramIndex}`;
+                params.push(tenantId);
+                paramIndex++;
+              }
+
+              query += ` ORDER BY timestamp DESC LIMIT $${paramIndex}`;
+              params.push(parseInt(limit));
+
+              const client = await pool.connect();
+              try {
+                const result = await client.query(query, params);
+                res.json(result.rows);
+              } finally {
+                client.release();
+              }
+            } catch (error) {
+              console.error('Get audit logs error:', error);
+              res.status(500).json({ error: 'Failed to fetch audit logs' });
+            }
+          });
+
+          app.get('/api/v1/security/threats', async (req, res) => {
+            try {
+              const client = await pool.connect();
+              try {
+                // Detect suspicious patterns
+                const suspiciousIPs = await client.query(`
+                  SELECT ip_address, COUNT(*) as request_count,
+                         COUNT(CASE WHEN status_code >= 400 THEN 1 END) as error_count
+                  FROM audit_logs
+                  WHERE timestamp > NOW() - INTERVAL '1 hour'
+                  GROUP BY ip_address
+                  HAVING COUNT(*) > 100 OR COUNT(CASE WHEN status_code >= 400 THEN 1 END) > 20
+                  ORDER BY request_count DESC
+                  LIMIT 10
+                `);
+
+                const failedLogins = await client.query(`
+                  SELECT ip_address, COUNT(*) as failed_attempts
+                  FROM audit_logs
+                  WHERE url LIKE '%login%' AND status_code = 401
+                  AND timestamp > NOW() - INTERVAL '1 hour'
+                  GROUP BY ip_address
+                  HAVING COUNT(*) > 5
+                  ORDER BY failed_attempts DESC
+                  LIMIT 10
+                `);
+
+                res.json({
+                  suspiciousIPs: suspiciousIPs.rows,
+                  failedLogins: failedLogins.rows,
+                  timestamp: new Date().toISOString()
+                });
+              } finally {
+                client.release();
+              }
+            } catch (error) {
+              console.error('Security threats error:', error);
+              res.status(500).json({ error: 'Failed to analyze security threats' });
+            }
+          });
+
+          // Compliance reporting
+          app.get('/api/v1/compliance/hipaa', async (req, res) => {
+            try {
+              const client = await pool.connect();
+              try {
+                const report = await client.query(`
+                  SELECT
+                    COUNT(CASE WHEN method = 'GET' AND url LIKE '%patient%' THEN 1 END) as patient_data_access,
+                    COUNT(CASE WHEN status_code = 401 THEN 1 END) as unauthorized_access_attempts,
+                    COUNT(CASE WHEN url LIKE '%login%' THEN 1 END) as authentication_events,
+                    COUNT(DISTINCT user_id) as active_users,
+                    AVG(response_time) as avg_response_time
+                  FROM audit_logs
+                  WHERE timestamp > NOW() - INTERVAL '30 days'
+                `);
+
+                res.json({
+                  period: 'Last 30 days',
+                  metrics: report.rows[0],
+                  compliance: {
+                    patientDataAccessLogged: report.rows[0].patient_data_access > 0,
+                    unauthorizedAccessBlocked: report.rows[0].unauthorized_access_attempts > 0,
+                    authenticationAudited: report.rows[0].authentication_events > 0,
+                    userActivityMonitored: report.rows[0].active_users > 0
+                  }
+                });
+              } finally {
+                client.release();
+              }
+            } catch (error) {
+              console.error('HIPAA compliance error:', error);
+              res.status(500).json({ error: 'Failed to generate compliance report' });
+            }
+          });
+
+          // Automated security checks (runs every hour)
+          cron.schedule('0 * * * *', async () => {
+            try {
+              console.log('Running automated security checks...');
+
+              const client = await pool.connect();
+              try {
+                // Check for unusual activity patterns
+                const unusualActivity = await client.query(`
+                  SELECT tenant_id, COUNT(*) as activity_count
+                  FROM audit_logs
+                  WHERE timestamp > NOW() - INTERVAL '1 hour'
+                  GROUP BY tenant_id
+                  HAVING COUNT(*) > 1000
+                `);
+
+                if (unusualActivity.rows.length > 0) {
+                  console.warn('Unusual activity detected:', unusualActivity.rows);
+                  // In production, send alerts here
+                }
+
+                // Clean up old logs (keep last 90 days)
+                await client.query(`
+                  DELETE FROM audit_logs
+                  WHERE timestamp < NOW() - INTERVAL '90 days'
+                `);
+
+                console.log('Security checks completed');
+              } finally {
+                client.release();
+              }
+            } catch (error) {
+              console.error('Security check error:', error);
+            }
+          });
+
+          const PORT = process.env.PORT || 3004;
+          app.listen(PORT, () => {
+            console.log(`🚀 Security audit service running on port ${PORT}`);
+          });
+          EOF
+        volumeMounts:
+        - name: app-code
+          mountPath: /app
+      containers:
+      - name: security-audit
+        image: node:18-alpine
+        ports:
+        - containerPort: 3004
+          name: http
+        env:
+        - name: NODE_ENV
+          value: "production"
+        - name: PORT
+          value: "3004"
+        - name: DATABASE_HOST
+          value: "postgresql-hms.ultimate-hms.svc.cluster.local"
+        - name: DATABASE_PORT
+          value: "5432"
+        - name: DATABASE_NAME
+          value: "hms_db"
+        - name: DATABASE_USERNAME
+          value: "hms_user"
+        - name: DATABASE_PASSWORD
+          value: "hms_user_password"
+        - name: REDIS_URL
+          value: "redis://redis.graphql-system.svc.cluster.local:6379"
+        - name: REDIS_PASSWORD
+          value: "redis_passw0rd"
+        workingDir: /app
+        command:
+        - /bin/sh
+        - -c
+        - |
+          cd /app
+          npm install
+          npm start
+        volumeMounts:
+        - name: app-code
+          mountPath: /app
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 200m
+            memory: 512Mi
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3004
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 3004
+          initialDelaySeconds: 15
+          periodSeconds: 10
+          timeoutSeconds: 5
+      volumes:
+      - name: app-code
+        emptyDir: {}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: security-audit
+  namespace: security-system
+  labels:
+    app: hospital-management-system
+    component: security
+    system: audit
+spec:
+  selector:
+    app: hospital-management-system
+    component: security
+    system: audit
+  ports:
+  - name: http
+    port: 80
+    targetPort: 3004
+    protocol: TCP
+  type: ClusterIP

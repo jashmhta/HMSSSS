@@ -1,0 +1,75 @@
+---
+# Metasfresh RBAC Configuration
+# Service Account and Role Bindings for Metasfresh namespace
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: hms-admin
+  namespace: metasfresh-system
+  labels:
+    app: hospital-management-system
+    component: erp
+    system: metasfresh
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: metasfresh-admin-role
+  namespace: metasfresh-system
+  labels:
+    app: hospital-management-system
+    component: erp
+    system: metasfresh
+rules:
+- apiGroups: [""]
+  resources: ["pods", "services", "endpoints", "configmaps", "secrets", "persistentvolumeclaims"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["apps"]
+  resources: ["deployments", "replicasets", "statefulsets"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["batch"]
+  resources: ["jobs", "cronjobs"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["networking.k8s.io"]
+  resources: ["ingresses"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: metasfresh-admin-binding
+  namespace: metasfresh-system
+  labels:
+    app: hospital-management-system
+    component: erp
+    system: metasfresh
+subjects:
+- kind: ServiceAccount
+  name: hms-admin
+  namespace: metasfresh-system
+roleRef:
+  kind: Role
+  name: metasfresh-admin-role
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# Cluster Role Binding for cross-namespace access (PostgreSQL in ultimate-hms)
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: metasfresh-postgres-access
+  labels:
+    app: hospital-management-system
+    component: erp
+    system: metasfresh
+subjects:
+- kind: ServiceAccount
+  name: hms-admin
+  namespace: metasfresh-system
+roleRef:
+  kind: ClusterRole
+  name: hms-admin-role
+  apiGroup: rbac.authorization.k8s.io

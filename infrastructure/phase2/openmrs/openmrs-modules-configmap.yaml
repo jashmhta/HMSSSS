@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: openmrs-modules
+  namespace: openmrs-system
+  labels:
+    app: hospital-management-system
+    component: clinical
+    system: openmrs
+data:
+  # HMS Sync Module files would be included here
+  # In a real deployment, the compiled .omod file would be base64 encoded
+  hms-sync-module.jar: |
+    # Placeholder for compiled module JAR
+    # This would contain the compiled HmsSyncActivator class and dependencies

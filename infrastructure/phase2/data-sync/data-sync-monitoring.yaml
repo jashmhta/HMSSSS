@@ -1,0 +1,119 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: data-sync-service
+  namespace: data-sync-system
+  labels:
+    app: hospital-management-system
+    component: sync
+    system: data-sync
+    service: sync
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "3000"
+    prometheus.io/path: "/metrics"
+spec:
+  selector:
+    app: hospital-management-system
+    component: sync
+    system: data-sync
+    service: sync
+  ports:
+  - name: http
+    port: 3000
+    targetPort: 3000
+    protocol: TCP
+  - name: health
+    port: 8080
+    targetPort: 8080
+    protocol: TCP
+  type: ClusterIP
+
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: data-sync-service-monitor
+  namespace: monitoring
+  labels:
+    app: hospital-management-system
+    component: sync
+    system: data-sync
+spec:
+  selector:
+    matchLabels:
+      app: hospital-management-system
+      component: sync
+      system: data-sync
+      service: sync
+  namespaceSelector:
+    matchNames:
+    - data-sync-system
+  endpoints:
+  - port: http
+    path: /metrics
+    interval: 30s
+    scrapeTimeout: 10s
+  - port: health
+    path: /health
+    interval: 60s
+    scrapeTimeout: 10s
+
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: data-sync-alerts
+  namespace: monitoring
+  labels:
+    app: hospital-management-system
+    component: sync
+    system: data-sync
+spec:
+  groups:
+  - name: data-sync
+    rules:
+    - alert: DataSyncServiceDown
+      expr: up{job="data-sync-service"} == 0
+      for: 5m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Data Sync Service is down"
+        description: "Data Sync Service has been down for more than 5 minutes"
+
+    - alert: DataSyncHighErrorRate
+      expr: rate(sync_errors_total[5m]) > 0.1
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "High error rate in Data Sync Service"
+        description: "Data Sync Service error rate is above 10% for 5 minutes"
+
+    - alert: DataSyncQueueBacklog
+      expr: sync_queue_size > 1000
+      for: 10m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Data Sync queue backlog"
+        description: "Data Sync queue has more than 1000 pending items"
+
+    - alert: DataSyncRabbitMQDisconnected
+      expr: rabbitmq_connection_status == 0
+      for: 2m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Data Sync RabbitMQ connection lost"
+        description: "Data Sync Service lost connection to RabbitMQ"
+
+    - alert: DataSyncRedisDisconnected
+      expr: redis_connection_status == 0
+      for: 2m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Data Sync Redis connection lost"
+        description: "Data Sync Service lost connection to Redis"

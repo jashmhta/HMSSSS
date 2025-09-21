@@ -1,0 +1,75 @@
+---
+# Data Sync RBAC Configuration
+# Service Account and Role Bindings for Data Sync namespace
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: hms-admin
+  namespace: data-sync-system
+  labels:
+    app: hospital-management-system
+    component: sync
+    system: data-sync
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: data-sync-admin-role
+  namespace: data-sync-system
+  labels:
+    app: hospital-management-system
+    component: sync
+    system: data-sync
+rules:
+- apiGroups: [""]
+  resources: ["pods", "services", "endpoints", "configmaps", "secrets", "persistentvolumeclaims"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["apps"]
+  resources: ["deployments", "replicasets", "statefulsets"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["batch"]
+  resources: ["jobs", "cronjobs"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["networking.k8s.io"]
+  resources: ["ingresses"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: data-sync-admin-binding
+  namespace: data-sync-system
+  labels:
+    app: hospital-management-system
+    component: sync
+    system: data-sync
+subjects:
+- kind: ServiceAccount
+  name: hms-admin
+  namespace: data-sync-system
+roleRef:
+  kind: Role
+  name: data-sync-admin-role
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# Cross-namespace access for data sources
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: data-sync-cross-namespace-access
+  labels:
+    app: hospital-management-system
+    component: sync
+    system: data-sync
+subjects:
+- kind: ServiceAccount
+  name: hms-admin
+  namespace: data-sync-system
+roleRef:
+  kind: ClusterRole
+  name: hms-admin-role
+  apiGroup: rbac.authorization.k8s.io

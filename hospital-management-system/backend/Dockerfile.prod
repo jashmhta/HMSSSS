@@ -1,0 +1,68 @@
+# Multi-stage build for enterprise-grade production deployment
+FROM node:18-alpine AS base
+
+# Install dumb-init for proper signal handling
+RUN apk add --no-cache dumb-init
+
+# Set working directory
+WORKDIR /app
+
+# Create non-root user for security
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S nestjs -u 1001
+
+# Install dependencies only (for better layer caching)
+FROM base AS deps
+COPY package*.json ./
+RUN npm ci --only=production && npm cache clean --force
+
+# Build stage
+FROM base AS builder
+COPY package*.json ./
+COPY tsconfig*.json ./
+RUN npm ci
+
+# Copy source code
+COPY src ./src
+COPY test ./test
+
+# Build application
+RUN npm run build && \
+    npm prune --production && \
+    npm cache clean --force
+
+# Production stage
+FROM base AS production
+
+# Copy package files
+COPY package*.json ./
+
+# Copy production dependencies
+COPY --from=deps /app/node_modules ./node_modules
+
+# Copy built application
+COPY --from=builder /app/dist ./dist
+
+# Copy Prisma schema and migrations
+COPY --from=builder /app/src/database/schema.prisma ./dist/database/
+COPY --from=builder /app/prisma ./prisma
+
+# Create necessary directories
+RUN mkdir -p /app/logs /app/uploads /app/temp && \
+    chown -R nestjs:nodejs /app
+
+# Switch to non-root user
+USER nestjs
+
+# Expose port
+EXPOSE 3000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+  CMD node dist/healthcheck.js
+
+# Use dumb-init for proper signal handling
+ENTRYPOINT ["dumb-init", "--"]
+
+# Start application
+CMD ["node", "dist/main.js"]

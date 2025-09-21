@@ -1,0 +1,103 @@
+---
+# Istio Gateway for HMS
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: hms-gateway
+  namespace: ultimate-hms
+  labels:
+    app: hospital-management-system
+spec:
+  selector:
+    istio: ingressgateway
+  servers:
+  - port:
+      number: 80
+      name: http
+      protocol: HTTP
+    hosts:
+    - "*"
+
+---
+# Virtual Service for API Gateway
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: hms-api-gateway
+  namespace: ultimate-hms
+  labels:
+    app: hospital-management-system
+spec:
+  hosts:
+  - "*"
+  gateways:
+  - hms-gateway
+  http:
+  - match:
+    - uri:
+        prefix: "/api/v1"
+    route:
+    - destination:
+        host: kong-proxy.ultimate-hms.svc.cluster.local
+        port:
+          number: 8000
+  - match:
+    - uri:
+        prefix: "/graphql"
+    route:
+    - destination:
+        host: graphql-gateway.ultimate-hms.svc.cluster.local
+        port:
+          number: 4000
+  - match:
+    - uri:
+        prefix: "/auth"
+    route:
+    - destination:
+        host: keycloak.ultimate-hms.svc.cluster.local
+        port:
+          number: 8080
+
+---
+# Destination Rules for Traffic Policies
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: hms-services-dr
+  namespace: ultimate-hms
+  labels:
+    app: hospital-management-system
+spec:
+  host: "*.ultimate-hms.svc.cluster.local"
+  trafficPolicy:
+    loadBalancer:
+      simple: ROUND_ROBIN
+    connectionPool:
+      tcp:
+        maxConnections: 100
+      http:
+        http1MaxPendingRequests: 1024
+        http2MaxRequests: 1024
+        maxRequestsPerConnection: 10
+        maxRetries: 3
+    outlierDetection:
+      consecutive5xxErrors: 3
+      interval: 30s
+      baseEjectionTime: 30s
+      maxEjectionPercent: 50
+
+---
+# Peer Authentication for mTLS
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: hms-peer-authentication
+  namespace: ultimate-hms
+  labels:
+    app: hospital-management-system
+spec:
+  selector:
+    matchLabels:
+      app: hospital-management-system
+  mtls:
+    mode: PERMISSIVE

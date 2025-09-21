@@ -1,0 +1,288 @@
+---
+# Tenant Configuration Management
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tenant-hospital-a-config
+  namespace: ultimate-hms
+  labels:
+    app: hospital-management-system
+    component: tenant-config
+    tenant: hospital-a
+data:
+  tenant.json: |
+    {
+      "tenantId": "hospital-a",
+      "name": "General Hospital A",
+      "domain": "hospital-a.hms.local",
+      "database": {
+        "schema": "tenant_hospital_a",
+        "host": "postgresql-hms.ultimate-hms.svc.cluster.local",
+        "port": "5432",
+        "database": "hms_db"
+      },
+      "features": {
+        "ehr": true,
+        "appointments": true,
+        "billing": true,
+        "pharmacy": true,
+        "laboratory": true,
+        "radiology": true,
+        "emergency": true,
+        "mobile": true
+      },
+      "limits": {
+        "maxUsers": 500,
+        "maxPatients": 10000,
+        "storageGB": 100
+      },
+      "integrations": {
+        "fhir": true,
+        "dicom": true,
+        "openmrs": true,
+        "metasfresh": true
+      }
+    }
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tenant-hospital-b-config
+  namespace: ultimate-hms
+  labels:
+    app: hospital-management-system
+    component: tenant-config
+    tenant: hospital-b
+data:
+  tenant.json: |
+    {
+      "tenantId": "hospital-b",
+      "name": "Regional Hospital B",
+      "domain": "hospital-b.hms.local",
+      "database": {
+        "schema": "tenant_hospital_b",
+        "host": "postgresql-hms.ultimate-hms.svc.cluster.local",
+        "port": "5432",
+        "database": "hms_db"
+      },
+      "features": {
+        "ehr": true,
+        "appointments": true,
+        "billing": true,
+        "pharmacy": true,
+        "laboratory": true,
+        "radiology": true,
+        "emergency": true,
+        "mobile": false
+      },
+      "limits": {
+        "maxUsers": 200,
+        "maxPatients": 5000,
+        "storageGB": 50
+      },
+      "integrations": {
+        "fhir": true,
+        "dicom": true,
+        "openmrs": true,
+        "metasfresh": false
+      }
+    }
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tenant-clinic-c-config
+  namespace: ultimate-hms
+  labels:
+    app: hospital-management-system
+    component: tenant-config
+    tenant: clinic-c
+data:
+  tenant.json: |
+    {
+      "tenantId": "clinic-c",
+      "name": "Community Clinic C",
+      "domain": "clinic-c.hms.local",
+      "database": {
+        "schema": "tenant_clinic_c",
+        "host": "postgresql-hms.ultimate-hms.svc.cluster.local",
+        "port": "5432",
+        "database": "hms_db"
+      },
+      "features": {
+        "ehr": true,
+        "appointments": true,
+        "billing": false,
+        "pharmacy": false,
+        "laboratory": false,
+        "radiology": false,
+        "emergency": false,
+        "mobile": true
+      },
+      "limits": {
+        "maxUsers": 50,
+        "maxPatients": 1000,
+        "storageGB": 10
+      },
+      "integrations": {
+        "fhir": true,
+        "dicom": false,
+        "openmrs": true,
+        "metasfresh": false
+      }
+    }
+
+---
+# Tenant Router Service
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tenant-router
+  namespace: ultimate-hms
+  labels:
+    app: hospital-management-system
+    component: tenant-router
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: hospital-management-system
+      component: tenant-router
+  template:
+    metadata:
+      labels:
+        app: hospital-management-system
+        component: tenant-router
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: hms-admin
+      containers:
+      - name: tenant-router
+        image: nginx:alpine
+        ports:
+        - containerPort: 80
+          name: http
+        volumeMounts:
+        - name: nginx-config
+          mountPath: /etc/nginx/nginx.conf
+          subPath: nginx.conf
+        - name: tenant-configs
+          mountPath: /etc/nginx/tenants
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi
+      volumes:
+      - name: nginx-config
+        configMap:
+          name: tenant-router-config
+      - name: tenant-configs
+        projected:
+          sources:
+          - configMap:
+              name: tenant-hospital-a-config
+              items:
+              - key: tenant.json
+                path: hospital-a.json
+          - configMap:
+              name: tenant-hospital-b-config
+              items:
+              - key: tenant.json
+                path: hospital-b.json
+          - configMap:
+              name: tenant-clinic-c-config
+              items:
+              - key: tenant.json
+                path: clinic-c.json
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tenant-router-config
+  namespace: ultimate-hms
+data:
+  nginx.conf: |
+    events {
+      worker_connections 1024;
+    }
+
+    http {
+      include /etc/nginx/mime.types;
+      default_type application/octet-stream;
+
+      # Logging
+      log_format main '$remote_addr - $remote_user [$time_local] "$request" '
+                      '$status $body_bytes_sent "$http_referer" '
+                      '"$http_user_agent" "$http_x_forwarded_for"';
+
+      access_log /var/log/nginx/access.log main;
+
+      # Tenant-based routing
+      server {
+        listen 80;
+        server_name _;
+
+        # Extract tenant from Host header
+        location / {
+          # Default tenant routing
+          if ($host ~* "^([^.]+)\.hms\.local$") {
+            set $tenant $1;
+          }
+
+          # Route to appropriate backend based on tenant
+          location ~* ^/api/(.*) {
+            proxy_pass http://graphql-api.graphql-system.svc.cluster.local:80/api/$1;
+            proxy_set_header Host $host;
+            proxy_set_header X-Tenant-ID $tenant;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          }
+
+          location ~* ^/fhir/(.*) {
+            proxy_pass http://fhir-server.fhir-system.svc.cluster.local:8080/fhir/$1;
+            proxy_set_header Host $host;
+            proxy_set_header X-Tenant-ID $tenant;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          }
+
+          location ~* ^/openmrs/(.*) {
+            proxy_pass http://openmrs.openmrs-system.svc.cluster.local:8080/openmrs/$1;
+            proxy_set_header Host $host;
+            proxy_set_header X-Tenant-ID $tenant;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          }
+
+          # Default response
+          return 200 '{"status": "Tenant router active", "tenant": "$tenant"}';
+          add_header Content-Type application/json;
+        }
+      }
+    }
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: tenant-router
+  namespace: ultimate-hms
+  labels:
+    app: hospital-management-system
+    component: tenant-router
+spec:
+  selector:
+    app: hospital-management-system
+    component: tenant-router
+  ports:
+  - name: http
+    port: 80
+    targetPort: 80
+    protocol: TCP
+  type: ClusterIP

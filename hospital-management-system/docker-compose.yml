@@ -1,0 +1,117 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: hms-postgres
+    environment:
+      POSTGRES_DB: hms_db
+      POSTGRES_USER: hms_user
+      POSTGRES_PASSWORD: hms_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - hms-network
+    restart: unless-stopped
+
+  # Redis for caching and queues
+  redis:
+    image: redis:7-alpine
+    container_name: hms-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - hms-network
+    restart: unless-stopped
+
+  # Backend API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: hms-backend
+    environment:
+      DATABASE_URL: postgresql://hms_user:hms_password@postgres:5432/hms_db
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      JWT_SECRET: your-super-secret-jwt-key-change-in-production
+      NODE_ENV: production
+    ports:
+      - "3001:3001"
+    depends_on:
+      - postgres
+      - redis
+    volumes:
+      - ./backend/uploads:/app/uploads
+    networks:
+      - hms-network
+    restart: unless-stopped
+
+  # Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: hms-frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    networks:
+      - hms-network
+    restart: unless-stopped
+
+  # Nginx Reverse Proxy
+  nginx:
+    image: nginx:alpine
+    container_name: hms-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./infrastructure/nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./infrastructure/nginx/ssl:/etc/nginx/ssl
+    depends_on:
+      - frontend
+      - backend
+    networks:
+      - hms-network
+    restart: unless-stopped
+
+  # Monitoring (Optional)
+  # prometheus:
+  #   image: prom/prometheus
+  #   container_name: hms-prometheus
+  #   ports:
+  #     - "9090:9090"
+  #   volumes:
+  #     - ./infrastructure/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+  #   networks:
+  #     - hms-network
+
+  # grafana:
+  #   image: grafana/grafana
+  #   container_name: hms-grafana
+  #   environment:
+  #     GF_SECURITY_ADMIN_PASSWORD: admin
+  #   ports:
+  #     - "3002:3000"
+  #   volumes:
+  #     - grafana_data:/var/lib/grafana
+  #   networks:
+  #     - hms-network
+
+volumes:
+  postgres_data:
+  redis_data:
+  # grafana_data:
+
+networks:
+  hms-network:
+    driver: bridge

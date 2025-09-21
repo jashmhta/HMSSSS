@@ -1,0 +1,122 @@
+---
+# Network Policy for Ultimate HMS - Updated for inter-service communication
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: hms-network-policy
+  namespace: ultimate-hms
+  labels:
+    app: hospital-management-system
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: istio-system
+    - namespaceSelector:
+        matchLabels:
+          name: kube-system
+    - namespaceSelector:
+        matchLabels:
+          name: ultimate-hms
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    - podSelector: {}
+    ports:
+    - protocol: TCP
+      port: 8080
+    - protocol: TCP
+      port: 8443
+    - protocol: TCP
+      port: 9090
+    - protocol: TCP
+      port: 9200
+    - protocol: TCP
+      port: 9300
+    - protocol: TCP
+      port: 5432
+    - protocol: TCP
+      port: 27017
+    - protocol: TCP
+      port: 9092
+    - protocol: TCP
+      port: 5601
+    - protocol: TCP
+      port: 5044
+    - protocol: TCP
+      port: 8000
+    - protocol: TCP
+      port: 8001
+    - protocol: TCP
+      port: 2181
+    - protocol: TCP
+      port: 2379
+    - protocol: TCP
+      port: 2380
+    - protocol: TCP
+      port: 9114
+    - protocol: TCP
+      port: 9216
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: istio-system
+    - namespaceSelector:
+        matchLabels:
+          name: kube-system
+    - namespaceSelector:
+        matchLabels:
+          name: ultimate-hms
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    - podSelector: {}
+    ports:
+    - protocol: TCP
+      port: 53
+    - protocol: UDP
+      port: 53
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443
+    - protocol: TCP
+      port: 80
+    - protocol: TCP
+      port: 9200
+    - protocol: TCP
+      port: 9300
+    - protocol: TCP
+      port: 5432
+    - protocol: TCP
+      port: 27017
+    - protocol: TCP
+      port: 9092
+    - protocol: TCP
+      port: 5601
+    - protocol: TCP
+      port: 5044
+    - protocol: TCP
+      port: 8000
+    - protocol: TCP
+      port: 8001
+    - protocol: TCP
+      port: 2181
+    - protocol: TCP
+      port: 2379
+    - protocol: TCP
+      port: 2380
+    - protocol: TCP
+      port: 9114
+    - protocol: TCP
+      port: 9216
+    - protocol: TCP
+      port: 9090
+    - protocol: TCP
+      port: 3000

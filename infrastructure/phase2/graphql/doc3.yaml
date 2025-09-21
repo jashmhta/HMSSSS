@@ -1,0 +1,81 @@
+---
+# Redis for GraphQL Caching
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+  namespace: graphql-system
+  labels:
+    app: hospital-management-system
+    component: api
+    system: graphql
+    service: redis
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hospital-management-system
+      component: api
+      system: graphql
+      service: redis
+  template:
+    metadata:
+      labels:
+        app: hospital-management-system
+        component: api
+        system: graphql
+        service: redis
+    spec:
+      containers:
+      - name: redis
+        image: redis:7-alpine
+        ports:
+        - containerPort: 6379
+          name: redis
+        env:
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: graphql-secrets
+              key: redis-password
+        command:
+        - redis-server
+        - --requirepass
+        - $(REDIS_PASSWORD)
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi
+        volumeMounts:
+        - name: redis-data
+          mountPath: /data
+      volumes:
+      - name: redis-data
+        emptyDir: {}
+
+---
+# Redis Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  namespace: graphql-system
+  labels:
+    app: hospital-management-system
+    component: api
+    system: graphql
+    service: redis
+spec:
+  ports:
+  - name: redis
+    port: 6379
+    targetPort: 6379
+  selector:
+    app: hospital-management-system
+    component: api
+    system: graphql
+    service: redis
+

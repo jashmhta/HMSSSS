@@ -1,0 +1,168 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: hms-scaling-policies
+  namespace: hms
+data:
+  scaling-policies.json: |
+    {
+      "policies": {
+        "backend": {
+          "minReplicas": 2,
+          "maxReplicas": 10,
+          "scaleUp": {
+            "cpu": {
+              "threshold": 70,
+              "period": 60,
+              "cooldown": 300
+            },
+            "memory": {
+              "threshold": 80,
+              "period": 60,
+              "cooldown": 300
+            },
+            "requestsPerSecond": {
+              "threshold": 100,
+              "period": 60,
+              "cooldown": 180
+            },
+            "queueLength": {
+              "threshold": 50,
+              "period": 30,
+              "cooldown": 120
+            }
+          },
+          "scaleDown": {
+            "cpu": {
+              "threshold": 30,
+              "period": 300,
+              "cooldown": 600
+            },
+            "memory": {
+              "threshold": 40,
+              "period": 300,
+              "cooldown": 600
+            }
+          }
+        },
+        "frontend": {
+          "minReplicas": 2,
+          "maxReplicas": 5,
+          "scaleUp": {
+            "cpu": {
+              "threshold": 60,
+              "period": 60,
+              "cooldown": 180
+            },
+            "memory": {
+              "threshold": 70,
+              "period": 60,
+              "cooldown": 180
+            },
+            "concurrentConnections": {
+              "threshold": 1000,
+              "period": 30,
+              "cooldown": 120
+            }
+          },
+          "scaleDown": {
+            "cpu": {
+              "threshold": 20,
+              "period": 300,
+              "cooldown": 600
+            },
+            "memory": {
+              "threshold": 30,
+              "period": 300,
+              "cooldown": 600
+            }
+          }
+        },
+        "database": {
+          "minReplicas": 1,
+          "maxReplicas": 3,
+          "scaleUp": {
+            "cpu": {
+              "threshold": 75,
+              "period": 120,
+              "cooldown": 600
+            },
+            "memory": {
+              "threshold": 85,
+              "period": 120,
+              "cooldown": 600
+            },
+            "activeConnections": {
+              "threshold": 150,
+              "period": 60,
+              "cooldown": 300
+            }
+          },
+          "scaleDown": {
+            "cpu": {
+              "threshold": 25,
+              "period": 600,
+              "cooldown": 1200
+            },
+            "memory": {
+              "threshold": 35,
+              "period": 600,
+              "cooldown": 1200
+            }
+          }
+        }
+      },
+      "global": {
+        "maxTotalReplicas": 50,
+        "scaleUpMaxPercent": 100,
+        "scaleDownMaxPercent": 50,
+        "stabilizationWindow": 300,
+        "emergencyScaleUp": {
+          "cpuThreshold": 90,
+          "memoryThreshold": 95,
+          "maxScaleUpPercent": 200
+        }
+      }
+    }
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: hms-scaling-alerts
+  namespace: hms
+data:
+  alerts.json: |
+    {
+      "alerts": {
+        "scaleUpTriggered": {
+          "title": "Service Scaling Up",
+          "description": "{{.Service}} is scaling up to {{.Replicas}} replicas due to {{.Reason}}",
+          "severity": "info",
+          "channels": ["slack", "email"]
+        },
+        "scaleDownTriggered": {
+          "title": "Service Scaling Down",
+          "description": "{{.Service}} is scaling down to {{.Replicas}} replicas",
+          "severity": "info",
+          "channels": ["slack"]
+        },
+        "scalingFailed": {
+          "title": "Scaling Operation Failed",
+          "description": "Failed to scale {{.Service}}: {{.Error}}",
+          "severity": "error",
+          "channels": ["slack", "email", "pagerduty"]
+        },
+        "maxReplicasReached": {
+          "title": "Maximum Replicas Reached",
+          "description": "{{.Service}} has reached maximum replicas ({{.MaxReplicas}})",
+          "severity": "warning",
+          "channels": ["slack", "email"]
+        },
+        "emergencyScaling": {
+          "title": "Emergency Scaling Triggered",
+          "description": "Emergency scaling activated for {{.Service}} due to high resource usage",
+          "severity": "critical",
+          "channels": ["slack", "email", "pagerduty", "sms"]
+        }
+      }
+    }

@@ -1,0 +1,118 @@
+---
+# Keycloak for HMS Identity Management
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: keycloak-config
+  namespace: ultimate-hms
+  labels:
+    app: hospital-management-system
+    component: identity
+data:
+  KEYCLOAK_ADMIN: "admin"
+  KEYCLOAK_ADMIN_PASSWORD: "admin123"
+  KC_DB: "dev-file"
+  KC_HOSTNAME: "keycloak.hms.local"
+  KC_HTTP_ENABLED: "true"
+  KC_HTTP_PORT: "8080"
+  KC_HTTPS_PORT: "8443"
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: keycloak
+  namespace: ultimate-hms
+  labels:
+    app: hospital-management-system
+    component: identity
+    system: keycloak
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hospital-management-system
+      component: identity
+      system: keycloak
+  template:
+    metadata:
+      labels:
+        app: hospital-management-system
+        component: identity
+        system: keycloak
+    spec:
+      serviceAccountName: hms-admin
+      containers:
+      - name: keycloak
+        image: quay.io/keycloak/keycloak:22.0
+        ports:
+        - containerPort: 8080
+          name: http
+        - containerPort: 8443
+          name: https
+        envFrom:
+        - configMapRef:
+            name: keycloak-config
+        command:
+        - /opt/keycloak/bin/kc.sh
+        - start-dev
+        - --http-port=8080
+        - --https-port=8443
+        resources:
+          requests:
+            cpu: 500m
+            memory: 1Gi
+          limits:
+            cpu: 1000m
+            memory: 2Gi
+
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: keycloak
+  namespace: ultimate-hms
+  labels:
+    app: hospital-management-system
+    component: identity
+    system: keycloak
+spec:
+  selector:
+    app: hospital-management-system
+    component: identity
+    system: keycloak
+  ports:
+  - name: http
+    port: 8080
+    targetPort: 8080
+  - name: https
+    port: 8443
+    targetPort: 8443
+  type: ClusterIP
+
+---
+# Keycloak Ingress
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: keycloak-ingress
+  namespace: ultimate-hms
+  labels:
+    app: hospital-management-system
+    component: identity
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: keycloak.hms.local
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: keycloak
+            port:
+              number: 8080

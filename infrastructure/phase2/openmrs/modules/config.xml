@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<module configVersion="1.0">
+    <id>hms-sync</id>
+    <name>HMS Data Synchronization Module</name>
+    <version>1.0.0-SNAPSHOT</version>
+    <package>org.openmrs.module.hmssync</package>
+    <author>Ultimate HMS Team</author>
+    <description>
+        Module for synchronizing OpenMRS data with external systems via RabbitMQ
+    </description>
+
+    <require_version>2.0.0</require_version>
+    <require_database_version>2.0.0</require_database_version>
+
+    <activator>org.openmrs.module.hmssync.HmsSyncActivator</activator>
+
+    <globalProperty>
+        <property>hms.sync.rabbitmq.host</property>
+        <defaultValue>rabbitmq.metasfresh-system.svc.cluster.local</defaultValue>
+        <description>RabbitMQ hostname for data synchronization</description>
+    </globalProperty>
+
+    <globalProperty>
+        <property>hms.sync.rabbitmq.port</property>
+        <defaultValue>5672</defaultValue>
+        <description>RabbitMQ port for data synchronization</description>
+    </globalProperty>
+
+    <globalProperty>
+        <property>hms.sync.rabbitmq.username</property>
+        <defaultValue>metasfresh</defaultValue>
+        <description>RabbitMQ username for data synchronization</description>
+    </globalProperty>
+
+    <globalProperty>
+        <property>hms.sync.rabbitmq.password</property>
+        <defaultValue>rabbitmq_passw0rd</defaultValue>
+        <description>RabbitMQ password for data synchronization</description>
+    </globalProperty>
+
+    <globalProperty>
+        <property>hms.sync.enabled</property>
+        <defaultValue>true</defaultValue>
+        <description>Enable/disable data synchronization</description>
+    </globalProperty>
+
+</module>

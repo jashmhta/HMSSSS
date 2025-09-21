@@ -1,0 +1,96 @@
+---
+# Etcd Cluster for Patroni coordination
+apiVersion: v1
+kind: Service
+metadata:
+  name: etcd-cluster
+  namespace: ultimate-hms
+  labels:
+    app: hospital-management-system
+    component: etcd
+spec:
+  selector:
+    app: hospital-management-system
+    component: etcd
+  ports:
+  - name: etcd-client
+    port: 2379
+    targetPort: 2379
+  - name: etcd-peer
+    port: 2380
+    targetPort: 2380
+  clusterIP: None
+
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: etcd
+  namespace: ultimate-hms
+  labels:
+    app: hospital-management-system
+    component: etcd
+spec:
+  serviceName: etcd-cluster
+  replicas: 3
+  selector:
+    matchLabels:
+      app: hospital-management-system
+      component: etcd
+  template:
+    metadata:
+      labels:
+        app: hospital-management-system
+        component: etcd
+    spec:
+      containers:
+      - name: etcd
+        image: quay.io/coreos/etcd:v3.5.9
+        ports:
+        - containerPort: 2379
+          name: client
+        - containerPort: 2380
+          name: peer
+        env:
+        - name: ETCD_DATA_DIR
+          value: /etcd-data
+        - name: ETCD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: ETCD_INITIAL_CLUSTER_STATE
+          value: new
+        - name: ETCD_INITIAL_CLUSTER_TOKEN
+          value: etcd-cluster-hms
+        - name: ETCD_INITIAL_ADVERTISE_PEER_URLS
+          value: http://$(ETCD_NAME).etcd-cluster.ultimate-hms.svc.cluster.local:2380
+        - name: ETCD_LISTEN_PEER_URLS
+          value: http://0.0.0.0:2380
+        - name: ETCD_LISTEN_CLIENT_URLS
+          value: http://0.0.0.0:2379
+        - name: ETCD_ADVERTISE_CLIENT_URLS
+          value: http://$(ETCD_NAME).etcd-cluster.ultimate-hms.svc.cluster.local:2379
+        - name: ETCD_INITIAL_CLUSTER
+          value: etcd-0=http://etcd-0.etcd-cluster.ultimate-hms.svc.cluster.local:2380,etcd-1=http://etcd-1.etcd-cluster.ultimate-hms.svc.cluster.local:2380,etcd-2=http://etcd-2.etcd-cluster.ultimate-hms.svc.cluster.local:2380
+        volumeMounts:
+        - name: etcd-data
+          mountPath: /etcd-data
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 1Gi
+  volumeClaimTemplates:
+  - metadata:
+      name: etcd-data
+      labels:
+        app: hospital-management-system
+        component: etcd
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      resources:
+        requests:
+          storage: 10Gi
+      storageClassName: standard

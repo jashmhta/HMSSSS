@@ -1,0 +1,59 @@
+# Security hardening patches
+# apiVersion: apps/v1
+# kind: Deployment
+# metadata:
+#   name: graphql-api
+# spec:
+#   template:
+#     spec:
+#       containers:
+#       - name: graphql-api
+#         securityContext:
+#           runAsNonRoot: true
+#           runAsUser: 1000
+#           runAsGroup: 1000
+#           allowPrivilegeEscalation: false
+#           capabilities:
+#             drop:
+#             - ALL
+#         env:
+#         - name: SECURE_MODE
+#           value: "true"
+# ---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: analytics-service
+  namespace: analytics-system
+spec:
+  template:
+    spec:
+      containers:
+      - name: analytics
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1000
+          runAsGroup: 1000
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mobile-api
+  namespace: mobile-system
+spec:
+  template:
+    spec:
+      containers:
+      - name: mobile-api
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1000
+          runAsGroup: 1000
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL

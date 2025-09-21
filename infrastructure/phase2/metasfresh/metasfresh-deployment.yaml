@@ -1,0 +1,529 @@
+---
+# Metasfresh ERP System - Enterprise Deployment
+# Phase 2A: Foundation Services - Week 1
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: metasfresh-system
+  labels:
+    app: hospital-management-system
+    component: erp
+    system: metasfresh
+    phase: phase2
+
+---
+# Metasfresh ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: metasfresh-config
+  namespace: metasfresh-system
+  labels:
+    app: hospital-management-system
+    component: erp
+    system: metasfresh
+data:
+  METASFRESH_HOME: "/opt/metasfresh"
+  DB_HOST: "postgresql-hms.ultimate-hms.svc.cluster.local"
+  DB_PORT: "5432"
+  DB_NAME: "metasfresh"
+  DB_USER: "metasfresh_user"
+  RABBITMQ_HOST: "rabbitmq.metasfresh-system.svc.cluster.local"
+  RABBITMQ_PORT: "5672"
+  ELASTICSEARCH_HOST: "elasticsearch-hms.ultimate-hms.svc.cluster.local"
+  ELASTICSEARCH_PORT: "9200"
+
+---
+# Metasfresh Database Initialization Job
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: metasfresh-db-init
+  namespace: metasfresh-system
+  labels:
+    app: hospital-management-system
+    component: erp
+    system: metasfresh
+spec:
+  template:
+    spec:
+      serviceAccountName: hms-admin
+      restartPolicy: OnFailure
+      containers:
+      - name: db-init
+        image: postgres:15
+        command:
+        - /bin/bash
+        - -c
+        - |
+          set -e
+          echo "Waiting for PostgreSQL to be ready..."
+          until pg_isready -h postgresql-hms.ultimate-hms.svc.cluster.local -p 5432 -U hms_user -d hms_db; do
+            echo "PostgreSQL is unavailable - sleeping"
+            sleep 2
+          done
+
+          echo "Creating Metasfresh database and user..."
+          PGPASSWORD=hms_user_password psql -h postgresql-hms.ultimate-hms.svc.cluster.local -p 5432 -U hms_user -d hms_db -c "CREATE DATABASE metasfresh WITH ENCODING 'UTF8'"
+          PGPASSWORD=hms_user_password psql -h postgresql-hms.ultimate-hms.svc.cluster.local -p 5432 -U hms_user -d hms_db -c "CREATE USER metasfresh_user WITH ENCRYPTED PASSWORD 'metasfresh_passw0rd'"
+          PGPASSWORD=hms_user_password psql -h postgresql-hms.ultimate-hms.svc.cluster.local -p 5432 -U hms_user -d hms_db -c "GRANT ALL PRIVILEGES ON DATABASE metasfresh TO metasfresh_user"
+          PGPASSWORD=hms_user_password psql -h postgresql-hms.ultimate-hms.svc.cluster.local -p 5432 -U hms_user -d hms_db -c "ALTER USER metasfresh_user CREATEDB"
+
+          echo "Database initialization completed successfully"
+        env:
+        - name: PGPASSWORD
+          value: "hms_user_password"
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi
+
+---
+# Metasfresh Secrets
+apiVersion: v1
+kind: Secret
+metadata:
+  name: metasfresh-secrets
+  namespace: metasfresh-system
+  labels:
+    app: hospital-management-system
+    component: erp
+    system: metasfresh
+type: Opaque
+data:
+  # Base64 encoded passwords
+  db-password: bWV0YXNmcmVzaF9wYXNzdzByZA==  # metasfresh_passw0rd
+  admin-password: YWRtaW5fcGFzc3cwcmQ=        # admin_passw0rd
+  rabbitmq-password: cmFiYml0bXFfcGFzc3cwcmQ=  # rabbitmq_passw0rd
+  jwt-secret: bWV0YXNmcmVzaC1qd3Qtc2VjcmV0LWtleQ==  # metasfresh-jwt-secret-key
+
+---
+# RabbitMQ for Metasfresh
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rabbitmq
+  namespace: metasfresh-system
+  labels:
+    app: hospital-management-system
+    component: erp
+    system: metasfresh
+    service: rabbitmq
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hospital-management-system
+      component: erp
+      system: metasfresh
+      service: rabbitmq
+  template:
+    metadata:
+      labels:
+        app: hospital-management-system
+        component: erp
+        system: metasfresh
+        service: rabbitmq
+    spec:
+      containers:
+      - name: rabbitmq
+        image: rabbitmq:3.12-management-alpine
+        ports:
+        - containerPort: 5672
+          name: amqp
+        - containerPort: 15672
+          name: management
+        env:
+        - name: RABBITMQ_DEFAULT_USER
+          value: "metasfresh"
+        - name: RABBITMQ_DEFAULT_PASS
+          valueFrom:
+            secretKeyRef:
+              name: metasfresh-secrets
+              key: rabbitmq-password
+        resources:
+          requests:
+            cpu: 200m
+            memory: 512Mi
+          limits:
+            cpu: 500m
+            memory: 1Gi
+        volumeMounts:
+        - name: rabbitmq-data
+          mountPath: /var/lib/rabbitmq
+      volumes:
+      - name: rabbitmq-data
+        emptyDir: {}
+
+---
+# RabbitMQ Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: rabbitmq
+  namespace: metasfresh-system
+  labels:
+    app: hospital-management-system
+    component: erp
+    system: metasfresh
+    service: rabbitmq
+spec:
+  ports:
+  - name: amqp
+    port: 5672
+    targetPort: 5672
+  - name: management
+    port: 15672
+    targetPort: 15672
+  selector:
+    app: hospital-management-system
+    component: erp
+    system: metasfresh
+    service: rabbitmq
+
+---
+# Metasfresh Backend Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: metasfresh-backend
+  namespace: metasfresh-system
+  labels:
+    app: hospital-management-system
+    component: erp
+    system: metasfresh
+    service: backend
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: hospital-management-system
+      component: erp
+      system: metasfresh
+      service: backend
+  template:
+    metadata:
+      labels:
+        app: hospital-management-system
+        component: erp
+        system: metasfresh
+        service: backend
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/actuator/prometheus"
+    spec:
+      serviceAccountName: hms-admin
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      containers:
+      - name: metasfresh-backend
+        image: nginx:1.24-alpine
+        ports:
+        - containerPort: 8080
+          name: http
+        - containerPort: 61616
+          name: jms
+        env:
+        - name: DB_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: metasfresh-config
+              key: DB_HOST
+        - name: DB_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: metasfresh-config
+              key: DB_PORT
+        - name: DB_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: metasfresh-config
+              key: DB_NAME
+        - name: DB_USER
+          valueFrom:
+            configMapKeyRef:
+              name: metasfresh-config
+              key: DB_USER
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: metasfresh-secrets
+              key: db-password
+        - name: RABBITMQ_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: metasfresh-config
+              key: RABBITMQ_HOST
+        - name: RABBITMQ_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: metasfresh-config
+              key: RABBITMQ_PORT
+        - name: RABBITMQ_USER
+          value: "metasfresh"
+        - name: RABBITMQ_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: metasfresh-secrets
+              key: rabbitmq-password
+        - name: ELASTICSEARCH_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: metasfresh-config
+              key: ELASTICSEARCH_HOST
+        - name: ELASTICSEARCH_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: metasfresh-config
+              key: ELASTICSEARCH_PORT
+        - name: JAVA_OPTS
+          value: "-Xmx2g -Xms1g -XX:+UseG1GC -XX:+UseContainerSupport"
+        resources:
+          requests:
+            cpu: 1000m
+            memory: 2Gi
+          limits:
+            cpu: 2000m
+            memory: 4Gi
+        livenessProbe:
+          httpGet:
+            path: /actuator/health
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 300
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /actuator/health
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 60
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+
+---
+# Metasfresh Backend Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: metasfresh-backend
+  namespace: metasfresh-system
+  labels:
+    app: hospital-management-system
+    component: erp
+    system: metasfresh
+    service: backend
+spec:
+  type: ClusterIP
+  ports:
+  - name: http
+    port: 80
+    targetPort: 8080
+  - name: jms
+    port: 61616
+    targetPort: 61616
+  selector:
+    app: hospital-management-system
+    component: erp
+    system: metasfresh
+    service: backend
+
+---
+# Metasfresh WebUI Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: metasfresh-webui
+  namespace: metasfresh-system
+  labels:
+    app: hospital-management-system
+    component: erp
+    system: metasfresh
+    service: webui
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: hospital-management-system
+      component: erp
+      system: metasfresh
+      service: webui
+  template:
+    metadata:
+      labels:
+        app: hospital-management-system
+        component: erp
+        system: metasfresh
+        service: webui
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "80"
+        prometheus.io/path: "/health"
+    spec:
+      serviceAccountName: hms-admin
+      containers:
+      - name: metasfresh-webui
+        image: metasfresh/metasfresh-webui:5.205
+        ports:
+        - containerPort: 80
+          name: http
+        env:
+        - name: API_HOST
+          value: "metasfresh-backend.metasfresh-system.svc.cluster.local"
+        - name: API_PORT
+          value: "80"
+        resources:
+          requests:
+            cpu: 200m
+            memory: 512Mi
+          limits:
+            cpu: 500m
+            memory: 1Gi
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 80
+            scheme: HTTP
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 80
+            scheme: HTTP
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+
+---
+# Metasfresh WebUI Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: metasfresh-webui
+  namespace: metasfresh-system
+  labels:
+    app: hospital-management-system
+    component: erp
+    system: metasfresh
+    service: webui
+spec:
+  type: ClusterIP
+  ports:
+  - name: http
+    port: 80
+    targetPort: 80
+  selector:
+    app: hospital-management-system
+    component: erp
+    system: metasfresh
+    service: webui
+
+---
+# Metasfresh Ingress
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: metasfresh-ingress
+  namespace: metasfresh-system
+  labels:
+    app: hospital-management-system
+    component: erp
+    system: metasfresh
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/rate-limit: "100"
+    nginx.ingress.kubernetes.io/rate-limit-window: "1m"
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - metasfresh.hms.local
+    secretName: metasfresh-tls
+  rules:
+  - host: metasfresh.hms.local
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: metasfresh-webui
+            port:
+              number: 80
+
+---
+# Metasfresh HorizontalPodAutoscaler
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: metasfresh-backend-hpa
+  namespace: metasfresh-system
+  labels:
+    app: hospital-management-system
+    component: erp
+    system: metasfresh
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: metasfresh-backend
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+
+---
+# Metasfresh PodDisruptionBudget
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: metasfresh-backend-pdb
+  namespace: metasfresh-system
+  labels:
+    app: hospital-management-system
+    component: erp
+    system: metasfresh
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: hospital-management-system
+      component: erp
+      system: metasfresh
+      service: backend

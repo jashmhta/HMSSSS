@@ -1,0 +1,505 @@
+---
+# Advanced Analytics Service - Phase 3
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: analytics-system
+  labels:
+    app: hospital-management-system
+    component: analytics
+    system: analytics
+    phase: phase3
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: analytics-config
+  namespace: analytics-system
+  labels:
+    app: hospital-management-system
+    component: analytics
+    system: analytics
+data:
+  ELASTICSEARCH_URL: "http://elasticsearch-hms.ultimate-hms.svc.cluster.local:9200"
+  DATABASE_HOST: "postgresql-hms.ultimate-hms.svc.cluster.local"
+  DATABASE_PORT: "5432"
+  DATABASE_NAME: "hms_db"
+  REDIS_URL: "redis://redis.graphql-system.svc.cluster.local:6379"
+  PROMETHEUS_URL: "http://prometheus-operated.monitoring.svc.cluster.local:9090"
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: analytics-secrets
+  namespace: analytics-system
+  labels:
+    app: hospital-management-system
+    component: analytics
+    system: analytics
+type: Opaque
+data:
+  db-username: aG1zX3VzZXI=     # hms_user
+  db-password: aG1zX3VzZXJfcGFzc3cwcmQ=  # hms_user_password
+  redis-password: cmVkaXNfcGFzc3cwcmQ=   # redis_passw0rd
+  jwt-secret: YW5hbHl0aWNzLWp3dC1zZWNyZXQ= # analytics-jwt-secret
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: analytics-service
+  namespace: analytics-system
+  labels:
+    app: hospital-management-system
+    component: analytics
+    system: analytics
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: hospital-management-system
+      component: analytics
+      system: analytics
+  template:
+    metadata:
+      labels:
+        app: hospital-management-system
+        component: analytics
+        system: analytics
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "3001"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: default
+      initContainers:
+      - name: init-code
+        image: node:18-alpine
+        command:
+        - /bin/sh
+        - -c
+        - |
+          mkdir -p /app
+          cd /app
+          cat > package.json << 'EOF'
+          {
+            "name": "hms-analytics-service",
+            "version": "1.0.0",
+            "description": "Advanced Analytics Service for Ultimate HMS",
+            "main": "index.js",
+            "scripts": {
+              "start": "node index.js"
+            },
+            "dependencies": {
+              "express": "^4.18.2",
+              "pg": "^8.11.0",
+              "redis": "^4.6.0",
+              "@elastic/elasticsearch": "^8.9.0",
+              "prometheus-api-metrics": "^3.2.2",
+              "node-cron": "^3.0.2",
+              "axios": "^1.4.0"
+            }
+          }
+          EOF
+
+          cat > index.js << 'EOF'
+          const express = require('express');
+          const { Pool } = require('pg');
+          const { createClient } = require('redis');
+          const { Client } = require('@elastic/elasticsearch');
+          const cron = require('node-cron');
+          const axios = require('axios');
+
+          const app = express();
+          app.use(express.json());
+
+          // Database connections
+          const pool = new Pool({
+            host: process.env.DATABASE_HOST,
+            port: process.env.DATABASE_PORT,
+            database: process.env.DATABASE_NAME,
+            user: process.env.DATABASE_USERNAME,
+            password: process.env.DATABASE_PASSWORD,
+            max: 20
+          });
+
+          const redis = createClient({
+            url: process.env.REDIS_URL,
+            password: process.env.REDIS_PASSWORD
+          });
+
+          const elasticsearch = new Client({
+            node: process.env.ELASTICSEARCH_URL
+          });
+
+          // Health checks
+          app.get('/health', (req, res) => {
+            res.json({ status: 'healthy', service: 'analytics' });
+          });
+
+          app.get('/ready', (req, res) => {
+            res.json({ status: 'ready', service: 'analytics' });
+          });
+
+          // Analytics endpoints
+          app.get('/api/v1/analytics/patient-stats', async (req, res) => {
+            try {
+              const tenantId = req.headers['x-tenant-id'] || 'default';
+              const schema = tenantId === 'default' ? 'public' : `tenant_${tenantId.replace('-', '_')}`;
+
+              const client = await pool.connect();
+              try {
+                await client.query(`SET search_path TO ${schema}`);
+
+                const result = await client.query(`
+                  SELECT
+                    COUNT(*) as total_patients,
+                    COUNT(CASE WHEN date_of_birth > CURRENT_DATE - INTERVAL '18 years' THEN 1 END) as pediatric_patients,
+                    COUNT(CASE WHEN date_of_birth <= CURRENT_DATE - INTERVAL '65 years' THEN 1 END) as geriatric_patients,
+                    ROUND(AVG(EXTRACT(YEAR FROM CURRENT_DATE) - EXTRACT(YEAR FROM date_of_birth)), 1) as avg_age
+                  FROM patients
+                `);
+
+                res.json(result.rows[0]);
+              } finally {
+                client.release();
+              }
+            } catch (error) {
+              console.error('Error fetching patient stats:', error);
+              res.status(500).json({ error: 'Failed to fetch patient statistics' });
+            }
+          });
+
+          const PORT = process.env.PORT || 3001;
+          app.listen(PORT, () => {
+            console.log(`🚀 Analytics service running on port ${PORT}`);
+          });
+          EOF
+        volumeMounts:
+        - name: app-code
+          mountPath: /app
+      containers:
+      - name: analytics
+        image: node:18-alpine
+        ports:
+        - containerPort: 3001
+          name: http
+        env:
+        - name: NODE_ENV
+          value: "production"
+        - name: PORT
+          value: "3001"
+        - name: ELASTICSEARCH_URL
+          valueFrom:
+            configMapKeyRef:
+              name: analytics-config
+              key: ELASTICSEARCH_URL
+        - name: DATABASE_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: analytics-config
+              key: DATABASE_HOST
+        - name: DATABASE_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: analytics-config
+              key: DATABASE_PORT
+        - name: DATABASE_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: analytics-config
+              key: DATABASE_NAME
+        - name: DATABASE_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: analytics-secrets
+              key: db-username
+        - name: DATABASE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: analytics-secrets
+              key: db-password
+        - name: REDIS_URL
+          valueFrom:
+            configMapKeyRef:
+              name: analytics-config
+              key: REDIS_URL
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: analytics-secrets
+              key: redis-password
+        - name: PROMETHEUS_URL
+          valueFrom:
+            configMapKeyRef:
+              name: analytics-config
+              key: PROMETHEUS_URL
+        workingDir: /app
+        command:
+        - /bin/sh
+        - -c
+        - |
+          cd /app
+          npm install
+          npm start
+        volumeMounts:
+        - name: app-code
+          mountPath: /app
+        resources:
+          requests:
+            cpu: 500m
+            memory: 1Gi
+          limits:
+            cpu: 1000m
+            memory: 2Gi
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3001
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 3001
+          initialDelaySeconds: 15
+          periodSeconds: 10
+          timeoutSeconds: 5
+      volumes:
+      - name: app-code
+        emptyDir: {}
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: analytics-code
+  namespace: analytics-system
+  labels:
+    app: hospital-management-system
+    component: analytics
+    system: analytics
+data:
+  package.json: |
+    {
+      "name": "hms-analytics-service",
+      "version": "1.0.0",
+      "description": "Advanced Analytics Service for Ultimate HMS",
+      "main": "index.js",
+      "scripts": {
+        "start": "node index.js"
+      },
+      "dependencies": {
+        "express": "^4.18.2",
+        "pg": "^8.11.0",
+        "redis": "^4.6.0",
+        "@elastic/elasticsearch": "^8.9.0",
+        "prometheus-api-metrics": "^3.2.2",
+        "node-cron": "^3.0.2",
+        "axios": "^1.4.0"
+      }
+    }
+
+  index.js: |
+    const express = require('express');
+    const { Pool } = require('pg');
+    const { createClient } = require('redis');
+    const { Client } = require('@elastic/elasticsearch');
+    const cron = require('node-cron');
+    const axios = require('axios');
+
+    const app = express();
+    app.use(express.json());
+
+    // Database connections
+    const pool = new Pool({
+      host: process.env.DATABASE_HOST,
+      port: process.env.DATABASE_PORT,
+      database: process.env.DATABASE_NAME,
+      user: process.env.DATABASE_USERNAME,
+      password: process.env.DATABASE_PASSWORD,
+      max: 20
+    });
+
+    const redis = createClient({
+      url: process.env.REDIS_URL,
+      password: process.env.REDIS_PASSWORD
+    });
+
+    const elasticsearch = new Client({
+      node: process.env.ELASTICSEARCH_URL
+    });
+
+    // Health checks
+    app.get('/health', (req, res) => {
+      res.json({ status: 'healthy', service: 'analytics' });
+    });
+
+    app.get('/ready', (req, res) => {
+      res.json({ status: 'ready', service: 'analytics' });
+    });
+
+    // Analytics endpoints
+    app.get('/api/v1/analytics/patient-stats', async (req, res) => {
+      try {
+        const tenantId = req.headers['x-tenant-id'] || 'default';
+        const schema = tenantId === 'default' ? 'public' : `tenant_${tenantId.replace('-', '_')}`;
+
+        const client = await pool.connect();
+        try {
+          await client.query(`SET search_path TO ${schema}`);
+
+          const result = await client.query(`
+            SELECT
+              COUNT(*) as total_patients,
+              COUNT(CASE WHEN date_of_birth > CURRENT_DATE - INTERVAL '18 years' THEN 1 END) as pediatric_patients,
+              COUNT(CASE WHEN date_of_birth <= CURRENT_DATE - INTERVAL '65 years' THEN 1 END) as geriatric_patients,
+              AVG(EXTRACT(YEAR FROM CURRENT_DATE) - EXTRACT(YEAR FROM date_of_birth)) as avg_age
+            FROM patients
+          `);
+
+          res.json(result.rows[0]);
+        } finally {
+          client.release();
+        }
+      } catch (error) {
+        console.error('Error fetching patient stats:', error);
+        res.status(500).json({ error: 'Failed to fetch patient statistics' });
+      }
+    });
+
+    app.get('/api/v1/analytics/appointment-trends', async (req, res) => {
+      try {
+        const tenantId = req.headers['x-tenant-id'] || 'default';
+        const schema = tenantId === 'default' ? 'public' : `tenant_${tenantId.replace('-', '_')}`;
+
+        const client = await pool.connect();
+        try {
+          await client.query(`SET search_path TO ${schema}`);
+
+          const result = await client.query(`
+            SELECT
+              DATE_TRUNC('day', appointment_date) as date,
+              COUNT(*) as appointments,
+              COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed,
+              COUNT(CASE WHEN status = 'cancelled' THEN 1 END) as cancelled
+            FROM appointments
+            WHERE appointment_date >= CURRENT_DATE - INTERVAL '30 days'
+            GROUP BY DATE_TRUNC('day', appointment_date)
+            ORDER BY date
+          `);
+
+          res.json(result.rows);
+        } finally {
+          client.release();
+        }
+      } catch (error) {
+        console.error('Error fetching appointment trends:', error);
+        res.status(500).json({ error: 'Failed to fetch appointment trends' });
+      }
+    });
+
+    app.get('/api/v1/analytics/system-metrics', async (req, res) => {
+      try {
+        // Get metrics from Prometheus
+        const prometheusResponse = await axios.get(`${process.env.PROMETHEUS_URL}/api/v1/query`, {
+          params: {
+            query: 'up{job="kubernetes-service-endpoints"}'
+          }
+        });
+
+        // Get Elasticsearch cluster health
+        const esHealth = await elasticsearch.cluster.health();
+
+        res.json({
+          services: prometheusResponse.data.data.result || [],
+          elasticsearch: {
+            status: esHealth.body.status,
+            number_of_nodes: esHealth.body.number_of_nodes,
+            active_shards: esHealth.body.active_shards
+          },
+          timestamp: new Date().toISOString()
+        });
+      } catch (error) {
+        console.error('Error fetching system metrics:', error);
+        res.status(500).json({ error: 'Failed to fetch system metrics' });
+      }
+    });
+
+    // Real-time data aggregation (runs every 5 minutes)
+    cron.schedule('*/5 * * * *', async () => {
+      try {
+        console.log('Running real-time data aggregation...');
+
+        // Aggregate data from all tenants
+        const tenants = ['hospital_a', 'hospital_b', 'clinic_c'];
+
+        for (const tenant of tenants) {
+          const client = await pool.connect();
+          try {
+            await client.query(`SET search_path TO tenant_${tenant}`);
+
+            // Aggregate daily statistics
+            const stats = await client.query(`
+              SELECT
+                CURRENT_DATE as date,
+                COUNT(DISTINCT p.id) as active_patients,
+                COUNT(a.id) as total_appointments,
+                AVG(EXTRACT(EPOCH FROM (a.appointment_date - a.created_at))/3600) as avg_booking_lead_time
+              FROM patients p
+              LEFT JOIN appointments a ON a.patient_id = p.id
+              WHERE a.appointment_date >= CURRENT_DATE
+            `);
+
+            // Store in Elasticsearch for advanced analytics
+            if (stats.rows.length > 0) {
+              await elasticsearch.index({
+                index: `hms-analytics-${tenant}`,
+                body: {
+                  ...stats.rows[0],
+                  tenant: tenant,
+                  timestamp: new Date()
+                }
+              });
+            }
+          } finally {
+            client.release();
+          }
+        }
+
+        console.log('Data aggregation completed');
+      } catch (error) {
+        console.error('Error in data aggregation:', error);
+      }
+    });
+
+    const PORT = process.env.PORT || 3001;
+    app.listen(PORT, () => {
+      console.log(`🚀 Analytics service running on port ${PORT}`);
+    });
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: analytics-service
+  namespace: analytics-system
+  labels:
+    app: hospital-management-system
+    component: analytics
+    system: analytics
+spec:
+  selector:
+    app: hospital-management-system
+    component: analytics
+    system: analytics
+  ports:
+  - name: http
+    port: 80
+    targetPort: 3001
+    protocol: TCP
+  type: ClusterIP
+

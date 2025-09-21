@@ -1,0 +1,376 @@
+---
+# OpenMRS Electronic Health Records System - Enterprise Deployment
+# Phase 2A: Foundation Services - Week 1
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: openmrs-system
+  labels:
+    app: hospital-management-system
+    component: clinical
+    system: openmrs
+    phase: phase2
+
+---
+# OpenMRS ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: openmrs-config
+  namespace: openmrs-system
+  labels:
+    app: hospital-management-system
+    component: clinical
+    system: openmrs
+data:
+  OPENMRS_RUNTIME_PROPERTIES: |
+    # Database Configuration
+    connection.url=jdbc:postgresql://postgresql-hms.ultimate-hms.svc.cluster.local:5432/openmrs
+    connection.username=openmrs_user
+    connection.password=\${OPENMRS_DB_PASSWORD}
+
+    # Application Settings
+    application.name=Ultimate HMS - OpenMRS
+    locale.allowed=en,es,fr,pt
+    encounter.formatting=yyyy-MM-dd
+
+    # Security Settings
+    security.authorizationEngine=org.openmrs.api.security.BasicAuthorizationEngine
+    security.authenticationEngine=org.openmrs.api.security.BasicAuthenticationEngine
+
+    # Module Settings
+    module.allow_web_admin=true
+    module.auto_update=true
+
+    # Performance Settings
+    hibernate.cache.use_second_level_cache=true
+    hibernate.cache.use_query_cache=true
+    hibernate.cache.provider_class=org.hibernate.cache.EhCacheProvider
+
+    # Logging
+    log.level.org.openmrs=INFO
+    log.level.org.hibernate=INFO
+
+---
+# OpenMRS Database Initialization Job
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: openmrs-db-init
+  namespace: openmrs-system
+  labels:
+    app: hospital-management-system
+    component: clinical
+    system: openmrs
+spec:
+  template:
+    spec:
+      serviceAccountName: hms-admin
+      restartPolicy: OnFailure
+      containers:
+      - name: db-init
+        image: postgres:15
+        command:
+        - /bin/bash
+        - -c
+        - |
+          set -e
+          echo "Waiting for PostgreSQL to be ready..."
+          until pg_isready -h postgresql-hms.ultimate-hms.svc.cluster.local -p 5432 -U postgres; do
+            echo "PostgreSQL is unavailable - sleeping"
+            sleep 2
+          done
+
+          echo "Creating OpenMRS database and user..."
+           PGPASSWORD=hms_user_password psql -h postgresql-hms.ultimate-hms.svc.cluster.local -p 5432 -U hms_user -d hms_db -c "CREATE DATABASE openmrs WITH ENCODING 'UTF8'"
+           PGPASSWORD=hms_user_password psql -h postgresql-hms.ultimate-hms.svc.cluster.local -p 5432 -U hms_user -d hms_db -c "CREATE USER openmrs_user WITH ENCRYPTED PASSWORD '\${OPENMRS_DB_PASSWORD}'"
+           PGPASSWORD=hms_user_password psql -h postgresql-hms.ultimate-hms.svc.cluster.local -p 5432 -U hms_user -d hms_db -c "GRANT ALL PRIVILEGES ON DATABASE openmrs TO openmrs_user"
+           PGPASSWORD=hms_user_password psql -h postgresql-hms.ultimate-hms.svc.cluster.local -p 5432 -U hms_user -d hms_db -c "ALTER USER openmrs_user CREATEDB"
+
+          echo "Database initialization completed successfully"
+        env:
+        - name: OPENMRS_DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: openmrs-secrets
+              key: db-password
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi
+
+---
+# OpenMRS Secrets
+apiVersion: v1
+kind: Secret
+metadata:
+  name: openmrs-secrets
+  namespace: openmrs-system
+  labels:
+    app: hospital-management-system
+    component: clinical
+    system: openmrs
+type: Opaque
+data:
+  # Base64 encoded passwords - in production, use proper secret management
+  db-password: b3Blbm1yc19wYXNzdzByZA==  # openmrs_passw0rd
+  admin-password: YWRtaW5fcGFzc3cwcmQ=    # admin_passw0rd
+  jwt-secret: c2VjcmV0LWp3dC1rZXktZm9yLW9wZW5tcnM=  # secret-jwt-key-for-openmrs
+
+---
+# OpenMRS Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: openmrs
+  namespace: openmrs-system
+  labels:
+    app: hospital-management-system
+    component: clinical
+    system: openmrs
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: hospital-management-system
+      component: clinical
+      system: openmrs
+  template:
+    metadata:
+      labels:
+        app: hospital-management-system
+        component: clinical
+        system: openmrs
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/actuator/prometheus"
+    spec:
+      serviceAccountName: hms-admin
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+       containers:
+        - name: openmrs
+          image: openmrs/openmrs-core:2.6.0
+          ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+        - containerPort: 8443
+          name: https
+          protocol: TCP
+        env:
+        - name: OPENMRS_RUNTIME_PROPERTIES_FILE
+          value: /etc/openmrs/openmrs-runtime.properties
+        - name: OPENMRS_DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: openmrs-secrets
+              key: db-password
+        - name: OPENMRS_ADMIN_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: openmrs-secrets
+              key: admin-password
+        - name: JAVA_OPTS
+          value: "-Xmx2g -Xms1g -XX:+UseG1GC -XX:+UseContainerSupport -Djava.security.egd=file:/dev/./urandom"
+        volumeMounts:
+        - name: config
+          mountPath: /etc/openmrs
+          readOnly: true
+        - name: modules
+          mountPath: /usr/local/tomcat/.OpenMRS/modules
+        - name: openmrs-data
+          mountPath: /usr/local/tomcat/.OpenMRS
+        resources:
+          requests:
+            cpu: 1000m
+            memory: 2Gi
+          limits:
+            cpu: 2000m
+            memory: 4Gi
+        livenessProbe:
+          httpGet:
+            path: /openmrs/
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 300
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /openmrs/
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 60
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        startupProbe:
+          httpGet:
+            path: /openmrs/
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 30
+      volumes:
+      - name: config
+        configMap:
+          name: openmrs-config
+      - name: modules
+        configMap:
+          name: openmrs-modules
+          optional: true
+      - name: openmrs-data
+        emptyDir: {}
+
+---
+# OpenMRS Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: openmrs
+  namespace: openmrs-system
+  labels:
+    app: hospital-management-system
+    component: clinical
+    system: openmrs
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-ssl-cert: "arn:aws:iam::123456789012:server-certificate/openmrs-tls"
+spec:
+  type: ClusterIP
+  ports:
+  - name: http
+    port: 80
+    targetPort: 8080
+    protocol: TCP
+  - name: https
+    port: 443
+    targetPort: 8443
+    protocol: TCP
+  selector:
+    app: hospital-management-system
+    component: clinical
+    system: openmrs
+
+---
+# OpenMRS Ingress
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: openmrs-ingress
+  namespace: openmrs-system
+  labels:
+    app: hospital-management-system
+    component: clinical
+    system: openmrs
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/rate-limit: "100"
+    nginx.ingress.kubernetes.io/rate-limit-window: "1m"
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - openmrs.hms.local
+    secretName: openmrs-tls
+  rules:
+  - host: openmrs.hms.local
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: openmrs
+            port:
+              number: 80
+
+---
+# OpenMRS ServiceMonitor for Prometheus
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: openmrs-servicemonitor
+  namespace: openmrs-system
+  labels:
+    app: hospital-management-system
+    component: clinical
+    system: openmrs
+spec:
+  selector:
+    matchLabels:
+      app: hospital-management-system
+      component: clinical
+      system: openmrs
+  endpoints:
+  - port: http
+    path: /actuator/prometheus
+    interval: 30s
+    scrapeTimeout: 10s
+
+---
+# OpenMRS HorizontalPodAutoscaler
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: openmrs-hpa
+  namespace: openmrs-system
+  labels:
+    app: hospital-management-system
+    component: clinical
+    system: openmrs
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: openmrs
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+
+---
+# OpenMRS PodDisruptionBudget
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: openmrs-pdb
+  namespace: openmrs-system
+  labels:
+    app: hospital-management-system
+    component: clinical
+    system: openmrs
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: hospital-management-system
+      component: clinical
+      system: openmrs

@@ -1,0 +1,23 @@
+---
+# Redis Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  namespace: graphql-system
+  labels:
+    app: hospital-management-system
+    component: api
+    system: graphql
+    service: redis
+spec:
+  ports:
+  - name: redis
+    port: 6379
+    targetPort: 6379
+  selector:
+    app: hospital-management-system
+    component: api
+    system: graphql
+    service: redis
+

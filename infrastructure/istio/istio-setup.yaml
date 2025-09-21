@@ -1,0 +1,246 @@
+---
+# Istio Gateway for HMS
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: hms-gateway
+  namespace: ultimate-hms
+  labels:
+    app: hospital-management-system
+spec:
+  selector:
+    istio: ingressgateway
+  servers:
+  - port:
+      number: 80
+      name: http
+      protocol: HTTP
+    hosts:
+    - "*"
+
+---
+# Virtual Service for API Gateway
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: hms-api-gateway
+  namespace: ultimate-hms
+  labels:
+    app: hospital-management-system
+spec:
+  hosts:
+  - "*"
+  gateways:
+  - hms-gateway
+  http:
+  - match:
+    - uri:
+        prefix: "/api/v1"
+    route:
+    - destination:
+        host: kong-proxy.ultimate-hms.svc.cluster.local
+        port:
+          number: 8000
+  - match:
+    - uri:
+        prefix: "/graphql"
+    route:
+    - destination:
+        host: graphql-gateway.ultimate-hms.svc.cluster.local
+        port:
+          number: 4000
+  - match:
+    - uri:
+        prefix: "/auth"
+    route:
+    - destination:
+        host: keycloak.ultimate-hms.svc.cluster.local
+        port:
+          number: 8080
+
+---
+# Destination Rules for Traffic Policies
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: hms-services-dr
+  namespace: ultimate-hms
+  labels:
+    app: hospital-management-system
+spec:
+  host: "*.ultimate-hms.svc.cluster.local"
+  trafficPolicy:
+    loadBalancer:
+      simple: ROUND_ROBIN
+    connectionPool:
+      tcp:
+        maxConnections: 100
+      http:
+        http1MaxPendingRequests: 1024
+        http2MaxRequests: 1024
+        maxRequestsPerConnection: 10
+        maxRetries: 3
+    outlierDetection:
+      consecutive5xxErrors: 3
+      interval: 30s
+      baseEjectionTime: 30s
+      maxEjectionPercent: 50
+
+---
+# Peer Authentication for mTLS
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: hms-peer-authentication
+  namespace: ultimate-hms
+  labels:
+    app: hospital-management-system
+spec:
+  selector:
+    matchLabels:
+      app: hospital-management-system
+  mtls:
+    mode: STRICT
+
+---
+# Request Authentication
+apiVersion: security.istio.io/v1beta1
+kind: RequestAuthentication
+metadata:
+  name: hms-request-authentication
+  namespace: ultimate-hms
+  labels:
+    app: hospital-management-system
+spec:
+  selector:
+    matchLabels:
+      app: hospital-management-system
+  jwtRules:
+  - issuer: "https://keycloak.ultimate-hms.svc.cluster.local/auth/realms/hms"
+    jwksUri: "https://keycloak.ultimate-hms.svc.cluster.local/auth/realms/hms/protocol/openid-connect/certs"
+    forwardOriginalToken: true
+
+---
+# Authorization Policy
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: hms-authorization-policy
+  namespace: ultimate-hms
+  labels:
+    app: hospital-management-system
+spec:
+  selector:
+    matchLabels:
+      app: hospital-management-system
+  action: ALLOW
+  rules:
+  - from:
+    - source:
+        principals: ["cluster.local/ns/istio-system/sa/istio-ingressgateway-service-account"]
+    to:
+    - operation:
+        methods: ["GET", "POST", "PUT", "DELETE", "PATCH"]
+        paths: ["/api/v1/*", "/graphql/*", "/auth/*"]
+    when:
+    - key: request.auth.claims[preferred_username]
+      values: ["*"]
+
+---
+# Service Entry for external services
+apiVersion: networking.istio.io/v1beta1
+kind: ServiceEntry
+metadata:
+  name: external-services
+  namespace: ultimate-hms
+  labels:
+    app: hospital-management-system
+spec:
+  hosts:
+  - api.openai.com
+  - smtp.gmail.com
+  - api.twilio.com
+  ports:
+  - number: 443
+    name: https
+    protocol: HTTPS
+  - number: 587
+    name: smtp
+    protocol: TCP
+  resolution: DNS
+
+---
+# Envoy Filter for custom routing
+apiVersion: networking.istio.io/v1alpha3
+kind: EnvoyFilter
+metadata:
+  name: hms-envoy-filter
+  namespace: ultimate-hms
+  labels:
+    app: hospital-management-system
+spec:
+  workloadSelector:
+    labels:
+      app: hospital-management-system
+  configPatches:
+  - applyTo: HTTP_FILTER
+    match:
+      context: SIDECAR_INBOUND
+      listener:
+        filterChain:
+          filter:
+            name: "envoy.filters.network.http_connection_manager"
+            subFilter:
+              name: "envoy.filters.http.router"
+    patch:
+      operation: INSERT_BEFORE
+      value:
+        name: envoy.filters.http.cors
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.http.cors.v3.Cors
+          allow_origin_string_match:
+          - safe_regex:
+              google_re2: {}
+              regex: "https?://localhost(:[0-9]+)?$"
+          allow_methods: "GET,POST,PUT,DELETE,PATCH,OPTIONS"
+           allow_headers: "authorization,content-type,x-requested-with"
+           allow_credentials: true
+
+---
+# Telemetry configuration for observability
+apiVersion: telemetry.istio.io/v1alpha1
+kind: Telemetry
+metadata:
+  name: hms-telemetry
+  namespace: ultimate-hms
+  labels:
+    app: hospital-management-system
+spec:
+  selector:
+    matchLabels:
+      app: hospital-management-system
+  metrics:
+  - providers:
+    - name: prometheus
+    overrides:
+    - match:
+        metric: REQUEST_COUNT
+        mode: CLIENT_AND_SERVER
+      tagOverrides:
+        request_operation:
+          value: "istio_operationId"
+    - match:
+        metric: REQUEST_DURATION
+        mode: CLIENT_AND_SERVER
+      tagOverrides:
+        response_code:
+          value: "istio_responseCode"
+  tracing:
+  - providers:
+    - name: zipkin
+    randomSamplingPercentage: 100.0
+  accessLogging:
+  - providers:
+    - name: envoy
+    filter:
+      expression: "response.code >= 400"

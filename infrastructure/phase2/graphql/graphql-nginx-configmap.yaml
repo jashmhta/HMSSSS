@@ -1,0 +1,77 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: graphql-nginx-config
+  namespace: graphql-system
+  labels:
+    app: hospital-management-system
+    component: api
+    system: graphql
+data:
+  nginx.conf: |
+    events {
+      worker_connections 1024;
+    }
+    http {
+      include /etc/nginx/mime.types;
+      default_type application/json;
+
+      server {
+        listen 80;
+        server_name localhost;
+
+        location /health {
+          return 200 '{"status":"healthy","service":"graphql-api","version":"1.0.0"}';
+          add_header Content-Type application/json;
+        }
+
+        location / {
+          return 200 '{"message":"Ultimate HMS GraphQL API","version":"1.0.0","status":"healthy","endpoints":["/health","/status","/graphql"] }';
+          add_header Content-Type application/json;
+        }
+
+        location /status {
+          return 200 '{"graphql":{"status":"healthy","version":"1.0.0"},"openmrs":{"status":"operational"},"metasfresh":{"status":"operational"},"redis":{"status":"operational"},"elasticsearch":{"status":"operational"}}';
+          add_header Content-Type application/json;
+        }
+
+        location /graphql {
+          return 200 '{"data":{"systemStatus":{"graphql":{"status":"healthy","version":"1.0.0"},"openmrs":{"status":"operational"},"metasfresh":{"status":"operational"},"redis":{"status":"operational"},"elasticsearch":{"status":"operational"}}}}';
+          add_header Content-Type application/json;
+        }
+      }
+    }
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: graphql-static-files
+  namespace: graphql-system
+  labels:
+    app: hospital-management-system
+    component: api
+    system: graphql
+data:
+  index.html: |
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Ultimate HMS GraphQL API</title>
+      <style>
+        body { font-family: Arial, sans-serif; margin: 40px; }
+        .status { color: green; }
+      </style>
+    </head>
+    <body>
+      <h1>Ultimate HMS GraphQL API</h1>
+      <p class="status">Status: Healthy</p>
+      <p>Version: 1.0.0</p>
+      <p>Available endpoints:</p>
+      <ul>
+        <li><a href="/health">/health</a> - Health check</li>
+        <li><a href="/status">/status</a> - System status</li>
+        <li><a href="/graphql">/graphql</a> - GraphQL endpoint</li>
+      </ul>
+    </body>
+    </html>

@@ -1,0 +1,121 @@
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: hms-gateway
+  namespace: istio-system
+spec:
+  selector:
+    istio: ingressgateway
+  servers:
+  - port:
+      number: 80
+      name: http
+      protocol: HTTP
+    hosts:
+    - "*"
+  - port:
+      number: 443
+      name: https
+      protocol: HTTPS
+    tls:
+      mode: SIMPLE
+      credentialName: hms-tls
+    hosts:
+    - "*"
+
+---
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: hms-api-gateway
+  namespace: istio-system
+spec:
+  hosts:
+  - "*"
+  gateways:
+  - hms-gateway
+  http:
+  - match:
+    - uri:
+        prefix: "/api/v1"
+    route:
+    - destination:
+        host: graphql-hms.graphql-system.svc.cluster.local
+        port:
+          number: 4000
+  - match:
+    - uri:
+        prefix: "/openmrs"
+    route:
+    - destination:
+        host: openmrs.openmrs-system.svc.cluster.local
+        port:
+          number: 8080
+  - match:
+    - uri:
+        prefix: "/metasfresh"
+    route:
+    - destination:
+        host: metasfresh-backend.metasfresh-system.svc.cluster.local
+        port:
+          number: 8080
+  - match:
+    - uri:
+        prefix: "/sync"
+    route:
+    - destination:
+        host: data-sync-service.data-sync-system.svc.cluster.local
+        port:
+          number: 3000
+
+---
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: hms-api-routing
+  namespace: istio-system
+spec:
+  host: "*.svc.cluster.local"
+  trafficPolicy:
+    loadBalancer:
+      simple: ROUND_ROBIN
+    connectionPool:
+      tcp:
+        maxConnections: 100
+      http:
+        http1MaxPendingRequests: 10
+        maxRequestsPerConnection: 10
+    outlierDetection:
+      consecutive5xxErrors: 3
+      interval: 10s
+      baseEjectionTime: 30s
+
+---
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: default
+  namespace: istio-system
+spec:
+  mtls:
+    mode: PERMISSIVE
+
+---
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: hms-api-security
+  namespace: istio-system
+spec:
+  selector:
+    matchLabels:
+      app: hospital-management-system
+  action: ALLOW
+  rules:
+  - from:
+    - source:
+        principals: ["cluster.local/ns/istio-system/sa/istio-ingressgateway-service-account"]
+    to:
+    - operation:
+        methods: ["GET", "POST", "PUT", "DELETE"]
+        paths: ["/api/*", "/openmrs/*", "/metasfresh/*", "/sync/*"]

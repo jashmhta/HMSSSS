@@ -1,0 +1,75 @@
+---
+# OpenMRS RBAC Configuration
+# Service Account and Role Bindings for OpenMRS namespace
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: hms-admin
+  namespace: openmrs-system
+  labels:
+    app: hospital-management-system
+    component: clinical
+    system: openmrs
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: openmrs-admin-role
+  namespace: openmrs-system
+  labels:
+    app: hospital-management-system
+    component: clinical
+    system: openmrs
+rules:
+- apiGroups: [""]
+  resources: ["pods", "services", "endpoints", "configmaps", "secrets", "persistentvolumeclaims"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["apps"]
+  resources: ["deployments", "replicasets", "statefulsets"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["batch"]
+  resources: ["jobs", "cronjobs"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["networking.k8s.io"]
+  resources: ["ingresses"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: openmrs-admin-binding
+  namespace: openmrs-system
+  labels:
+    app: hospital-management-system
+    component: clinical
+    system: openmrs
+subjects:
+- kind: ServiceAccount
+  name: hms-admin
+  namespace: openmrs-system
+roleRef:
+  kind: Role
+  name: openmrs-admin-role
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# Cluster Role Binding for cross-namespace access (PostgreSQL in ultimate-hms)
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: openmrs-postgres-access
+  labels:
+    app: hospital-management-system
+    component: clinical
+    system: openmrs
+subjects:
+- kind: ServiceAccount
+  name: hms-admin
+  namespace: openmrs-system
+roleRef:
+  kind: ClusterRole
+  name: hms-admin-role
+  apiGroup: rbac.authorization.k8s.io

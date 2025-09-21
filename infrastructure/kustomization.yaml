@@ -1,0 +1,105 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+metadata:
+  name: hms-infrastructure
+
+# Common labels applied to all resources
+commonLabels:
+  app: hospital-management-system
+  managed-by: kustomize
+
+# Each service has its own namespace
+
+# Base resources
+resources:
+  # Databases
+  - databases/postgresql-cluster.yaml
+  - databases/elasticsearch-cluster.yaml
+  - databases/mongodb-cluster.yaml
+
+  # Core services
+  - phase2/data-sync/data-sync-deployment.yaml
+  - phase2/fhir/fhir-server-deployment.yaml
+  - phase2/dicom/dicom-server-deployment.yaml
+  - phase2/openmrs/openmrs-deployment-fixed.yaml
+  - phase2/metasfresh/metasfresh-deployment.yaml
+  - phase2/graphql/graphql-deployment.yaml
+
+  # Phase 3 services
+  - phase3/tenant-db-init-job.yaml
+  - phase3/tenant-configs.yaml
+  - phase3/analytics-service.yaml
+  - phase3/mobile-api-service.yaml
+  - phase3/oidc-security.yaml
+  - phase3/security-db-init.yaml
+
+  # Monitoring
+  - monitoring/prometheus-grafana.yaml
+
+  # Istio
+  - istio/istio-simple.yaml
+
+# Image transformations
+images:
+  - name: hms-backend
+    newTag: latest
+  - name: hms-frontend
+    newTag: latest
+  - name: hms-mobile
+    newTag: latest
+  - name: hms-graphql
+    newTag: latest
+  - name: hms-analytics
+    newTag: latest
+  - name: hms-mobile-api
+    newTag: latest
+
+# ConfigMap generators
+configMapGenerator:
+  - name: hms-config
+    literals:
+      - ENVIRONMENT=production
+      - LOG_LEVEL=info
+      - METRICS_ENABLED=true
+
+# Secret generators (use external secrets management in production)
+secretGenerator:
+  - name: hms-secrets
+    literals:
+      - jwt-secret=your-jwt-secret-here
+      - db-password=your-db-password-here
+      - api-keys=your-api-keys-here
+
+# Patches for different environments
+patchesStrategicMerge:
+  - patches/production.yaml
+  - patches/security.yaml
+
+# JSON 6902 patches
+patches:
+  # - target:
+  #     kind: Deployment
+  #     name: graphql-api
+  #   patch: |-
+  #     - op: replace
+  #       path: /spec/replicas
+  #       value: 3
+  - target:
+      kind: Deployment
+      name: analytics-service
+      namespace: analytics-system
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 2
+
+# Replica count transformations
+replicas:
+  # - name: graphql-api
+  #   count: 3
+  - name: analytics-service
+    count: 2
+  - name: mobile-api
+    count: 2
+

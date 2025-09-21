@@ -1,0 +1,129 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: openmrs
+  namespace: openmrs-system
+  labels:
+    app: hospital-management-system
+    component: clinical
+    system: openmrs
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: hospital-management-system
+      component: clinical
+      system: openmrs
+  template:
+    metadata:
+      labels:
+        app: hospital-management-system
+        component: clinical
+        system: openmrs
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/actuator/prometheus"
+    spec:
+      serviceAccountName: hms-admin
+      securityContext:
+        runAsUser: 0
+        runAsGroup: 0
+        fsGroup: 0
+      containers:
+      - name: openmrs
+        image: openmrs/openmrs-core:2.6.0
+        command: ["/bin/bash", "-c", "chmod +x /openmrs/startup.sh && exec /openmrs/startup.sh"]
+        ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+        - containerPort: 8443
+          name: https
+          protocol: TCP
+        env:
+        - name: OPENMRS_RUNTIME_PROPERTIES_FILE
+          value: /etc/openmrs/openmrs-runtime.properties
+        - name: OPENMRS_DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: openmrs-secrets
+              key: db-password
+        - name: OPENMRS_ADMIN_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: openmrs-secrets
+              key: admin-password
+        - name: OMRS_DB
+          value: "postgresql"
+        - name: OMRS_DB_HOSTNAME
+          value: "postgresql-hms.ultimate-hms.svc.cluster.local"
+        - name: OMRS_DB_PORT
+          value: "5432"
+        - name: OMRS_DB_NAME
+          value: "openmrs"
+        - name: OMRS_DB_USERNAME
+          value: "openmrs_user"
+        - name: OMRS_DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: openmrs-secrets
+              key: db-password
+        - name: JAVA_OPTS
+          value: "-Xmx2g -Xms1g -XX:+UseG1GC -XX:+UseContainerSupport -Djava.security.egd=file:/dev/./urandom"
+        volumeMounts:
+        - name: config
+          mountPath: /etc/openmrs
+          readOnly: true
+        - name: modules
+          mountPath: /usr/local/tomcat/.OpenMRS/modules
+        - name: openmrs-data
+          mountPath: /usr/local/tomcat/.OpenMRS
+        resources:
+          requests:
+            cpu: 1000m
+            memory: 2Gi
+          limits:
+            cpu: 2000m
+            memory: 4Gi
+        livenessProbe:
+          httpGet:
+            path: /openmrs/
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 300
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /openmrs/
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 60
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        startupProbe:
+          httpGet:
+            path: /openmrs/
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 30
+      volumes:
+      - name: config
+        configMap:
+          name: openmrs-config
+      - name: modules
+        emptyDir: {}
+      - name: openmrs-data
+        emptyDir: {}

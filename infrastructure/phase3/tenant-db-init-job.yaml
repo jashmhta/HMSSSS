@@ -1,0 +1,128 @@
+---
+# Multi-Tenant Database Initialization Job
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: tenant-db-init
+  namespace: ultimate-hms
+  labels:
+    app: hospital-management-system
+    component: database
+    system: tenant-init
+spec:
+  template:
+    spec:
+      serviceAccountName: hms-admin
+      restartPolicy: OnFailure
+      containers:
+      - name: tenant-init
+        image: postgres:15
+        command:
+        - /bin/bash
+        - -c
+        - |
+          set -e
+          echo "🚀 Initializing multi-tenant database schemas..."
+
+          # Wait for PostgreSQL to be ready
+          until pg_isready -h postgresql-hms.ultimate-hms.svc.cluster.local -p 5432 -U hms_user; do
+            echo "PostgreSQL is unavailable - sleeping"
+            sleep 2
+          done
+
+          echo "✅ PostgreSQL is ready"
+
+          # Create tenant schemas
+          echo "🏗️ Creating tenant schemas..."
+
+          PGPASSWORD=hms_user_password psql -h postgresql-hms.ultimate-hms.svc.cluster.local -p 5432 -U hms_user -d hms_db -c "
+            -- Create tenant isolation schemas
+            CREATE SCHEMA IF NOT EXISTS tenant_hospital_a;
+            CREATE SCHEMA IF NOT EXISTS tenant_hospital_b;
+            CREATE SCHEMA IF NOT EXISTS tenant_clinic_c;
+
+            -- Grant permissions to hms_user
+            GRANT ALL ON SCHEMA tenant_hospital_a TO hms_user;
+            GRANT ALL ON SCHEMA tenant_hospital_b TO hms_user;
+            GRANT ALL ON SCHEMA tenant_clinic_c TO hms_user;
+
+            -- Create tenant metadata table
+            CREATE TABLE IF NOT EXISTS public.tenants (
+              id SERIAL PRIMARY KEY,
+              tenant_id VARCHAR(50) UNIQUE NOT NULL,
+              schema_name VARCHAR(100) NOT NULL,
+              name VARCHAR(255) NOT NULL,
+              domain VARCHAR(255),
+              status VARCHAR(20) DEFAULT 'active',
+              created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+              updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+
+            -- Insert tenant records
+            INSERT INTO public.tenants (tenant_id, schema_name, name, domain) VALUES
+            ('hospital-a', 'tenant_hospital_a', 'General Hospital A', 'hospital-a.hms.local'),
+            ('hospital-b', 'tenant_hospital_b', 'Regional Hospital B', 'hospital-b.hms.local'),
+            ('clinic-c', 'tenant_clinic_c', 'Community Clinic C', 'clinic-c.hms.local')
+            ON CONFLICT (tenant_id) DO NOTHING;
+          "
+
+          # Create tenant-specific tables in each schema
+          for tenant in hospital_a hospital_b clinic_c; do
+            echo "📋 Creating tables for tenant_$tenant..."
+
+            PGPASSWORD=hms_user_password psql -h postgresql-hms.ultimate-hms.svc.cluster.local -p 5432 -U hms_user -d hms_db -c "
+              -- Set search path to tenant schema
+              SET search_path TO tenant_$tenant;
+
+              -- Create tenant-specific patient table
+              CREATE TABLE IF NOT EXISTS patients (
+                id SERIAL PRIMARY KEY,
+                tenant_id VARCHAR(50) NOT NULL DEFAULT '$tenant',
+                patient_id VARCHAR(100) UNIQUE NOT NULL,
+                first_name VARCHAR(100) NOT NULL,
+                last_name VARCHAR(100) NOT NULL,
+                date_of_birth DATE,
+                gender VARCHAR(20),
+                email VARCHAR(255),
+                phone VARCHAR(50),
+                address JSONB,
+                medical_record_number VARCHAR(100),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+              );
+
+              -- Create tenant-specific appointments table
+              CREATE TABLE IF NOT EXISTS appointments (
+                id SERIAL PRIMARY KEY,
+                tenant_id VARCHAR(50) NOT NULL DEFAULT '$tenant',
+                patient_id INTEGER REFERENCES patients(id),
+                provider_id INTEGER,
+                appointment_date TIMESTAMP NOT NULL,
+                duration INTEGER DEFAULT 30,
+                status VARCHAR(20) DEFAULT 'scheduled',
+                type VARCHAR(50),
+                notes TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+              );
+
+              -- Create indexes for performance
+              CREATE INDEX IF NOT EXISTS idx_patients_tenant ON patients(tenant_id);
+              CREATE INDEX IF NOT EXISTS idx_patients_mrn ON patients(medical_record_number);
+              CREATE INDEX IF NOT EXISTS idx_appointments_tenant ON appointments(tenant_id);
+              CREATE INDEX IF NOT EXISTS idx_appointments_date ON appointments(appointment_date);
+              CREATE INDEX IF NOT EXISTS idx_appointments_patient ON appointments(patient_id);
+            "
+          done
+
+          echo "🎉 Multi-tenant database initialization completed successfully"
+        env:
+        - name: PGPASSWORD
+          value: "hms_user_password"
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi

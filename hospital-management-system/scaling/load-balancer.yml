@@ -1,0 +1,213 @@
+version: '3.8'
+
+services:
+  # Advanced Load Balancer with HAProxy
+  load-balancer:
+    image: haproxy:2.7-alpine
+    container_name: hms-load-balancer
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8404:8404"  # HAProxy stats
+    volumes:
+      - ./scaling/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+      - ./nginx/ssl:/etc/ssl/certs:ro
+      - haproxy_logs:/var/log/haproxy
+    networks:
+      - hms_network
+    restart: unless-stopped
+    depends_on:
+      - backend
+      - frontend
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8404/stats"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Backend Service with Multiple Replicas
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.prod
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=${REDIS_URL}
+      - JWT_SECRET=${JWT_SECRET}
+      - API_PORT=3000
+    volumes:
+      - backend_logs:/app/logs
+      - uploads:/app/uploads
+    networks:
+      - hms_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # Frontend Service with Multiple Replicas
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+    environment:
+      - NODE_ENV=production
+      - API_URL=https://api.hms.local
+    networks:
+      - hms_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # PostgreSQL with Connection Pooling
+  postgres:
+    image: postgres:15-alpine
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 1G
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_MAX_CONNECTIONS=200
+      - POSTGRES_SHARED_BUFFERS=512MB
+      - POSTGRES_EFFECTIVE_CACHE_SIZE=1GB
+      - POSTGRES_WORK_MEM=4MB
+      - POSTGRES_MAINTENANCE_WORK_MEM=64MB
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - postgres_logs:/var/log/postgresql
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      - hms_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # Redis Cluster for High Availability
+  redis-master:
+    image: redis:7-alpine
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
+    volumes:
+      - redis_master_data:/data
+      - redis_logs:/var/log/redis
+    networks:
+      - hms_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  redis-replica:
+    image: redis:7-alpine
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    command: >
+      redis-server
+      --replicaof redis-master 6379
+      --requirepass ${REDIS_PASSWORD}
+      --masterauth ${REDIS_PASSWORD}
+      --appendonly yes
+    volumes:
+      - redis_replica_data:/data
+      - redis_logs:/var/log/redis
+    networks:
+      - hms_network
+    depends_on:
+      - redis-master
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_master_data:
+    driver: local
+  redis_replica_data:
+    driver: local
+  backend_logs:
+    driver: local
+  uploads:
+    driver: local
+  haproxy_logs:
+    driver: local
+  postgres_logs:
+    driver: local
+  redis_logs:
+    driver: local
+
+networks:
+  hms_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

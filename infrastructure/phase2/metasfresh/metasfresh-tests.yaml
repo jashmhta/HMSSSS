@@ -1,0 +1,98 @@
+---
+# Metasfresh Testing Suite - Enterprise Quality Assurance
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: metasfresh-integration-tests
+  namespace: metasfresh-system
+  labels:
+    app: hospital-management-system
+    component: erp
+    system: metasfresh
+    test-type: integration
+spec:
+  template:
+    spec:
+      serviceAccountName: hms-admin
+      restartPolicy: Never
+      containers:
+      - name: integration-tests
+        image: curlimages/curl:latest
+        command:
+        - /bin/sh
+        - -c
+        - |
+          set -e
+          echo "🚀 Starting Metasfresh Integration Tests"
+
+          # Wait for Metasfresh backend to be ready
+          echo "⏳ Waiting for Metasfresh backend to be ready..."
+          for i in {1..60}; do
+            if curl -s -f http://metasfresh-backend.metasfresh-system.svc.cluster.local/actuator/health > /dev/null 2>&1; then
+              echo "✅ Metasfresh backend is ready"
+              break
+            fi
+            if [ $i -eq 60 ]; then
+              echo "❌ Metasfresh backend failed to become ready within 5 minutes"
+              exit 1
+            fi
+            sleep 5
+          done
+
+          # Wait for Metasfresh webui to be ready
+          echo "⏳ Waiting for Metasfresh webui to be ready..."
+          for i in {1..30}; do
+            if curl -s -f http://metasfresh-webui.metasfresh-system.svc.cluster.local/health > /dev/null 2>&1; then
+              echo "✅ Metasfresh webui is ready"
+              break
+            fi
+            if [ $i -eq 30 ]; then
+              echo "❌ Metasfresh webui failed to become ready within 2.5 minutes"
+              exit 1
+            fi
+            sleep 5
+          done
+
+          # Test backend health endpoint
+          echo "🔍 Testing Backend Health Endpoint..."
+          BACKEND_RESPONSE=$(curl -s -w "\n%{http_code}" http://metasfresh-backend.metasfresh-system.svc.cluster.local/actuator/health)
+          BACKEND_CODE=$(echo "$BACKEND_RESPONSE" | tail -n1)
+
+          if [ "$BACKEND_CODE" -eq 200 ]; then
+            echo "✅ Backend health check PASSED"
+          else
+            echo "❌ Backend health check FAILED (HTTP $BACKEND_CODE)"
+            exit 1
+          fi
+
+          # Test webui health endpoint
+          echo "🔍 Testing WebUI Health Endpoint..."
+          WEBUI_RESPONSE=$(curl -s -w "\n%{http_code}" http://metasfresh-webui.metasfresh-system.svc.cluster.local/health)
+          WEBUI_CODE=$(echo "$WEBUI_RESPONSE" | tail -n1)
+
+          if [ "$WEBUI_CODE" -eq 200 ]; then
+            echo "✅ WebUI health check PASSED"
+          else
+            echo "❌ WebUI health check FAILED (HTTP $WEBUI_CODE)"
+            exit 1
+          fi
+
+          # Test RabbitMQ connectivity (if accessible)
+          echo "🐰 Testing RabbitMQ Management Interface..."
+          RABBITMQ_RESPONSE=$(curl -s -w "\n%{http_code}" -u metasfresh:metasfresh_passw0rd http://rabbitmq.metasfresh-system.svc.cluster.local:15672/api/overview 2>/dev/null || echo "Connection failed")
+          RABBITMQ_CODE=$(echo "$RABBITMQ_RESPONSE" | tail -n1 2>/dev/null || echo "000")
+
+          if [ "$RABBITMQ_CODE" -eq 200 ]; then
+            echo "✅ RabbitMQ connectivity test PASSED"
+          else
+            echo "⚠️ RabbitMQ connectivity test SKIPPED (may not be accessible)"
+          fi
+
+          echo "🎉 All Metasfresh integration tests PASSED!"
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi

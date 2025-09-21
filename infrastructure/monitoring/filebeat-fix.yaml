@@ -1,0 +1,18 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: filebeat-config
+  namespace: ultimate-hms
+  labels:
+    app: hospital-management-system
+    component: logging
+data:
+  filebeat.yml: |
+    filebeat.inputs:
+    - type: log
+      paths:
+        - /var/log/containers/*.log
+
+    output.logstash:
+      hosts: ["logstash:5044"]

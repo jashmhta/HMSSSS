@@ -1,0 +1,465 @@
+---
+# Data Synchronization Service - Real-time Event-Driven Sync
+# Phase 2C: Advanced Integration - Real-time Data Sync
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: data-sync-system
+  labels:
+    app: hospital-management-system
+    component: sync
+    system: data-sync
+    phase: phase2
+
+---
+# Data Sync ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: data-sync-config
+  namespace: data-sync-system
+  labels:
+    app: hospital-management-system
+    component: sync
+    system: data-sync
+data:
+  OPENMRS_API_URL: "http://openmrs.openmrs-system.svc.cluster.local"
+  METASFRESH_API_URL: "http://metasfresh-backend.metasfresh-system.svc.cluster.local"
+  RABBITMQ_URL: "amqp://metasfresh:rabbitmq_passw0rd@rabbitmq.metasfresh-system.svc.cluster.local:5672"
+  REDIS_URL: "redis://:redis_passw0rd@redis.graphql-system.svc.cluster.local:6379"
+  ELASTICSEARCH_URL: "http://elasticsearch-hms.ultimate-hms.svc.cluster.local:9200"
+  SYNC_INTERVAL: "30"
+  BATCH_SIZE: "100"
+  RETRY_ATTEMPTS: "3"
+  DEAD_LETTER_EXCHANGE: "sync.dlx"
+
+---
+# Data Sync Secrets
+apiVersion: v1
+kind: Secret
+metadata:
+  name: data-sync-secrets
+  namespace: data-sync-system
+  labels:
+    app: hospital-management-system
+    component: sync
+    system: data-sync
+type: Opaque
+data:
+  # Base64 encoded credentials
+  openmrs-username: YWRtaW4=     # admin
+  openmrs-password: YWRtaW5fcGFzc3cwcmQ=  # admin_passw0rd
+  metasfresh-username: YWRtaW4=   # admin
+  metasfresh-password: YWRtaW5fcGFzc3cwcmQ= # admin_passw0rd
+  rabbitmq-username: bWV0YXNmcmVzaA==  # metasfresh
+  rabbitmq-password: cmFiYml0bXFfcGFzc3cwcmQ=  # rabbitmq_passw0rd
+  redis-password: cmVkaXNfcGFzc3cwcmQ=   # redis_passw0rd
+  jwt-secret: ZGF0YS1zeW5jLWp3dC1zZWNyZXQ= # data-sync-jwt-secret
+
+---
+# RabbitMQ Exchanges and Queues for Data Sync
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rabbitmq-setup
+  namespace: data-sync-system
+  labels:
+    app: hospital-management-system
+    component: sync
+    system: data-sync
+data:
+  setup.sh: |
+    #!/bin/bash
+    set -e
+
+    echo "Setting up RabbitMQ exchanges and queues for data synchronization..."
+
+    # Wait for RabbitMQ to be ready
+    until rabbitmqctl node_health_check; do
+      echo "Waiting for RabbitMQ..."
+      sleep 5
+    done
+
+    # Create exchanges
+    rabbitmqadmin declare exchange name=sync.patient type=topic durable=true
+    rabbitmqadmin declare exchange name=sync.encounter type=topic durable=true
+    rabbitmqadmin declare exchange name=sync.businesspartner type=topic durable=true
+    rabbitmqadmin declare exchange name=sync.product type=topic durable=true
+    rabbitmqadmin declare exchange name=sync.dlx type=topic durable=true
+
+    # Create queues
+    rabbitmqadmin declare queue name=sync.patient.openmrs durable=true
+    rabbitmqadmin declare queue name=sync.patient.metasfresh durable=true
+    rabbitmqadmin declare queue name=sync.encounter.openmrs durable=true
+    rabbitmqadmin declare queue name=sync.businesspartner.metasfresh durable=true
+    rabbitmqadmin declare queue name=sync.product.metasfresh durable=true
+
+    # Create dead letter queues
+    rabbitmqadmin declare queue name=sync.dead.letter durable=true
+
+    # Bind queues to exchanges
+    rabbitmqadmin declare binding source=sync.patient destination_type=queue destination=sync.patient.openmrs routing_key=patient.created
+    rabbitmqadmin declare binding source=sync.patient destination_type=queue destination=sync.patient.openmrs routing_key=patient.updated
+    rabbitmqadmin declare binding source=sync.patient destination_type=queue destination=sync.patient.metasfresh routing_key=patient.created
+    rabbitmqadmin declare binding source=sync.patient destination_type=queue destination=sync.patient.metasfresh routing_key=patient.updated
+
+    rabbitmqadmin declare binding source=sync.encounter destination_type=queue destination=sync.encounter.openmrs routing_key=encounter.created
+    rabbitmqadmin declare binding source=sync.encounter destination_type=queue destination=sync.encounter.openmrs routing_key=encounter.updated
+
+    rabbitmqadmin declare binding source=sync.businesspartner destination_type=queue destination=sync.businesspartner.metasfresh routing_key=businesspartner.created
+    rabbitmqadmin declare binding source=sync.businesspartner destination_type=queue destination=sync.businesspartner.metasfresh routing_key=businesspartner.updated
+
+    rabbitmqadmin declare binding source=sync.product destination_type=queue destination=sync.product.metasfresh routing_key=product.created
+    rabbitmqadmin declare binding source=sync.product destination_type=queue destination=sync.product.metasfresh routing_key=product.updated
+
+    # Dead letter queue bindings
+    rabbitmqadmin declare binding source=sync.dlx destination_type=queue destination=sync.dead.letter routing_key=#
+
+    echo "RabbitMQ setup completed successfully"
+
+---
+# RabbitMQ Setup Job
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: rabbitmq-setup
+  namespace: data-sync-system
+  labels:
+    app: hospital-management-system
+    component: sync
+    system: data-sync
+spec:
+  template:
+    spec:
+      serviceAccountName: hms-admin
+      restartPolicy: OnFailure
+      containers:
+      - name: rabbitmq-setup
+        image: curlimages/curl:latest
+        command:
+        - /bin/sh
+        - -c
+        - |
+          # Wait for RabbitMQ to be ready
+          echo "Waiting for RabbitMQ management API..."
+          until curl -f -u $RABBITMQ_USER:$RABBITMQ_PASSWORD http://$RABBITMQ_HOST:$RABBITMQ_PORT/api/overview; do
+            echo "RabbitMQ not ready, waiting..."
+            sleep 5
+          done
+
+          echo "Setting up RabbitMQ exchanges and queues..."
+
+          # Create exchanges
+          curl -u $RABBITMQ_USER:$RABBITMQ_PASSWORD -X PUT http://$RABBITMQ_HOST:$RABBITMQ_PORT/api/exchanges/%2F/sync.patient -H "content-type:application/json" -d '{"type":"topic","durable":true}'
+          curl -u $RABBITMQ_USER:$RABBITMQ_PASSWORD -X PUT http://$RABBITMQ_HOST:$RABBITMQ_PORT/api/exchanges/%2F/sync.encounter -H "content-type:application/json" -d '{"type":"topic","durable":true}'
+          curl -u $RABBITMQ_USER:$RABBITMQ_PASSWORD -X PUT http://$RABBITMQ_HOST:$RABBITMQ_PORT/api/exchanges/%2F/sync.businesspartner -H "content-type:application/json" -d '{"type":"topic","durable":true}'
+          curl -u $RABBITMQ_USER:$RABBITMQ_PASSWORD -X PUT http://$RABBITMQ_HOST:$RABBITMQ_PORT/api/exchanges/%2F/sync.product -H "content-type:application/json" -d '{"type":"topic","durable":true}'
+          curl -u $RABBITMQ_USER:$RABBITMQ_PASSWORD -X PUT http://$RABBITMQ_HOST:$RABBITMQ_PORT/api/exchanges/%2F/sync.dlx -H "content-type:application/json" -d '{"type":"topic","durable":true}'
+
+          # Create queues
+          curl -u $RABBITMQ_USER:$RABBITMQ_PASSWORD -X PUT http://$RABBITMQ_HOST:$RABBITMQ_PORT/api/queues/%2F/sync.patient.openmrs -H "content-type:application/json" -d '{"durable":true}'
+          curl -u $RABBITMQ_USER:$RABBITMQ_PASSWORD -X PUT http://$RABBITMQ_HOST:$RABBITMQ_PORT/api/queues/%2F/sync.patient.metasfresh -H "content-type:application/json" -d '{"durable":true}'
+          curl -u $RABBITMQ_USER:$RABBITMQ_PASSWORD -X PUT http://$RABBITMQ_HOST:$RABBITMQ_PORT/api/queues/%2F/sync.encounter.openmrs -H "content-type:application/json" -d '{"durable":true}'
+          curl -u $RABBITMQ_USER:$RABBITMQ_PASSWORD -X PUT http://$RABBITMQ_HOST:$RABBITMQ_PORT/api/queues/%2F/sync.businesspartner.metasfresh -H "content-type:application/json" -d '{"durable":true}'
+          curl -u $RABBITMQ_USER:$RABBITMQ_PASSWORD -X PUT http://$RABBITMQ_HOST:$RABBITMQ_PORT/api/queues/%2F/sync.product.metasfresh -H "content-type:application/json" -d '{"durable":true}'
+          curl -u $RABBITMQ_USER:$RABBITMQ_PASSWORD -X PUT http://$RABBITMQ_HOST:$RABBITMQ_PORT/api/queues/%2F/sync.dead.letter -H "content-type:application/json" -d '{"durable":true}'
+
+          # Create bindings
+          curl -u $RABBITMQ_USER:$RABBITMQ_PASSWORD -X POST http://$RABBITMQ_HOST:$RABBITMQ_PORT/api/bindings/%2F/e/sync.patient/q/sync.patient.openmrs -H "content-type:application/json" -d '{"routing_key":"patient.created"}'
+          curl -u $RABBITMQ_USER:$RABBITMQ_PASSWORD -X POST http://$RABBITMQ_HOST:$RABBITMQ_PORT/api/bindings/%2F/e/sync.patient/q/sync.patient.openmrs -H "content-type:application/json" -d '{"routing_key":"patient.updated"}'
+          curl -u $RABBITMQ_USER:$RABBITMQ_PASSWORD -X POST http://$RABBITMQ_HOST:$RABBITMQ_PORT/api/bindings/%2F/e/sync.patient/q/sync.patient.metasfresh -H "content-type:application/json" -d '{"routing_key":"patient.created"}'
+          curl -u $RABBITMQ_USER:$RABBITMQ_PASSWORD -X POST http://$RABBITMQ_HOST:$RABBITMQ_PORT/api/bindings/%2F/e/sync.patient/q/sync.patient.metasfresh -H "content-type:application/json" -d '{"routing_key":"patient.updated"}'
+
+          curl -u $RABBITMQ_USER:$RABBITMQ_PASSWORD -X POST http://$RABBITMQ_HOST:$RABBITMQ_PORT/api/bindings/%2F/e/sync.encounter/q/sync.encounter.openmrs -H "content-type:application/json" -d '{"routing_key":"encounter.created"}'
+          curl -u $RABBITMQ_USER:$RABBITMQ_PASSWORD -X POST http://$RABBITMQ_HOST:$RABBITMQ_PORT/api/bindings/%2F/e/sync.encounter/q/sync.encounter.openmrs -H "content-type:application/json" -d '{"routing_key":"encounter.updated"}'
+
+          curl -u $RABBITMQ_USER:$RABBITMQ_PASSWORD -X POST http://$RABBITMQ_HOST:$RABBITMQ_PORT/api/bindings/%2F/e/sync.businesspartner/q/sync.businesspartner.metasfresh -H "content-type:application/json" -d '{"routing_key":"businesspartner.created"}'
+          curl -u $RABBITMQ_USER:$RABBITMQ_PASSWORD -X POST http://$RABBITMQ_HOST:$RABBITMQ_PORT/api/bindings/%2F/e/sync.businesspartner/q/sync.businesspartner.metasfresh -H "content-type:application/json" -d '{"routing_key":"businesspartner.updated"}'
+
+          curl -u $RABBITMQ_USER:$RABBITMQ_PASSWORD -X POST http://$RABBITMQ_HOST:$RABBITMQ_PORT/api/bindings/%2F/e/sync.product/q/sync.product.metasfresh -H "content-type:application/json" -d '{"routing_key":"product.created"}'
+          curl -u $RABBITMQ_USER:$RABBITMQ_PASSWORD -X POST http://$RABBITMQ_HOST:$RABBITMQ_PORT/api/bindings/%2F/e/sync.product/q/sync.product.metasfresh -H "content-type:application/json" -d '{"routing_key":"product.updated"}'
+
+          # Dead letter queue binding
+          curl -u $RABBITMQ_USER:$RABBITMQ_PASSWORD -X POST http://$RABBITMQ_HOST:$RABBITMQ_PORT/api/bindings/%2F/e/sync.dlx/q/sync.dead.letter -H "content-type:application/json" -d '{"routing_key":"#"}'
+
+          echo "RabbitMQ setup completed successfully"
+        env:
+        - name: RABBITMQ_HOST
+          value: "rabbitmq.metasfresh-system.svc.cluster.local"
+        - name: RABBITMQ_PORT
+          value: "15672"
+        - name: RABBITMQ_USER
+          value: "metasfresh"
+        - name: RABBITMQ_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: data-sync-secrets
+              key: rabbitmq-password
+
+---
+# Data Sync Service Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: data-sync-service
+  namespace: data-sync-system
+  labels:
+    app: hospital-management-system
+    component: sync
+    system: data-sync
+    service: sync
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: hospital-management-system
+      component: sync
+      system: data-sync
+      service: sync
+  template:
+    metadata:
+      labels:
+        app: hospital-management-system
+        component: sync
+        system: data-sync
+        service: sync
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "3000"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: hms-admin
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      initContainers:
+      - name: wait-for-dependencies
+        image: busybox
+        command:
+        - /bin/sh
+        - -c
+        - |
+          echo "Waiting for dependencies..."
+          # Wait for RabbitMQ
+          until nc -z rabbitmq.metasfresh-system.svc.cluster.local 5672; do
+            echo "Waiting for RabbitMQ..."
+            sleep 5
+          done
+          # Wait for Redis
+          until nc -z redis.graphql-system.svc.cluster.local 6379; do
+            echo "Waiting for Redis..."
+            sleep 5
+          done
+          echo "All dependencies ready"
+      containers:
+      - name: data-sync
+        image: node:18-alpine
+        ports:
+        - containerPort: 3000
+          name: metrics
+        env:
+        - name: NODE_ENV
+          value: "production"
+        - name: PORT
+          value: "3000"
+        - name: OPENMRS_API_URL
+          valueFrom:
+            configMapKeyRef:
+              name: data-sync-config
+              key: OPENMRS_API_URL
+        - name: METASFRESH_API_URL
+          valueFrom:
+            configMapKeyRef:
+              name: data-sync-config
+              key: METASFRESH_API_URL
+        - name: RABBITMQ_URL
+          valueFrom:
+            configMapKeyRef:
+              name: data-sync-config
+              key: RABBITMQ_URL
+        - name: REDIS_URL
+          valueFrom:
+            configMapKeyRef:
+              name: data-sync-config
+              key: REDIS_URL
+        - name: ELASTICSEARCH_URL
+          valueFrom:
+            configMapKeyRef:
+              name: data-sync-config
+              key: ELASTICSEARCH_URL
+        - name: SYNC_INTERVAL
+          valueFrom:
+            configMapKeyRef:
+              name: data-sync-config
+              key: SYNC_INTERVAL
+        - name: BATCH_SIZE
+          valueFrom:
+            configMapKeyRef:
+              name: data-sync-config
+              key: BATCH_SIZE
+        - name: RETRY_ATTEMPTS
+          valueFrom:
+            configMapKeyRef:
+              name: data-sync-config
+              key: RETRY_ATTEMPTS
+        - name: OPENMRS_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: data-sync-secrets
+              key: openmrs-username
+        - name: OPENMRS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: data-sync-secrets
+              key: openmrs-password
+        - name: METASFRESH_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: data-sync-secrets
+              key: metasfresh-username
+        - name: METASFRESH_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: data-sync-secrets
+              key: metasfresh-password
+        - name: RABBITMQ_USER
+          valueFrom:
+            secretKeyRef:
+              name: data-sync-secrets
+              key: rabbitmq-username
+        - name: RABBITMQ_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: data-sync-secrets
+              key: rabbitmq-password
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: data-sync-secrets
+              key: redis-password
+        workingDir: /app
+        command:
+        - /bin/sh
+        - -c
+        - |
+          cd /app
+          cp /code/package-json package.json
+          cp /code/index-js index.js
+          npm install --production
+          npm start
+        volumeMounts:
+        - name: sync-code-config
+          mountPath: /code
+          readOnly: true
+        resources:
+          requests:
+            cpu: 500m
+            memory: 1Gi
+          limits:
+            cpu: 1000m
+            memory: 2Gi
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+            scheme: HTTP
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+          readinessProbe:
+           httpGet:
+             path: /health
+             port: 3000
+             scheme: HTTP
+           initialDelaySeconds: 30
+           periodSeconds: 10
+           timeoutSeconds: 5
+           failureThreshold: 3
+      volumes:
+      - name: sync-code-config
+        configMap:
+          name: sync-code-config
+          defaultMode: 0644
+
+---
+# Data Sync Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: data-sync-service
+  namespace: data-sync-system
+  labels:
+    app: hospital-management-system
+    component: sync
+    system: data-sync
+    service: sync
+spec:
+  type: ClusterIP
+  ports:
+  - name: metrics
+    port: 80
+    targetPort: 3000
+  selector:
+    app: hospital-management-system
+    component: sync
+    system: data-sync
+    service: sync
+
+---
+# Data Sync HorizontalPodAutoscaler
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: data-sync-hpa
+  namespace: data-sync-system
+  labels:
+    app: hospital-management-system
+    component: sync
+    system: data-sync
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: data-sync-service
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+
+---
+# Data Sync PodDisruptionBudget
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: data-sync-pdb
+  namespace: data-sync-system
+  labels:
+    app: hospital-management-system
+    component: sync
+    system: data-sync
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: hospital-management-system
+      component: sync
+      system: data-sync
+      service: sync

@@ -1,0 +1,75 @@
+---
+# GraphQL API RBAC Configuration
+# Service Account and Role Bindings for GraphQL namespace
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: hms-admin
+  namespace: graphql-system
+  labels:
+    app: hospital-management-system
+    component: api
+    system: graphql
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: graphql-admin-role
+  namespace: graphql-system
+  labels:
+    app: hospital-management-system
+    component: api
+    system: graphql
+rules:
+- apiGroups: [""]
+  resources: ["pods", "services", "endpoints", "configmaps", "secrets", "persistentvolumeclaims"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["apps"]
+  resources: ["deployments", "replicasets", "statefulsets"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["batch"]
+  resources: ["jobs", "cronjobs"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["networking.k8s.io"]
+  resources: ["ingresses"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: graphql-admin-binding
+  namespace: graphql-system
+  labels:
+    app: hospital-management-system
+    component: api
+    system: graphql
+subjects:
+- kind: ServiceAccount
+  name: hms-admin
+  namespace: graphql-system
+roleRef:
+  kind: Role
+  name: graphql-admin-role
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# Cross-namespace access for data sources
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: graphql-cross-namespace-access
+  labels:
+    app: hospital-management-system
+    component: api
+    system: graphql
+subjects:
+- kind: ServiceAccount
+  name: hms-admin
+  namespace: graphql-system
+roleRef:
+  kind: ClusterRole
+  name: hms-admin-role
+  apiGroup: rbac.authorization.k8s.io

@@ -1,0 +1,303 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fhir-server-code
+  namespace: fhir-system
+  labels:
+    app: hospital-management-system
+    component: interoperability
+    system: fhir
+data:
+  package-json: |
+    {
+      "name": "hms-fhir-server",
+      "version": "1.0.0",
+      "description": "HL7 FHIR Server for HMS",
+      "main": "index.js",
+      "scripts": {
+        "start": "node index.js"
+      },
+      "dependencies": {
+        "express": "^4.18.2",
+        "node-fetch": "^2.6.7",
+        "winston": "^3.8.2",
+        "prom-client": "^14.2.0",
+        "uuid": "^9.0.0"
+      }
+    }
+
+  index-js: |
+    const express = require('express');
+    const fetch = require('node-fetch');
+    const winston = require('winston');
+    const promClient = require('prom-client');
+    const { v4: uuidv4 } = require('uuid');
+
+    const app = express();
+    const PORT = process.env.SERVER_PORT || 8080;
+
+    // Logger setup
+    const logger = winston.createLogger({
+      level: 'info',
+      format: winston.format.json(),
+      transports: [
+        new winston.transports.Console()
+      ]
+    });
+
+    // Prometheus metrics
+    const register = new promClient.Registry();
+    const fhirRequestsTotal = new promClient.Counter({
+      name: 'fhir_requests_total',
+      help: 'Total number of FHIR requests',
+      labelNames: ['method', 'resource', 'status']
+    });
+
+    const fhirRequestDuration = new promClient.Histogram({
+      name: 'fhir_request_duration_seconds',
+      help: 'Duration of FHIR requests',
+      labelNames: ['method', 'resource']
+    });
+
+    register.registerMetric(fhirRequestsTotal);
+    register.registerMetric(fhirRequestDuration);
+
+    app.use(express.json());
+
+    // FHIR Capability Statement
+    app.get('/fhir/metadata', async (req, res) => {
+      const end = fhirRequestDuration.startTimer({ method: 'GET', resource: 'metadata' });
+
+      try {
+        const capabilityStatement = {
+          resourceType: 'CapabilityStatement',
+          status: 'active',
+          date: new Date().toISOString(),
+          publisher: 'Ultimate HMS',
+          kind: 'instance',
+          software: {
+            name: 'HMS FHIR Server',
+            version: '1.0.0'
+          },
+          implementation: {
+            description: 'HL7 FHIR Server for Hospital Management System'
+          },
+          fhirVersion: process.env.FHIR_VERSION || '4.0.1',
+          format: ['json'],
+          rest: [{
+            mode: 'server',
+            resource: [
+              {
+                type: 'Patient',
+                interaction: [
+                  { code: 'read' },
+                  { code: 'search-type' },
+                  { code: 'create' },
+                  { code: 'update' }
+                ],
+                searchParam: [
+                  { name: '_id', type: 'token' },
+                  { name: 'identifier', type: 'token' },
+                  { name: 'name', type: 'string' },
+                  { name: 'birthdate', type: 'date' }
+                ]
+              },
+              {
+                type: 'Encounter',
+                interaction: [
+                  { code: 'read' },
+                  { code: 'search-type' },
+                  { code: 'create' },
+                  { code: 'update' }
+                ]
+              },
+              {
+                type: 'Observation',
+                interaction: [
+                  { code: 'read' },
+                  { code: 'search-type' },
+                  { code: 'create' },
+                  { code: 'update' }
+                ]
+              }
+            ]
+          }]
+        };
+
+        res.json(capabilityStatement);
+        fhirRequestsTotal.inc({ method: 'GET', resource: 'metadata', status: '200' });
+      } catch (error) {
+        logger.error('Error serving capability statement:', error);
+        res.status(500).json({ error: 'Internal server error' });
+        fhirRequestsTotal.inc({ method: 'GET', resource: 'metadata', status: '500' });
+      } finally {
+        end();
+      }
+    });
+
+    // FHIR Patient resources
+    app.get('/fhir/Patient', async (req, res) => {
+      const end = fhirRequestDuration.startTimer({ method: 'GET', resource: 'Patient' });
+
+      try {
+        // Get patients from OpenMRS
+        const openmrsResponse = await fetch(`${process.env.OPENMRS_BASE_URL}/ws/rest/v1/patient?q=&v=full`, {
+          headers: {
+            'Authorization': 'Basic ' + Buffer.from(`${process.env.OPENMRS_USERNAME}:${process.env.OPENMRS_PASSWORD}`).toString('base64')
+          }
+        });
+
+        if (!openmrsResponse.ok) {
+          throw new Error(`OpenMRS API error: ${openmrsResponse.status}`);
+        }
+
+        const openmrsData = await openmrsResponse.json();
+
+        // Convert to FHIR Patient resources
+        const fhirPatients = {
+          resourceType: 'Bundle',
+          type: 'searchset',
+          total: openmrsData.results?.length || 0,
+          entry: openmrsData.results?.map(patient => ({
+            resource: convertOpenMRSPatientToFHIR(patient)
+          })) || []
+        };
+
+        res.json(fhirPatients);
+        fhirRequestsTotal.inc({ method: 'GET', resource: 'Patient', status: '200' });
+      } catch (error) {
+        logger.error('Error fetching patients:', error);
+        res.status(500).json({ error: 'Failed to fetch patients' });
+        fhirRequestsTotal.inc({ method: 'GET', resource: 'Patient', status: '500' });
+      } finally {
+        end();
+      }
+    });
+
+    app.get('/fhir/Patient/:id', async (req, res) => {
+      const end = fhirRequestDuration.startTimer({ method: 'GET', resource: 'Patient' });
+
+      try {
+        const patientId = req.params.id;
+
+        // Get patient from OpenMRS
+        const openmrsResponse = await fetch(`${process.env.OPENMRS_BASE_URL}/ws/rest/v1/patient/${patientId}?v=full`, {
+          headers: {
+            'Authorization': 'Basic ' + Buffer.from(`${process.env.OPENMRS_USERNAME}:${process.env.OPENMRS_PASSWORD}`).toString('base64')
+          }
+        });
+
+        if (!openmrsResponse.ok) {
+          if (openmrsResponse.status === 404) {
+            return res.status(404).json({ error: 'Patient not found' });
+          }
+          throw new Error(`OpenMRS API error: ${openmrsResponse.status}`);
+        }
+
+        const patient = await openmrsResponse.json();
+        const fhirPatient = convertOpenMRSPatientToFHIR(patient);
+
+        res.json(fhirPatient);
+        fhirRequestsTotal.inc({ method: 'GET', resource: 'Patient', status: '200' });
+      } catch (error) {
+        logger.error('Error fetching patient:', error);
+        res.status(500).json({ error: 'Failed to fetch patient' });
+        fhirRequestsTotal.inc({ method: 'GET', resource: 'Patient', status: '500' });
+      } finally {
+        end();
+      }
+    });
+
+    // FHIR Encounter resources
+    app.get('/fhir/Encounter', async (req, res) => {
+      const end = fhirRequestDuration.startTimer({ method: 'GET', resource: 'Encounter' });
+
+      try {
+        // Get encounters from OpenMRS
+        const openmrsResponse = await fetch(`${process.env.OPENMRS_BASE_URL}/ws/rest/v1/encounter?q=&v=full`, {
+          headers: {
+            'Authorization': 'Basic ' + Buffer.from(`${process.env.OPENMRS_USERNAME}:${process.env.OPENMRS_PASSWORD}`).toString('base64')
+          }
+        });
+
+        if (!openmrsResponse.ok) {
+          throw new Error(`OpenMRS API error: ${openmrsResponse.status}`);
+        }
+
+        const openmrsData = await openmrsResponse.json();
+
+        // Convert to FHIR Encounter resources
+        const fhirEncounters = {
+          resourceType: 'Bundle',
+          type: 'searchset',
+          total: openmrsData.results?.length || 0,
+          entry: openmrsData.results?.map(encounter => ({
+            resource: convertOpenMRSEncounterToFHIR(encounter)
+          })) || []
+        };
+
+        res.json(fhirEncounters);
+        fhirRequestsTotal.inc({ method: 'GET', resource: 'Encounter', status: '200' });
+      } catch (error) {
+        logger.error('Error fetching encounters:', error);
+        res.status(500).json({ error: 'Failed to fetch encounters' });
+        fhirRequestsTotal.inc({ method: 'GET', resource: 'Encounter', status: '500' });
+      } finally {
+        end();
+      }
+    });
+
+    // Metrics endpoint
+    app.get('/fhir/metrics', async (req, res) => {
+      try {
+        res.set('Content-Type', register.contentType);
+        res.end(await register.metrics());
+      } catch (error) {
+        res.status(500).end(error.message);
+      }
+    });
+
+    // Helper functions
+    function convertOpenMRSPatientToFHIR(openmrsPatient) {
+      return {
+        resourceType: 'Patient',
+        id: openmrsPatient.uuid,
+        identifier: [{
+          system: 'urn:oid:2.16.840.1.113883.3.72',
+          value: openmrsPatient.uuid
+        }],
+        name: openmrsPatient.person?.names?.map(name => ({
+          family: name.familyName,
+          given: [name.givenName],
+          text: `${name.givenName} ${name.familyName}`
+        })) || [],
+        gender: openmrsPatient.person?.gender?.toLowerCase(),
+        birthDate: openmrsPatient.person?.birthdate,
+        active: !openmrsPatient.voided
+      };
+    }
+
+    function convertOpenMRSEncounterToFHIR(openmrsEncounter) {
+      return {
+        resourceType: 'Encounter',
+        id: openmrsEncounter.uuid,
+        status: 'finished',
+        class: {
+          system: 'http://terminology.hl7.org/CodeSystem/v3-ActCode',
+          code: 'AMB'
+        },
+        subject: {
+          reference: `Patient/${openmrsEncounter.patient?.uuid}`
+        },
+        period: {
+          start: openmrsEncounter.encounterDatetime
+        },
+        serviceProvider: {
+          reference: `Organization/${openmrsEncounter.location?.uuid}`
+        }
+      };
+    }
+
+    app.listen(PORT, () => {
+      logger.info(`HL7 FHIR Server listening on port ${PORT}`);
+    });

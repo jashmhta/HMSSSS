@@ -1,0 +1,607 @@
+---
+# Mobile API Service - Phase 3
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: mobile-system
+  labels:
+    app: hospital-management-system
+    component: mobile
+    system: mobile
+    phase: phase3
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mobile-config
+  namespace: mobile-system
+  labels:
+    app: hospital-management-system
+    component: mobile
+    system: mobile
+data:
+  DATABASE_HOST: "postgresql-hms.ultimate-hms.svc.cluster.local"
+  DATABASE_PORT: "5432"
+  DATABASE_NAME: "hms_db"
+  REDIS_URL: "redis://redis.graphql-system.svc.cluster.local:6379"
+  GRAPHQL_URL: "http://graphql-api.graphql-system.svc.cluster.local"
+  ANALYTICS_URL: "http://analytics-service.analytics-system.svc.cluster.local"
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mobile-secrets
+  namespace: mobile-system
+  labels:
+    app: hospital-management-system
+    component: mobile
+    system: mobile
+type: Opaque
+data:
+  db-username: aG1zX3VzZXI=     # hms_user
+  db-password: aG1zX3VzZXJfcGFzc3cwcmQ=  # hms_user_password
+  redis-password: cmVkaXNfcGFzc3cwcmQ=   # redis_passw0rd
+  jwt-secret: bW9iaWxlLWFwaS1qd3Qtc2VjcmV0 # mobile-api-jwt-secret
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mobile-api
+  namespace: mobile-system
+  labels:
+    app: hospital-management-system
+    component: mobile
+    system: mobile
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: hospital-management-system
+      component: mobile
+      system: mobile
+  template:
+    metadata:
+      labels:
+        app: hospital-management-system
+        component: mobile
+        system: mobile
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "3002"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: default
+      initContainers:
+      - name: init-mobile-code
+        image: node:18-alpine
+        command:
+        - /bin/sh
+        - -c
+        - |
+          mkdir -p /app
+          cd /app
+          cat > package.json << 'EOF'
+          {
+            "name": "hms-mobile-api",
+            "version": "1.0.0",
+            "description": "Mobile API Service for Ultimate HMS",
+            "main": "index.js",
+            "scripts": {
+              "start": "node index.js"
+            },
+            "dependencies": {
+              "express": "^4.18.2",
+              "pg": "^8.11.0",
+              "redis": "^4.6.0",
+              "jsonwebtoken": "^9.0.0",
+              "bcryptjs": "^2.4.3",
+              "axios": "^1.4.0",
+              "express-rate-limit": "^6.7.0",
+              "helmet": "^6.0.1",
+              "cors": "^2.8.5"
+            }
+          }
+          EOF
+
+          cat > index.js << 'EOF'
+          const express = require('express');
+          const { Pool } = require('pg');
+          const { createClient } = require('redis');
+          const jwt = require('jsonwebtoken');
+          const bcrypt = require('bcryptjs');
+          const axios = require('axios');
+          const rateLimit = require('express-rate-limit');
+          const helmet = require('helmet');
+          const cors = require('cors');
+
+          const app = express();
+          app.use(helmet());
+          app.use(cors());
+          app.use(express.json());
+
+          // Rate limiting
+          const limiter = rateLimit({
+            windowMs: 15 * 60 * 1000, // 15 minutes
+            max: 100 // limit each IP to 100 requests per windowMs
+          });
+          app.use('/api/', limiter);
+
+          // Database connections
+          const pool = new Pool({
+            host: process.env.DATABASE_HOST,
+            port: process.env.DATABASE_PORT,
+            database: process.env.DATABASE_NAME,
+            user: process.env.DATABASE_USERNAME,
+            password: process.env.DATABASE_PASSWORD,
+            max: 20
+          });
+
+          const redis = createClient({
+            url: process.env.REDIS_URL,
+            password: process.env.REDIS_PASSWORD
+          });
+
+          // Authentication middleware
+          const authenticateToken = (req, res, next) => {
+            const authHeader = req.headers['authorization'];
+            const token = authHeader && authHeader.split(' ')[1];
+
+            if (!token) return res.sendStatus(401);
+
+            jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
+              if (err) return res.sendStatus(403);
+              req.user = user;
+              next();
+            });
+          };
+
+          // Tenant context middleware
+          const getTenantContext = (req) => {
+            const tenantId = req.headers['x-tenant-id'] ||
+                            req.headers['x-tenantid'] ||
+                            req.user?.tenantId ||
+                            'default';
+            const schema = tenantId === 'default' ? 'public' : `tenant_${tenantId.replace('-', '_')}`;
+            return { tenantId, schema };
+          };
+
+          // Health checks
+          app.get('/health', (req, res) => {
+            res.json({ status: 'healthy', service: 'mobile-api' });
+          });
+
+          app.get('/ready', (req, res) => {
+            res.json({ status: 'ready', service: 'mobile-api' });
+          });
+
+          // Patient Authentication
+          app.post('/api/v1/auth/patient/login', async (req, res) => {
+            try {
+              const { email, password } = req.body;
+              const { schema } = getTenantContext(req);
+
+              const client = await pool.connect();
+              try {
+                await client.query(`SET search_path TO ${schema}`);
+
+                const result = await client.query(
+                  'SELECT id, email, first_name, last_name FROM patients WHERE email = $1',
+                  [email]
+                );
+
+                if (result.rows.length === 0) {
+                  return res.status(401).json({ error: 'Invalid credentials' });
+                }
+
+                // For demo purposes, accept any password
+                // In production, use proper password hashing
+                const user = result.rows[0];
+                const token = jwt.sign(
+                  { id: user.id, email: user.email, role: 'patient', tenantId: req.headers['x-tenant-id'] },
+                  process.env.JWT_SECRET,
+                  { expiresIn: '24h' }
+                );
+
+                res.json({
+                  token,
+                  user: {
+                    id: user.id,
+                    name: `${user.first_name} ${user.last_name}`,
+                    email: user.email
+                  }
+                });
+              } finally {
+                client.release();
+              }
+            } catch (error) {
+              console.error('Patient login error:', error);
+              res.status(500).json({ error: 'Login failed' });
+            }
+          });
+
+          // Doctor Authentication
+          app.post('/api/v1/auth/doctor/login', async (req, res) => {
+            try {
+              const { email, password } = req.body;
+              // For demo, simulate doctor login
+              // In production, integrate with user management system
+
+              const token = jwt.sign(
+                { id: 'doc-123', email, role: 'doctor', tenantId: req.headers['x-tenant-id'] },
+                process.env.JWT_SECRET,
+                { expiresIn: '24h' }
+              );
+
+              res.json({
+                token,
+                user: {
+                  id: 'doc-123',
+                  name: 'Dr. Smith',
+                  email: email,
+                  specialty: 'General Medicine'
+                }
+              });
+            } catch (error) {
+              console.error('Doctor login error:', error);
+              res.status(500).json({ error: 'Login failed' });
+            }
+          });
+
+          // Patient APIs
+          app.get('/api/v1/patient/appointments', authenticateToken, async (req, res) => {
+            try {
+              if (req.user.role !== 'patient') return res.sendStatus(403);
+
+              const { schema } = getTenantContext(req);
+              const client = await pool.connect();
+
+              try {
+                await client.query(`SET search_path TO ${schema}`);
+
+                const result = await client.query(`
+                  SELECT a.*, p.first_name, p.last_name
+                  FROM appointments a
+                  JOIN patients p ON a.patient_id = p.id
+                  WHERE a.patient_id = $1
+                  ORDER BY a.appointment_date DESC
+                  LIMIT 10
+                `, [req.user.id]);
+
+                res.json(result.rows.map(apt => ({
+                  id: apt.id,
+                  date: apt.appointment_date,
+                  duration: apt.duration,
+                  status: apt.status,
+                  type: apt.type,
+                  provider: `${apt.first_name} ${apt.last_name}`,
+                  notes: apt.notes
+                })));
+              } finally {
+                client.release();
+              }
+            } catch (error) {
+              console.error('Get appointments error:', error);
+              res.status(500).json({ error: 'Failed to fetch appointments' });
+            }
+          });
+
+          app.post('/api/v1/patient/appointments', authenticateToken, async (req, res) => {
+            try {
+              if (req.user.role !== 'patient') return res.sendStatus(403);
+
+              const { providerId, date, type, notes } = req.body;
+              const { schema } = getTenantContext(req);
+
+              const client = await pool.connect();
+              try {
+                await client.query(`SET search_path TO ${schema}`);
+
+                const result = await client.query(`
+                  INSERT INTO appointments (patient_id, provider_id, appointment_date, type, notes, status)
+                  VALUES ($1, $2, $3, $4, $5, 'scheduled')
+                  RETURNING id, appointment_date, status
+                `, [req.user.id, providerId, date, type, notes]);
+
+                res.status(201).json(result.rows[0]);
+              } finally {
+                client.release();
+              }
+            } catch (error) {
+              console.error('Book appointment error:', error);
+              res.status(500).json({ error: 'Failed to book appointment' });
+            }
+          });
+
+          app.get('/api/v1/patient/records', authenticateToken, async (req, res) => {
+            try {
+              if (req.user.role !== 'patient') return res.sendStatus(403);
+
+              // Get medical records from GraphQL API
+              const graphqlResponse = await axios.post(process.env.GRAPHQL_URL, {
+                query: `
+                  query GetPatientRecords($patientId: ID!) {
+                    patient(id: $patientId) {
+                      medicalRecords {
+                        id
+                        type
+                        date
+                        diagnosis {
+                          description
+                        }
+                        medications {
+                          name
+                          dosage
+                        }
+                      }
+                    }
+                  }
+                `,
+                variables: { patientId: req.user.id }
+              }, {
+                headers: {
+                  'x-tenant-id': req.headers['x-tenant-id'],
+                  'Authorization': req.headers['authorization']
+                }
+              });
+
+              res.json(graphqlResponse.data.data.patient.medicalRecords);
+            } catch (error) {
+              console.error('Get records error:', error);
+              res.status(500).json({ error: 'Failed to fetch medical records' });
+            }
+          });
+
+          // Doctor APIs
+          app.get('/api/v1/doctor/schedule', authenticateToken, async (req, res) => {
+            try {
+              if (req.user.role !== 'doctor') return res.sendStatus(403);
+
+              const { date } = req.query;
+              const targetDate = date || new Date().toISOString().split('T')[0];
+              const { schema } = getTenantContext(req);
+
+              const client = await pool.connect();
+              try {
+                await client.query(`SET search_path TO ${schema}`);
+
+                const result = await client.query(`
+                  SELECT a.*, p.first_name, p.last_name, p.date_of_birth
+                  FROM appointments a
+                  JOIN patients p ON a.patient_id = p.id
+                  WHERE DATE(a.appointment_date) = $1
+                  ORDER BY a.appointment_date
+                `, [targetDate]);
+
+                res.json(result.rows.map(apt => ({
+                  id: apt.id,
+                  time: apt.appointment_date,
+                  patient: {
+                    name: `${apt.first_name} ${apt.last_name}`,
+                    age: apt.date_of_birth ? Math.floor((new Date() - new Date(apt.date_of_birth)) / (365.25 * 24 * 60 * 60 * 1000)) : null
+                  },
+                  status: apt.status,
+                  type: apt.type,
+                  notes: apt.notes
+                })));
+              } finally {
+                client.release();
+              }
+            } catch (error) {
+              console.error('Get schedule error:', error);
+              res.status(500).json({ error: 'Failed to fetch schedule' });
+            }
+          });
+
+          app.put('/api/v1/doctor/patients/:id/record', authenticateToken, async (req, res) => {
+            try {
+              if (req.user.role !== 'doctor') return res.sendStatus(403);
+
+              const { diagnosis, prescription, notes } = req.body;
+              const patientId = req.params.id;
+              const { schema } = getTenantContext(req);
+
+              const client = await pool.connect();
+              try {
+                await client.query(`SET search_path TO ${schema}`);
+
+                // Insert medical record
+                await client.query(`
+                  INSERT INTO medical_records (patient_id, provider_id, diagnosis, prescription, notes, created_at)
+                  VALUES ($1, $2, $3, $4, $5, NOW())
+                `, [patientId, req.user.id, diagnosis, prescription, notes]);
+
+                res.json({ success: true, message: 'Record updated successfully' });
+              } finally {
+                client.release();
+              }
+            } catch (error) {
+              console.error('Update record error:', error);
+              res.status(500).json({ error: 'Failed to update patient record' });
+            }
+          });
+
+          // Analytics for mobile
+          app.get('/api/v1/analytics/dashboard', authenticateToken, async (req, res) => {
+            try {
+              const analyticsResponse = await axios.get(`${process.env.ANALYTICS_URL}/api/v1/analytics/patient-stats`, {
+                headers: {
+                  'x-tenant-id': req.headers['x-tenant-id'],
+                  'Authorization': req.headers['authorization']
+                }
+              });
+
+              res.json(analyticsResponse.data);
+            } catch (error) {
+              console.error('Analytics error:', error);
+              res.status(500).json({ error: 'Failed to fetch analytics' });
+            }
+          });
+
+          const PORT = process.env.PORT || 3002;
+          app.listen(PORT, () => {
+            console.log(`🚀 Mobile API service running on port ${PORT}`);
+          });
+          EOF
+        volumeMounts:
+        - name: app-code
+          mountPath: /app
+      containers:
+      - name: mobile-api
+        image: node:18-alpine
+        ports:
+        - containerPort: 3002
+          name: http
+        env:
+        - name: NODE_ENV
+          value: "production"
+        - name: PORT
+          value: "3002"
+        - name: DATABASE_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: mobile-config
+              key: DATABASE_HOST
+        - name: DATABASE_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: mobile-config
+              key: DATABASE_PORT
+        - name: DATABASE_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: mobile-config
+              key: DATABASE_NAME
+        - name: DATABASE_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: mobile-secrets
+              key: db-username
+        - name: DATABASE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: mobile-secrets
+              key: db-password
+        - name: REDIS_URL
+          valueFrom:
+            configMapKeyRef:
+              name: mobile-config
+              key: REDIS_URL
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: mobile-secrets
+              key: redis-password
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: mobile-secrets
+              key: jwt-secret
+        - name: GRAPHQL_URL
+          valueFrom:
+            configMapKeyRef:
+              name: mobile-config
+              key: GRAPHQL_URL
+        - name: ANALYTICS_URL
+          valueFrom:
+            configMapKeyRef:
+              name: mobile-config
+              key: ANALYTICS_URL
+        workingDir: /app
+        command:
+        - /bin/sh
+        - -c
+        - |
+          cd /app
+          npm install
+          npm start
+        volumeMounts:
+        - name: app-code
+          mountPath: /app
+        resources:
+          requests:
+            cpu: 200m
+            memory: 512Mi
+          limits:
+            cpu: 500m
+            memory: 1Gi
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3002
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 3002
+          initialDelaySeconds: 15
+          periodSeconds: 10
+          timeoutSeconds: 5
+      volumes:
+      - name: app-code
+        emptyDir: {}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mobile-api
+  namespace: mobile-system
+  labels:
+    app: hospital-management-system
+    component: mobile
+    system: mobile
+spec:
+  selector:
+    app: hospital-management-system
+    component: mobile
+    system: mobile
+  ports:
+  - name: http
+    port: 80
+    targetPort: 3002
+    protocol: TCP
+  type: ClusterIP
+
+---
+# Mobile API Ingress
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: mobile-api-ingress
+  namespace: mobile-system
+  labels:
+    app: hospital-management-system
+    component: mobile
+    system: mobile
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/rate-limit: "100"
+    nginx.ingress.kubernetes.io/rate-limit-window: "1m"
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/cors-allow-origin: "*"
+    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, PUT, DELETE, OPTIONS"
+    nginx.ingress.kubernetes.io/cors-allow-headers: "DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization,X-Tenant-ID"
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - mobile-api.hms.local
+    secretName: mobile-api-tls
+  rules:
+  - host: mobile-api.hms.local
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: mobile-api
+            port:
+              number: 80

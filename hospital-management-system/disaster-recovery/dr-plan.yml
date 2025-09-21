@@ -1,0 +1,178 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: hms-disaster-recovery-plan
+  namespace: hms
+data:
+  disaster-recovery-plan.json: |
+    {
+      "version": "1.0",
+      "lastUpdated": "2024-01-15",
+      "organization": "Hospital Management System",
+      "contact": {
+        "primary": "dr-coordinator@hospital.com",
+        "secondary": "it-director@hospital.com",
+        "emergency": "+1-555-0123"
+      },
+      "objectives": {
+        "rto": "4 hours",
+        "rpo": "15 minutes",
+        "mttr": "2 hours"
+      },
+      "recoveryStrategies": {
+        "dataCenterFailure": {
+          "strategy": "Multi-region deployment",
+          "primarySite": "us-east-1",
+          "secondarySite": "us-west-2",
+          "failoverTime": "30 minutes"
+        },
+        "serviceFailure": {
+          "strategy": "Blue-green deployment with automated rollback",
+          "rollbackTime": "10 minutes"
+        },
+        "dataCorruption": {
+          "strategy": "Point-in-time recovery from backups",
+          "recoveryTime": "2 hours"
+        },
+        "cyberAttack": {
+          "strategy": "Isolated backup systems with air-gapping",
+          "recoveryTime": "6 hours"
+        }
+      },
+      "criticalSystems": [
+        {
+          "name": "Patient Database",
+          "priority": "Critical",
+          "rto": "1 hour",
+          "rpo": "5 minutes",
+          "dependencies": ["PostgreSQL", "Redis"]
+        },
+        {
+          "name": "API Services",
+          "priority": "High",
+          "rto": "30 minutes",
+          "rpo": "1 minute",
+          "dependencies": ["Backend", "Load Balancer"]
+        },
+        {
+          "name": "Frontend Application",
+          "priority": "Medium",
+          "rto": "2 hours",
+          "rpo": "15 minutes",
+          "dependencies": ["CDN", "Static Assets"]
+        },
+        {
+          "name": "Monitoring Systems",
+          "priority": "High",
+          "rto": "1 hour",
+          "rpo": "5 minutes",
+          "dependencies": ["Prometheus", "Grafana", "ELK Stack"]
+        }
+      ],
+      "communicationPlan": {
+        "internal": {
+          "slack": "#incident-response",
+          "email": "it-team@hospital.com",
+          "phone": "extension 911"
+        },
+        "external": {
+          "patients": "1-800-PATIENT",
+          "media": "pr@hospital.com",
+          "regulators": "compliance@hospital.com"
+        }
+      },
+      "escalationMatrix": {
+        "level1": {
+          "trigger": "Service degradation",
+          "responders": ["On-call Engineer"],
+          "timeout": "15 minutes"
+        },
+        "level2": {
+          "trigger": "Service outage",
+          "responders": ["DevOps Team", "Database Admin"],
+          "timeout": "30 minutes"
+        },
+        "level3": {
+          "trigger": "Data center failure",
+          "responders": ["DR Coordinator", "IT Director", "Executive Team"],
+          "timeout": "60 minutes"
+        }
+      }
+    }
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: hms-backup-strategy
+  namespace: hms
+data:
+  backup-strategy.json: |
+    {
+      "backupTypes": {
+        "full": {
+          "frequency": "Weekly",
+          "retention": "30 days",
+          "schedule": "Sunday 02:00 UTC",
+          "method": "pg_dump with compression"
+        },
+        "incremental": {
+          "frequency": "Daily",
+          "retention": "7 days",
+          "schedule": "Daily 02:00 UTC",
+          "method": "WAL archiving"
+        },
+        "continuous": {
+          "frequency": "Real-time",
+          "retention": "24 hours",
+          "method": "Streaming replication"
+        }
+      },
+      "storageLocations": [
+        {
+          "name": "Primary S3",
+          "type": "Cloud Storage",
+          "region": "us-east-1",
+          "encryption": "AES-256",
+          "retention": "365 days"
+        },
+        {
+          "name": "Secondary S3",
+          "type": "Cloud Storage",
+          "region": "us-west-2",
+          "encryption": "AES-256",
+          "retention": "365 days"
+        },
+        {
+          "name": "On-premise NAS",
+          "type": "Local Storage",
+          "location": "Data Center B",
+          "encryption": "AES-256",
+          "retention": "90 days"
+        },
+        {
+          "name": "Tape Backup",
+          "type": "Offline Storage",
+          "location": "Secure Facility",
+          "encryption": "AES-256",
+          "retention": "7 years"
+        }
+      ],
+      "backupVerification": {
+        "automated": [
+          "Checksum validation",
+          "Restore testing",
+          "Integrity checks"
+        ],
+        "manual": [
+          "Quarterly restore drills",
+          "Annual full recovery test",
+          "Compliance audits"
+        ]
+      },
+      "encryption": {
+        "algorithm": "AES-256-GCM",
+        "keyManagement": "AWS KMS",
+        "keyRotation": "90 days",
+        "backupKeys": "Separate secure location"
+      }
+    }

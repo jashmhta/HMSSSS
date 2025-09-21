@@ -1,0 +1,46 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: openmrs-db-init
+  namespace: openmrs-system
+  labels:
+    app: hospital-management-system
+    component: clinical
+    system: openmrs
+spec:
+  template:
+    spec:
+      serviceAccountName: hms-admin
+      restartPolicy: OnFailure
+      containers:
+      - name: db-init
+        image: postgres:15
+        command:
+        - /bin/bash
+        - -c
+        - |
+          set -e
+          echo "Waiting for PostgreSQL to be ready..."
+          until pg_isready -h postgresql-hms.ultimate-hms.svc.cluster.local -p 5432 -U hms_user -d hms_db; do
+            echo "PostgreSQL is unavailable - sleeping"
+            sleep 2
+          done
+
+          echo "Creating OpenMRS database and user..."
+          PGPASSWORD=hms_user_password psql -h postgresql-hms.ultimate-hms.svc.cluster.local -p 5432 -U hms_user -d hms_db -c "CREATE DATABASE openmrs WITH ENCODING 'UTF8'"
+          PGPASSWORD=hms_user_password psql -h postgresql-hms.ultimate-hms.svc.cluster.local -p 5432 -U hms_user -d hms_db -c "CREATE USER openmrs_user WITH ENCRYPTED PASSWORD 'openmrs_passw0rd'"
+          PGPASSWORD=hms_user_password psql -h postgresql-hms.ultimate-hms.svc.cluster.local -p 5432 -U hms_user -d hms_db -c "GRANT ALL PRIVILEGES ON DATABASE openmrs TO openmrs_user"
+          PGPASSWORD=hms_user_password psql -h postgresql-hms.ultimate-hms.svc.cluster.local -p 5432 -U hms_user -d hms_db -c "ALTER USER openmrs_user CREATEDB"
+
+          echo "Database initialization completed successfully"
+        env:
+        - name: PGPASSWORD
+          value: "hms_user_password"
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi

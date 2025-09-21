@@ -1,0 +1,212 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: fhir-system
+  labels:
+    app: hospital-management-system
+    component: interoperability
+    system: fhir
+    phase: phase2
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fhir-config
+  namespace: fhir-system
+  labels:
+    app: hospital-management-system
+    component: interoperability
+    system: fhir
+data:
+  OPENMRS_BASE_URL: "http://openmrs.openmrs-system.svc.cluster.local"
+  METASFRESH_BASE_URL: "http://metasfresh-backend.metasfresh-system.svc.cluster.local"
+  DATA_SYNC_URL: "http://data-sync-service.data-sync-system.svc.cluster.local:3000"
+  FHIR_VERSION: "4.0.1"
+  SERVER_PORT: "8080"
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: fhir-secrets
+  namespace: fhir-system
+  labels:
+    app: hospital-management-system
+    component: interoperability
+    system: fhir
+type: Opaque
+data:
+  # Base64 encoded credentials
+  openmrs-username: "YWRtaW4="  # admin
+  openmrs-password: "YWRtaW5fcGFzc3cwcmQ="  # admin_passw0rd
+  metasfresh-username: "bWV0YXNmcmVzaA=="  # metasfresh
+  metasfresh-password: "bWV0YXNmcmVzaF9wYXNzdzByZA=="  # metasfresh_passw0rd
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fhir-server
+  namespace: fhir-system
+  labels:
+    app: hospital-management-system
+    component: interoperability
+    system: fhir
+    service: fhir-server
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: hospital-management-system
+      component: interoperability
+      system: fhir
+      service: fhir-server
+  template:
+    metadata:
+      labels:
+        app: hospital-management-system
+        component: interoperability
+        system: fhir
+        service: fhir-server
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/fhir/metrics"
+    spec:
+      containers:
+      - name: fhir-server
+        image: node:18-alpine
+        ports:
+        - containerPort: 8080
+          name: http
+        env:
+        - name: NODE_ENV
+          value: "production"
+        - name: OPENMRS_BASE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: fhir-config
+              key: OPENMRS_BASE_URL
+        - name: METASFRESH_BASE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: fhir-config
+              key: METASFRESH_BASE_URL
+        - name: DATA_SYNC_URL
+          valueFrom:
+            configMapKeyRef:
+              name: fhir-config
+              key: DATA_SYNC_URL
+        - name: FHIR_VERSION
+          valueFrom:
+            configMapKeyRef:
+              name: fhir-config
+              key: FHIR_VERSION
+        - name: OPENMRS_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: fhir-secrets
+              key: openmrs-username
+        - name: OPENMRS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: fhir-secrets
+              key: openmrs-password
+        - name: METASFRESH_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: fhir-secrets
+              key: metasfresh-username
+        - name: METASFRESH_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: fhir-secrets
+              key: metasfresh-password
+        workingDir: /app
+        command:
+        - /bin/sh
+        - -c
+        - |
+          cd /app
+          cp /code/package-json package.json
+          cp /code/index-js index.js
+          npm install --production
+          npm start
+        volumeMounts:
+        - name: fhir-code
+          mountPath: /code
+          readOnly: true
+        resources:
+          requests:
+            cpu: 200m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        livenessProbe:
+          httpGet:
+            path: /fhir/metadata
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /fhir/metadata
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 15
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+      volumes:
+      - name: fhir-code
+        configMap:
+          name: fhir-server-code
+          defaultMode: 0644
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fhir-server
+  namespace: fhir-system
+  labels:
+    app: hospital-management-system
+    component: interoperability
+    system: fhir
+    service: fhir-server
+spec:
+  selector:
+    app: hospital-management-system
+    component: interoperability
+    system: fhir
+    service: fhir-server
+  ports:
+  - name: http
+    port: 80
+    targetPort: 8080
+    protocol: TCP
+  type: ClusterIP
+
+---
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: fhir-server-routing
+  namespace: fhir-system
+spec:
+  hosts:
+  - "fhir.hms.local"
+  http:
+  - match:
+    - uri:
+        prefix: "/fhir"
+    route:
+    - destination:
+        host: fhir-server.fhir-system.svc.cluster.local
+        port:
+          number: 80

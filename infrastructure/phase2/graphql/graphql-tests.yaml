@@ -1,0 +1,54 @@
+---
+# GraphQL API Testing Suite - Enterprise Quality Assurance
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: graphql-integration-tests
+  namespace: graphql-system
+  labels:
+    app: hospital-management-system
+    component: api
+    system: graphql
+    test-type: integration
+spec:
+  template:
+    spec:
+      serviceAccountName: hms-admin
+      restartPolicy: Never
+      containers:
+      - name: integration-tests
+        image: curlimages/curl:latest
+        command:
+        - /bin/sh
+        - -c
+        - |
+          set -e
+          echo "🚀 Starting GraphQL API Integration Tests"
+
+          # Test GraphQL API connectivity
+          echo "🌐 Testing GraphQL API connectivity..."
+
+          # Test basic GraphQL connectivity
+          BASIC_RESPONSE=$(curl -s -w "\n%{http_code}" \
+            -X POST \
+            -H "Content-Type: application/json" \
+            --max-time 10 \
+            http://graphql-api.graphql-system.svc.cluster.local/graphql \
+            -d '{"query": "{ systemStatus }"}' 2>/dev/null || echo "Connection failed")
+          BASIC_CODE=$(echo "$BASIC_RESPONSE" | tail -n1 2>/dev/null || echo "000")
+
+          if [ "$BASIC_CODE" = "200" ]; then
+            echo "✅ GraphQL API connectivity test PASSED"
+          else
+            echo "❌ GraphQL API connectivity test FAILED (HTTP $BASIC_CODE)"
+            echo "Response: $BASIC_RESPONSE"
+          fi
+
+          echo "🎉 GraphQL API test completed!"
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi

@@ -1,0 +1,492 @@
+---
+# Ultimate HMS - Elasticsearch Cluster Configuration
+# This configuration sets up an Elasticsearch cluster for search and analytics
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: elasticsearch-config
+  namespace: ultimate-hms
+  labels:
+    app: hospital-management-system
+    component: search
+data:
+  elasticsearch.yml: |
+    cluster.name: hms-elasticsearch
+    node.name: ${POD_NAME}
+    path.data: /usr/share/elasticsearch/data
+    path.logs: /usr/share/elasticsearch/logs
+    network.host: 0.0.0.0
+    http.port: 9200
+    discovery.seed_hosts: 127.0.0.1:9300
+    cluster.initial_master_nodes: elasticsearch-0
+    bootstrap.memory_lock: false
+    xpack.security.enabled: false
+    xpack.security.transport.ssl.enabled: false
+    xpack.security.http.ssl.enabled: false
+    xpack.monitoring.collection.enabled: true
+
+  jvm.options: |
+    -Xms2g
+    -Xmx2g
+    -XX:+UseG1GC
+    -XX:MaxGCPauseMillis=200
+    -XX:+UnlockExperimentalVMOptions
+    -Djava.security.egd=file:/dev/./urandom
+
+  log4j2.properties: |
+    appender.console.type = Console
+    appender.console.name = console
+    appender.console.layout.type = PatternLayout
+    appender.console.layout.pattern = [%d{ISO8601}][%-5p][%-25c{1.}] %marker%m%n
+
+    rootLogger.level = info
+    rootLogger.appenderRef.console.ref = console
+
+---
+# Elasticsearch StatefulSet
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: elasticsearch
+  namespace: ultimate-hms
+  labels:
+    app: hospital-management-system
+    component: search
+    system: elasticsearch
+spec:
+  serviceName: elasticsearch-hms
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hospital-management-system
+      component: search
+      system: elasticsearch
+  template:
+    metadata:
+      labels:
+        app: hospital-management-system
+        component: search
+        system: elasticsearch
+    spec:
+      serviceAccountName: hms-admin
+      priorityClassName: hms-critical
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      initContainers:
+      - name: init-sysctl
+        image: busybox:1.27.2
+        command:
+        - sysctl
+        - -w
+        - vm.max_map_count=262144
+        securityContext:
+          privileged: true
+      containers:
+      - name: elasticsearch
+        image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+        ports:
+        - containerPort: 9200
+          name: http
+        - containerPort: 9300
+          name: transport
+        env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: ES_JAVA_OPTS
+          value: "-Xms2g -Xmx2g"
+        - name: ELASTIC_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: elasticsearch-secret
+              key: elastic-password
+        volumeMounts:
+        - name: elasticsearch-data
+          mountPath: /usr/share/elasticsearch/data
+        - name: elasticsearch-config
+          mountPath: /usr/share/elasticsearch/config/elasticsearch.yml
+          subPath: elasticsearch.yml
+        - name: jvm-config
+          mountPath: /usr/share/elasticsearch/config/jvm.options
+          subPath: jvm.options
+        - name: log4j-config
+          mountPath: /usr/share/elasticsearch/config/log4j2.properties
+          subPath: log4j2.properties
+
+        resources:
+          requests:
+            cpu: 1000m
+            memory: 4Gi
+          limits:
+            cpu: 2000m
+            memory: 8Gi
+        livenessProbe:
+          httpGet:
+            path: /_cluster/health
+            port: 9200
+            scheme: HTTP
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 6
+        readinessProbe:
+          httpGet:
+            path: /_cluster/health
+            port: 9200
+            scheme: HTTP
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+      volumes:
+      - name: elasticsearch-config
+        configMap:
+          name: elasticsearch-config
+          items:
+          - key: elasticsearch.yml
+            path: elasticsearch.yml
+      - name: jvm-config
+        configMap:
+          name: elasticsearch-config
+          items:
+          - key: jvm.options
+            path: jvm.options
+      - name: log4j-config
+        configMap:
+          name: elasticsearch-config
+          items:
+          - key: log4j2.properties
+            path: log4j2.properties
+  volumeClaimTemplates:
+  - metadata:
+      name: elasticsearch-data
+      labels:
+        app: hospital-management-system
+        component: search
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      resources:
+        requests:
+          storage: 100Gi
+      storageClassName: standard
+
+---
+# Elasticsearch Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: elasticsearch-hms
+  namespace: ultimate-hms
+  labels:
+    app: hospital-management-system
+    component: search
+    system: elasticsearch
+spec:
+  selector:
+    app: hospital-management-system
+    component: search
+    system: elasticsearch
+  ports:
+  - name: http
+    port: 9200
+    targetPort: 9200
+  - name: transport
+    port: 9300
+    targetPort: 9300
+  clusterIP: None
+
+---
+# Elasticsearch Secret
+apiVersion: v1
+kind: Secret
+metadata:
+  name: elasticsearch-secret
+  namespace: ultimate-hms
+  labels:
+    app: hospital-management-system
+    component: search
+type: Opaque
+data:
+  elastic-password: ZWxhc3RpY19wYXNzd29yZA==  # base64 encoded: elastic_password
+
+---
+# Elasticsearch Certificates Secret (placeholder)
+apiVersion: v1
+kind: Secret
+metadata:
+  name: elasticsearch-certs
+  namespace: ultimate-hms
+  labels:
+    app: hospital-management-system
+    component: search
+type: Opaque
+data:
+  elastic-certificates.p12: ZWxhc3RpY19jZXJ0aWZpY2F0ZXM=  # placeholder
+
+---
+# Elasticsearch Init Job
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: elasticsearch-init
+  namespace: ultimate-hms
+  labels:
+    app: hospital-management-system
+    component: search
+spec:
+  template:
+    spec:
+      serviceAccountName: hms-admin
+      restartPolicy: OnFailure
+      containers:
+      - name: elasticsearch-init
+        image: curlimages/curl:8.00.1
+        command:
+        - /bin/sh
+        - -c
+        - |
+          # Wait for Elasticsearch to be ready
+          until curl -f http://elasticsearch-hms:9200/_cluster/health; do
+            echo "Waiting for Elasticsearch..."
+            sleep 10
+          done
+
+          # Create HMS indices
+          curl -X PUT http://elasticsearch-hms:9200/patients \
+            -H 'Content-Type: application/json' \
+            -d '{
+              "settings": {
+                "number_of_shards": 3,
+                "number_of_replicas": 1
+              },
+              "mappings": {
+                "properties": {
+                  "patient_id": {"type": "keyword"},
+                  "first_name": {"type": "text"},
+                  "last_name": {"type": "text"},
+                  "date_of_birth": {"type": "date"},
+                  "gender": {"type": "keyword"},
+                  "phone": {"type": "keyword"},
+                  "email": {"type": "keyword"},
+                  "address": {"type": "text"},
+                  "medical_record_number": {"type": "keyword"}
+                }
+              }
+            }'
+
+          curl -X PUT http://elasticsearch-hms:9200/encounters \
+            -H 'Content-Type: application/json' \
+            -d '{
+              "settings": {
+                "number_of_shards": 3,
+                "number_of_replicas": 1
+              },
+              "mappings": {
+                "properties": {
+                  "encounter_id": {"type": "keyword"},
+                  "patient_id": {"type": "keyword"},
+                  "encounter_date": {"type": "date"},
+                  "encounter_type": {"type": "keyword"},
+                  "provider_id": {"type": "keyword"},
+                  "diagnosis_codes": {"type": "keyword"},
+                  "chief_complaint": {"type": "text"},
+                  "notes": {"type": "text"}
+                }
+              }
+            }'
+
+          curl -X PUT http://elasticsearch-hms:9200/medications \
+            -H 'Content-Type: application/json' \
+            -d '{
+              "settings": {
+                "number_of_shards": 3,
+                "number_of_replicas": 1
+              },
+              "mappings": {
+                "properties": {
+                  "medication_id": {"type": "keyword"},
+                  "patient_id": {"type": "keyword"},
+                  "drug_name": {"type": "text"},
+                  "dosage": {"type": "text"},
+                  "frequency": {"type": "keyword"},
+                  "start_date": {"type": "date"},
+                  "end_date": {"type": "date"},
+                  "prescribing_provider": {"type": "keyword"}
+                }
+              }
+            }'
+
+---
+# Elasticsearch Exporter for Prometheus
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: elasticsearch-exporter
+  namespace: ultimate-hms
+  labels:
+    app: hospital-management-system
+    component: monitoring
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hospital-management-system
+      component: monitoring
+      system: elasticsearch-exporter
+  template:
+    metadata:
+      labels:
+        app: hospital-management-system
+        component: monitoring
+        system: elasticsearch-exporter
+    spec:
+      serviceAccountName: hms-admin
+      containers:
+      - name: elasticsearch-exporter
+        image: quay.io/prometheuscommunity/elasticsearch-exporter:v1.7.0
+        ports:
+        - containerPort: 9114
+          name: metrics
+        env:
+        - name: ES_URI
+          value: "http://elasticsearch-hms:9200"
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi
+
+---
+# Elasticsearch Exporter Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: elasticsearch-exporter
+  namespace: ultimate-hms
+  labels:
+    app: hospital-management-system
+    component: monitoring
+spec:
+  selector:
+    app: hospital-management-system
+    component: monitoring
+    system: elasticsearch-exporter
+  ports:
+  - name: metrics
+    port: 9114
+    targetPort: 9114
+  type: ClusterIP
+
+---
+# Elasticsearch ServiceMonitor (for Prometheus)
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: elasticsearch-servicemonitor
+  namespace: ultimate-hms
+  labels:
+    app: hospital-management-system
+    component: monitoring
+spec:
+  selector:
+    matchLabels:
+      app: hospital-management-system
+      component: monitoring
+  endpoints:
+  - port: metrics
+    path: /metrics
+    interval: 30s
+    scrapeTimeout: 10s
+
+---
+# Elasticsearch Curator CronJob for Index Management
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: elasticsearch-curator
+  namespace: ultimate-hms
+  labels:
+    app: hospital-management-system
+    component: search
+spec:
+  schedule: "0 4 * * *"  # Daily at 4 AM
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: hms-admin
+          containers:
+          - name: curator
+            image: bobrik/curator:5.8.1
+            command:
+            - curator
+            - --config
+            - /etc/curator/config.yml
+            - /etc/curator/actions.yml
+            volumeMounts:
+            - name: curator-config
+              mountPath: /etc/curator
+          volumes:
+          - name: curator-config
+            configMap:
+              name: elasticsearch-curator-config
+          restartPolicy: OnFailure
+
+---
+# Elasticsearch Curator ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: elasticsearch-curator-config
+  namespace: ultimate-hms
+  labels:
+    app: hospital-management-system
+    component: search
+data:
+  config.yml: |
+    client:
+      hosts:
+        - elasticsearch-hms
+      port: 9200
+      url_prefix:
+      use_ssl: False
+      certificate:
+      client_cert:
+      client_key:
+      ssl_no_validate: False
+      timeout: 30
+      master_only: False
+
+    logging:
+      loglevel: INFO
+      logfile:
+      logformat: default
+      blacklist: ['elasticsearch', 'urllib3']
+
+  actions.yml: |
+    actions:
+      1:
+        action: delete_indices
+        description: "Delete indices older than 90 days"
+        options:
+          ignore_empty_list: True
+          timeout_override:
+          continue_if_exception: False
+          disable_action: False
+        filters:
+        - filtertype: age
+          source: name
+          direction: older
+          timestring: '%Y.%m.%d'
+          unit: days
+          unit_count: 90
+          field:
+          stats_result:
+          epoch:
+          exclude: False
