@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import {
-  XRayIcon,
+  ViewfinderCircleIcon,
   MagnifyingGlassIcon,
   PlusIcon,
   EyeIcon,
@@ -306,7 +306,7 @@ const RadiologyManagement: React.FC = () => {
 
         <div className="bg-blue-50 border-l-4 border-blue-400 p-4">
           <div className="flex">
-            <XRayIcon className="h-5 w-5 text-blue-400" />
+            <ViewfinderCircleIcon className="h-5 w-5 text-blue-400" />
             <div className="ml-3">
               <p className="text-sm font-medium text-blue-800">In Progress</p>
               <p className="text-sm text-blue-700">
@@ -380,7 +380,7 @@ const RadiologyManagement: React.FC = () => {
               <div className="flex items-start justify-between">
                 <div className="flex items-start space-x-4">
                   <div className="bg-blue-100 p-2 rounded-lg">
-                    <XRayIcon className="h-5 w-5 text-blue-600" />
+                    <ViewfinderCircleIcon className="h-5 w-5 text-blue-600" />
                   </div>
                   <div className="flex-1">
                     <div className="flex items-center space-x-2 mb-2">
@@ -508,7 +508,7 @@ const RadiologyManagement: React.FC = () => {
                   )}
                   {exam.status === "scheduled" && (
                     <button className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                      <XRayIcon className="h-4 w-4 mr-1" />
+                      <ViewfinderCircleIcon className="h-4 w-4 mr-1" />
                       Start Exam
                     </button>
                   )}
@@ -532,7 +532,7 @@ const RadiologyManagement: React.FC = () => {
 
         {filteredExams.length === 0 && (
           <div className="p-12 text-center">
-            <XRayIcon className="mx-auto h-12 w-12 text-gray-400" />
+            <ViewfinderCircleIcon className="mx-auto h-12 w-12 text-gray-400" />
             <h3 className="mt-2 text-sm font-medium text-gray-900">
               No radiology exams found
             </h3>

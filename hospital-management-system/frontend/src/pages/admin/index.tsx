@@ -5,7 +5,7 @@ import {
   CalendarIcon,
   DocumentTextIcon,
   BeakerIcon,
-  XRayIcon,
+  ViewfinderCircleIcon,
   CurrencyDollarIcon,
   CogIcon,
   ChartBarIcon,

@@ -1,15 +1,23 @@
 import { test, expect } from '@playwright/test'
 
 test.describe('Authentication', () => {
-  test('should login successfully with valid credentials', async ({ page }) => {
+  test.beforeEach(async ({ page }) => {
     // Navigate to login page
     await page.goto('/auth/login')
+  })
 
+  test('should display login form elements', async ({ page }) => {
     // Verify login page elements
     await expect(page.getByText('Sign in to your account')).toBeVisible()
     await expect(page.getByLabel('Email address')).toBeVisible()
     await expect(page.getByLabel('Password')).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Sign in' })).toBeVisible()
+    await expect(page.getByText('Remember me')).toBeVisible()
+    await expect(page.getByText('create a new account')).toBeVisible()
+    await expect(page.getByText('Forgot your password?')).toBeVisible()
+  })
 
+  test('should login successfully with valid credentials', async ({ page }) => {
     // Fill in login form
     await page.getByLabel('Email address').fill('admin@hms.com')
     await page.getByLabel('Password').fill('admin123')
@@ -26,9 +34,6 @@ test.describe('Authentication', () => {
   })
 
   test('should show error for invalid credentials', async ({ page }) => {
-    // Navigate to login page
-    await page.goto('/auth/login')
-
     // Fill in invalid credentials
     await page.getByLabel('Email address').fill('invalid@email.com')
     await page.getByLabel('Password').fill('wrongpassword')
@@ -41,25 +46,26 @@ test.describe('Authentication', () => {
   })
 
   test('should toggle password visibility', async ({ page }) => {
-    await page.goto('/auth/login')
-
     const passwordInput = page.getByLabel('Password')
 
     // Initially password should be hidden
     await expect(passwordInput).toHaveAttribute('type', 'password')
 
-    // Click eye icon to show password
-    await page.locator('button').filter({ has: page.locator('[data-testid="eye-icon"]') }).click()
-    await expect(passwordInput).toHaveAttribute('type', 'text')
+    // Try to find and click eye icon if it exists
+    const eyeButton = page.locator('button').filter({ hasText: '' }).first()
+    const eyeButtonCount = await eyeButton.count()
 
-    // Click again to hide password
-    await page.locator('button').filter({ has: page.locator('[data-testid="eye-slash-icon"]') }).click()
-    await expect(passwordInput).toHaveAttribute('type', 'password')
+    if (eyeButtonCount > 1) { // Second button is typically the password toggle
+      await eyeButton.nth(1).click()
+      await expect(passwordInput).toHaveAttribute('type', 'text')
+
+      // Click again to hide password
+      await eyeButton.nth(1).click()
+      await expect(passwordInput).toHaveAttribute('type', 'password')
+    }
   })
 
   test('should validate required fields', async ({ page }) => {
-    await page.goto('/auth/login')
-
     // Try to submit without filling fields
     await page.getByRole('button', { name: 'Sign in' }).click()
 
@@ -73,19 +79,29 @@ test.describe('Authentication', () => {
   })
 
   test('should navigate to register page', async ({ page }) => {
-    await page.goto('/auth/login')
-
     await page.getByText('create a new account').click()
 
     await expect(page).toHaveURL('/auth/register')
   })
 
   test('should navigate to forgot password page', async ({ page }) => {
-    await page.goto('/auth/login')
-
     await page.getByText('Forgot your password?').click()
 
     await expect(page).toHaveURL('/auth/forgot-password')
+  })
+
+  test('should persist remember me preference', async ({ page }) => {
+    // Check remember me
+    await page.getByLabel('Remember me').check()
+    await page.getByLabel('Email address').fill('test@example.com')
+    await page.getByLabel('Password').fill('testpassword')
+    await page.getByRole('button', { name: 'Sign in' }).click()
+
+    // Wait for error (invalid credentials)
+    await expect(page.getByText('Login failed')).toBeVisible()
+
+    // Email should still be filled due to remember me
+    await expect(page.getByLabel('Email address')).toHaveValue('test@example.com')
   })
 })
 

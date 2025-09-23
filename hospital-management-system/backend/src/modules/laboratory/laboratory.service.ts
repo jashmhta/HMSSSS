@@ -1,3 +1,4 @@
+/*[object Object]*/
 import {
   Injectable,
   NotFoundException,
@@ -5,12 +6,20 @@ import {
   Inject,
   forwardRef,
 } from '@nestjs/common';
+
 import { PrismaService } from '../../database/prisma.service';
+
 import { LISIntegrationService } from './lis-integration.service';
 import { BarcodeService } from './barcode.service';
 
+/**
+ *
+ */
 @Injectable()
 export class LaboratoryService {
+  /**
+   *
+   */
   constructor(
     private prisma: PrismaService,
     @Inject(forwardRef(() => LISIntegrationService))
@@ -729,7 +738,6 @@ export class LaboratoryService {
 
     const departments = await this.prisma.labTestCatalog.groupBy({
       by: ['department'],
-      where: dateFilter,
       _count: {
         id: true,
       },

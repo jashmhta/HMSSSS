@@ -1,14 +1,22 @@
+/*[object Object]*/
 import {
   Injectable,
   NotFoundException,
   BadRequestException,
   ConflictException,
 } from '@nestjs/common';
+
 import { PrismaService } from '../../database/prisma.service';
 import { ComplianceService } from '../compliance/compliance.service';
 
+/**
+ *
+ */
 @Injectable()
 export class PatientsService {
+  /**
+   *
+   */
   constructor(
     private prisma: PrismaService,
     private complianceService: ComplianceService,
@@ -264,7 +272,7 @@ export class PatientsService {
         });
       }
 
-      const updatedPatient = await tx.patient.update({
+      return await tx.patient.update({
         where: { id: patientId },
         data: { ...patientUpdate, updatedAt: new Date() },
         include: {
@@ -274,15 +282,12 @@ export class PatientsService {
               email: true,
               firstName: true,
               lastName: true,
-              lastName: true,
               phone: true,
               role: true,
             },
           },
         },
       });
-
-      return updatedPatient;
     });
 
     // Log update event
@@ -341,15 +346,25 @@ export class PatientsService {
 
     if (searchCriteria.query) {
       where.OR = [
-        { mrn: { contains: searchCriteria.query, mode: 'insensitive' } },
+        { mrn: { contains: searchCriteria.query, mode: 'insensitive' as const } },
         {
           user: {
-            OR: [
-              { firstName: { contains: searchCriteria.query, mode: 'insensitive' } },
-              { lastName: { contains: searchCriteria.query, mode: 'insensitive' } },
-              { email: { contains: searchCriteria.query, mode: 'insensitive' } },
-              { phone: { contains: searchCriteria.query, mode: 'insensitive' } },
-            ],
+            firstName: { contains: searchCriteria.query, mode: 'insensitive' as const },
+          },
+        },
+        {
+          user: {
+            lastName: { contains: searchCriteria.query, mode: 'insensitive' as const },
+          },
+        },
+        {
+          user: {
+            email: { contains: searchCriteria.query, mode: 'insensitive' as const },
+          },
+        },
+        {
+          user: {
+            phone: { contains: searchCriteria.query, mode: 'insensitive' as const },
           },
         },
       ];
@@ -397,7 +412,6 @@ export class PatientsService {
           select: {
             firstName: true,
             lastName: true,
-            dateOfBirth: true,
           },
         },
         appointments: {
@@ -465,6 +479,9 @@ export class PatientsService {
 
   // Helper methods
 
+  /**
+   *
+   */
   private async generateMRN(): Promise<string> {
     const year = new Date().getFullYear();
     const count = await this.prisma.patient.count({
@@ -478,6 +495,9 @@ export class PatientsService {
     return `${year}${(count + 1).toString().padStart(6, '0')}`;
   }
 
+  /**
+   *
+   */
   private generateTemporaryPassword(): string {
     // Generate a secure temporary password
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
@@ -488,6 +508,9 @@ export class PatientsService {
     return password;
   }
 
+  /**
+   *
+   */
   private calculateAge(dateOfBirth: Date): number {
     const today = new Date();
     let age = today.getFullYear() - dateOfBirth.getFullYear();
@@ -501,6 +524,9 @@ export class PatientsService {
   }
 
   // Legacy method for backward compatibility
+  /**
+   *
+   */
   async create(data: {
     userId: string;
     mrn: string;
@@ -545,15 +571,30 @@ export class PatientsService {
     });
   }
 
+  /**
+   *
+   */
   async findAll(page: number = 1, limit: number = 10, search?: string) {
     const skip = (page - 1) * limit;
 
     const where = search
       ? {
           OR: [
-            { user: { firstName: { contains: search, mode: 'insensitive' } } },
-            { user: { lastName: { contains: search, mode: 'insensitive' } } },
-            { user: { email: { contains: search, mode: 'insensitive' } } },
+            {
+              user: {
+                firstName: { contains: search, mode: 'insensitive' as const },
+              },
+            },
+            {
+              user: {
+                lastName: { contains: search, mode: 'insensitive' as const },
+              },
+            },
+            {
+              user: {
+                email: { contains: search, mode: 'insensitive' as const },
+              },
+            },
             { mrn: { contains: search } },
           ],
         }
@@ -592,6 +633,9 @@ export class PatientsService {
     };
   }
 
+  /**
+   *
+   */
   async findOne(id: string) {
     const patient = await this.prisma.patient.findUnique({
       where: { id },
@@ -636,6 +680,9 @@ export class PatientsService {
     return patient;
   }
 
+  /**
+   *
+   */
   async update(
     id: string,
     data: Partial<{
@@ -674,6 +721,9 @@ export class PatientsService {
     });
   }
 
+  /**
+   *
+   */
   async remove(id: string) {
     const patient = await this.prisma.patient.findUnique({
       where: { id },
@@ -688,12 +738,17 @@ export class PatientsService {
     });
   }
 
+  /**
+   *
+   */
   async getPatientStats() {
     const [totalPatients, activePatients, todayAppointments] = await Promise.all([
       this.prisma.patient.count(),
       this.prisma.patient.count({
         where: {
-          user: { isActive: true },
+          user: {
+            isActive: true,
+          },
         },
       }),
       this.prisma.appointment.count({

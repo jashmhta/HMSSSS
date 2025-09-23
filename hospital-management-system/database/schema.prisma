@@ -774,6 +774,7 @@ model Bill {
   // Relations
   patient           Patient        @relation(fields: [patientId], references: [id])
   items             BillItem[]
+  insuranceClaims   InsuranceClaim[]
 
   @@map("bills")
 }
@@ -819,6 +820,7 @@ enum BillItemType {
   RADIOLOGY_TEST
   MEDICATION
   ROOM_CHARGE
+  EMERGENCY
   OTHER
 }
 
@@ -1233,4 +1235,362 @@ enum DataCategory {
   FINANCIAL
   ADMINISTRATIVE
   AUDIT
+}
+
+// Accounting Models
+model Invoice {
+  id                String      @id @default(cuid())
+  invoiceNumber     String      @unique
+  patientId         String
+  amount            Decimal     @db.Decimal(15, 2)
+  status            InvoiceStatus @default(PENDING)
+  issuedAt          DateTime    @default(now())
+  dueDate           DateTime
+  paidAt            DateTime?
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  // Relations
+  patient           Patient     @relation(fields: [patientId], references: [id])
+
+  @@map("invoices")
+  @@index([patientId])
+  @@index([status])
+  @@index([issuedAt])
+}
+
+model Expense {
+  id                String      @id @default(cuid())
+  description       String
+  amount            Decimal     @db.Decimal(15, 2)
+  category          ExpenseCategory
+  expenseDate       DateTime    @default(now())
+  hospitalId        String?
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  @@map("expenses")
+  @@index([category])
+  @@index([expenseDate])
+  @@index([hospitalId])
+}
+
+model Asset {
+  id                String      @id @default(cuid())
+  name              String
+  description       String?
+  category          AssetCategory
+  value             Decimal     @db.Decimal(15, 2)
+  purchaseDate      DateTime
+  depreciationRate  Float?      // Annual depreciation rate
+  currentValue      Decimal     @db.Decimal(15, 2)
+  status            AssetStatus @default(ACTIVE)
+  hospitalId        String?
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  @@map("assets")
+  @@index([category])
+  @@index([status])
+  @@index([hospitalId])
+}
+
+model ReferralIncome {
+  id                String      @id @default(cuid())
+  source            String
+  amount            Decimal     @db.Decimal(15, 2)
+  referralDate      DateTime    @default(now())
+  status            ReferralStatus @default(PENDING)
+  hospitalId        String?
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  @@map("referral_incomes")
+  @@index([source])
+  @@index([status])
+  @@index([hospitalId])
+}
+
+model OutsourcedService {
+  id                String      @id @default(cuid())
+  serviceName       String
+  provider          String
+  cost              Decimal     @db.Decimal(15, 2)
+  serviceDate       DateTime    @default(now())
+  hospitalId        String?
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  @@map("outsourced_services")
+  @@index([provider])
+  @@index([serviceDate])
+  @@index([hospitalId])
+}
+
+model FixedCost {
+  id                String      @id @default(cuid())
+  description       String
+  amount            Decimal     @db.Decimal(15, 2)
+  frequency         CostFrequency @default(MONTHLY)
+  startDate         DateTime    @default(now())
+  endDate           DateTime?
+  hospitalId        String?
+  isActive          Boolean     @default(true)
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  @@map("fixed_costs")
+  @@index([frequency])
+  @@index([hospitalId])
+  @@index([isActive])
+}
+
+model VariableCost {
+  id                String      @id @default(cuid())
+  description       String
+  unitCost          Decimal     @db.Decimal(15, 2)
+  category          VariableCostCategory
+  hospitalId        String?
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  @@map("variable_costs")
+  @@index([category])
+  @@index([hospitalId])
+}
+
+// Hospital Management
+model Hospital {
+  id                String      @id @default(cuid())
+  name              String
+  address           Json?
+  phone             String?
+  email             String?
+  status            HospitalStatus @default(ACTIVE)
+  licenseNumber     String?
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  @@map("hospitals")
+  @@index([status])
+  @@index([name])
+}
+
+// Insurance Claim Model
+model InsuranceClaim {
+  id                String              @id @default(cuid())
+  billId            String
+  invoiceId         String?
+  insuranceProvider String
+  claimNumber       String              @unique
+  claimAmount       Decimal             @db.Decimal(10,2)
+  approvedAmount    Decimal             @db.Decimal(10,2) @default(0)
+  claimStatus       InsuranceClaimStatus @default(PENDING)
+  claimDate         DateTime            @default(now())
+  processedBy       String
+  notes             String?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  // Relations
+  bill              Bill?               @relation(fields: [billId], references: [id])
+
+  @@map("insurance_claims")
+  @@index([billId])
+  @@index([claimStatus])
+  @@index([claimDate])
+}
+
+// Notification Model
+model Notification {
+  id                String      @id @default(cuid())
+  userId            String
+  title             String
+  message           String
+  type              NotificationType
+  metadata          Json?
+  isRead            Boolean     @default(false)
+  readAt            DateTime?
+  createdAt         DateTime    @default(now())
+
+  // Relations
+  user              User        @relation(fields: [userId], references: [id])
+
+  @@map("notifications")
+  @@index([userId])
+  @@index([isRead])
+  @@index([createdAt])
+}
+
+// Audit Log Model
+model AuditLog {
+  id                String      @id @default(cuid())
+  userId            String?
+  action            String
+  entity            String
+  entityId          String?
+  changes           Json?
+  ipAddress         String?
+  userAgent         String?
+  timestamp         DateTime    @default(now())
+
+  @@map("audit_logs")
+  @@index([userId])
+  @@index([action])
+  @@index([entity])
+  @@index([timestamp])
+}
+
+// Enums for Accounting
+enum InvoiceStatus {
+  PENDING
+  PAID
+  OVERDUE
+  CANCELLED
+}
+
+enum ExpenseCategory {
+  SALARIES
+  UTILITIES
+  SUPPLIES
+  MAINTENANCE
+  EQUIPMENT
+  INSURANCE
+  OTHER
+}
+
+enum AssetCategory {
+  EQUIPMENT
+  BUILDING
+  VEHICLE
+  FURNITURE
+  TECHNOLOGY
+  OTHER
+}
+
+enum AssetStatus {
+  ACTIVE
+  INACTIVE
+  MAINTENANCE
+  DISPOSED
+}
+
+enum ReferralStatus {
+  PENDING
+  COMPLETED
+  CANCELLED
+}
+
+enum CostFrequency {
+  DAILY
+  WEEKLY
+  MONTHLY
+  QUARTERLY
+  YEARLY
+}
+
+enum VariableCostCategory {
+  MEDICAL_SUPPLIES
+  LABORATORY
+  PHARMACY
+  LAUNDRY
+  CATERING
+  OTHER
+}
+
+enum HospitalStatus {
+  ACTIVE
+  INACTIVE
+  MAINTENANCE
+}
+
+enum InsuranceClaimStatus {
+  PENDING
+  APPROVED
+  DENIED
+  PARTIALLY_APPROVED
+}
+
+enum NotificationType {
+  INFO
+  WARNING
+  ERROR
+  SUCCESS
+  APPOINTMENT
+  BILLING
+  SECURITY
+}
+
+// Price Estimator Management
+model ServicePricing {
+  id                String           @id @default(cuid())
+  serviceType       ServiceType      // CONSULTATION, LAB_TEST, RADIOLOGY, SURGERY, ROOM, PROCEDURE
+  serviceName       String
+  serviceCode       String?          @unique
+  description       String?
+  basePrice         Decimal          @db.Decimal(10,2)
+  currency          String           @default("USD")
+  isActive          Boolean          @default(true)
+  category          String?
+  subcategory       String?
+  duration          Int?             // Duration in minutes for time-based services
+  requirements      Json?            // Special requirements or pre-conditions
+  insuranceCoverage Json?            // Insurance coverage details
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  @@map("service_pricing")
+}
+
+model Medicine {
+  id                String           @id @default(cuid())
+  name              String
+  genericName       String?
+  brandName         String?
+  dosageForm        String
+  strength          String
+  manufacturer      String?
+  batchNumber       String?
+  expiryDate        DateTime?
+  stockQuantity     Int              @default(0)
+  reorderLevel      Int              @default(10)
+  unitPrice         Decimal          @db.Decimal(10,2)
+  category          String?
+  requiresPrescription Boolean        @default(true)
+  isActive          Boolean          @default(true)
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  @@map("medicines")
+}
+
+model ServicePackage {
+  id                String           @id @default(cuid())
+  name              String
+  description       String?
+  packageCode       String?          @unique
+  basePrice         Decimal          @db.Decimal(10,2)
+  currency          String           @default("USD")
+  isActive          Boolean          @default(true)
+  category          String?
+  duration          Int?             // Validity period in days
+  services          Json             // Array of service IDs with quantities
+  inclusions        Json?            // What's included in the package
+  exclusions        Json?            // What's excluded from the package
+  terms             Json?            // Terms and conditions
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  @@map("service_packages")
+}
+
+enum ServiceType {
+  CONSULTATION
+  LAB_TEST
+  RADIOLOGY
+  SURGERY
+  ROOM
+  PROCEDURE
+  MEDICATION
+  OTHER
 }

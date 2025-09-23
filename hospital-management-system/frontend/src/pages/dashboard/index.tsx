@@ -4,7 +4,7 @@ import {
   CalendarIcon,
   DocumentTextIcon,
   BeakerIcon,
-  XRayIcon,
+  ViewfinderCircleIcon,
   CurrencyDollarIcon,
   ExclamationTriangleIcon,
   HeartIcon,
@@ -144,7 +144,7 @@ const Dashboard: React.FC = () => {
     {
       title: "Pending Radiology",
       value: stats.pendingRadiologyTests.toString(),
-      icon: XRayIcon,
+      icon: ViewfinderCircleIcon,
       color: "bg-pink-500",
       change: "+1",
       href: "/radiology",
@@ -192,7 +192,7 @@ const Dashboard: React.FC = () => {
     },
     {
       name: "Radiology",
-      icon: XRayIcon,
+      icon: ViewfinderCircleIcon,
       href: "/radiology",
       color: "bg-pink-500",
     },

@@ -44,6 +44,7 @@ coverage/
 .env.production.local
 .env.prod
 .env.local
+.env.production
 
 # Next.js build output
 .next/
@@ -169,3 +170,27 @@ playwright-report/
 # Istio binaries (download separately)
 istio-*/bin/
 istio-*/tools/_istioctl
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfvars
+
+# Private keys and certificates
+*.key
+*.pem
+*.crt
+*.p12
+*.pfx
+
+# Helm
+.helm/
+
+# Additional IDE files
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# OS specific
+.DS_Store
+Thumbs.db

@@ -183,7 +183,7 @@ Copy `.env.example` to `.env` and configure:
 - **Security Tests**: Authentication and authorization validation
 
 ### Test Database
-The system includes a comprehensive test database configuration at `test/test-database.config.ts` that:
+The system includes a comprehensive test database configuration that:
 - Creates isolated test databases
 - Handles database migrations
 - Seeds test data

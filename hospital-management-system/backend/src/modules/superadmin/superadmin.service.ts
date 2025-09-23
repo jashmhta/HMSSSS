@@ -1,24 +1,37 @@
+/*[object Object]*/
 import { Injectable, ForbiddenException, NotFoundException } from '@nestjs/common';
+import { UserRole } from '@prisma/client';
+
 import { PrismaService } from '../../database/prisma.service';
 
+/**
+ *
+ */
 @Injectable()
 export class SuperadminService {
+  /**
+   *
+   */
   constructor(private prisma: PrismaService) {}
 
+  /**
+   *
+   */
   async getAllHospitals() {
     return this.prisma.hospital.findMany({
       include: {
         _count: {
           select: {
-            users: true,
             patients: true,
-            appointments: true,
           },
         },
       },
     });
   }
 
+  /**
+   *
+   */
   async createHospital(data: any) {
     return this.prisma.hospital.create({
       data: {
@@ -29,6 +42,9 @@ export class SuperadminService {
     });
   }
 
+  /**
+   *
+   */
   async updateHospital(hospitalId: string, data: any) {
     return this.prisma.hospital.update({
       where: { id: hospitalId },
@@ -36,6 +52,9 @@ export class SuperadminService {
     });
   }
 
+  /**
+   *
+   */
   async deactivateHospital(hospitalId: string) {
     return this.prisma.hospital.update({
       where: { id: hospitalId },
@@ -43,46 +62,61 @@ export class SuperadminService {
     });
   }
 
-  async getHospitalUsers(hospitalId: string) {
+  /**
+   *
+   */
+  async getHospitalUsers() {
     return this.prisma.user.findMany({
-      where: { hospitalId },
-      include: { role: true },
-    });
-  }
-
-  async createHospitalUser(hospitalId: string, userData: any) {
-    // Check user limit for the hospital's plan
-    const hospital = await this.prisma.hospital.findUnique({
-      where: { id: hospitalId },
-    });
-
-    const userCount = await this.prisma.user.count({
-      where: { hospitalId },
-    });
-
-    if (userCount >= hospital.maxUsers) {
-      throw new ForbiddenException('User limit exceeded for this hospital plan');
-    }
-
-    return this.prisma.user.create({
-      data: {
-        ...userData,
-        hospitalId,
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        role: true,
         isActive: true,
+        createdAt: true,
       },
     });
   }
 
-  async updateUserPermissions(userId: string, permissions: any) {
-    return this.prisma.user.update({
-      where: { id: userId },
-      data: { permissions },
+  /**
+   *
+   */
+  async createHospitalUser(userData: any) {
+    return this.prisma.user.create({
+      data: {
+        ...userData,
+        isActive: true,
+        createdAt: new Date(),
+      },
     });
   }
 
+  /**
+   *
+   */
+  async updateUserRole(userId: string, role: UserRole) {
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: { role },
+    });
+  }
+
+  /**
+   *
+   */
   async resetUserPassword(userId: string) {
     // Generate temporary password
     const tempPassword = Math.random().toString(36).slice(-12);
+
+    // Update user password in database
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        password: tempPassword,
+        passwordChangedAt: new Date(),
+      },
+    });
 
     // In production, send email with reset link
     // For now, return the temp password (not secure, just for demo)
@@ -94,6 +128,9 @@ export class SuperadminService {
     };
   }
 
+  /**
+   *
+   */
   async getSystemAnalytics() {
     const [totalHospitals, activeHospitals, totalUsers, totalPatients, totalRevenue] =
       await Promise.all([
@@ -103,7 +140,7 @@ export class SuperadminService {
         this.prisma.patient.count(),
         this.prisma.invoice.aggregate({
           where: { status: 'PAID' },
-          _sum: { totalAmount: true },
+          _sum: { amount: true },
         }),
       ]);
 
@@ -112,10 +149,13 @@ export class SuperadminService {
       activeHospitals,
       totalUsers,
       totalPatients,
-      totalRevenue: totalRevenue._sum.totalAmount || 0,
+      totalRevenue: totalRevenue._sum.amount || 0,
     };
   }
 
+  /**
+   *
+   */
   async enableModuleForHospital(hospitalId: string, moduleName: string) {
     const hospital = await this.prisma.hospital.findUnique({
       where: { id: hospitalId },
@@ -134,6 +174,9 @@ export class SuperadminService {
     });
   }
 
+  /**
+   *
+   */
   async disableModuleForHospital(hospitalId: string, moduleName: string) {
     const hospital = await this.prisma.hospital.findUnique({
       where: { id: hospitalId },
@@ -150,48 +193,55 @@ export class SuperadminService {
     });
   }
 
+  /**
+   *
+   */
   async getHospitalSubscription(hospitalId: string) {
     const hospital = await this.prisma.hospital.findUnique({
       where: { id: hospitalId },
-      include: { subscription: true },
+      // subscription is a JSON field, not a relation
     });
 
     if (!hospital) throw new NotFoundException('Hospital not found');
 
+    const subscription = (hospital.subscription as any) || {};
     return {
       hospital: hospital.name,
-      plan: hospital.subscription?.plan || 'FREE',
+      plan: subscription.plan || 'FREE',
       maxUsers: hospital.maxUsers,
-      enabledModules: hospital.enabledModules,
-      expiresAt: hospital.subscription?.expiresAt,
+      enabledModules: subscription.enabledModules || [],
+      expiresAt: subscription.expiresAt,
     };
   }
 
+  /**
+   *
+   */
   async updateHospitalSubscription(hospitalId: string, subscriptionData: any) {
     return this.prisma.hospital.update({
       where: { id: hospitalId },
       data: {
         maxUsers: subscriptionData.maxUsers,
-        enabledModules: subscriptionData.enabledModules,
-        subscription: {
-          upsert: {
-            create: subscriptionData,
-            update: subscriptionData,
-          },
-        },
+        subscription: subscriptionData,
       },
     });
   }
 
+  /**
+   *
+   */
   async getAuditLogs(filters: any = {}) {
     return this.prisma.auditLog.findMany({
       where: filters,
-      include: { user: true, hospital: true },
-      orderBy: { createdAt: 'desc' },
+      include: { user: true },
+      orderBy: { timestamp: 'desc' },
       take: 1000,
     });
   }
 
+  /**
+   *
+   */
   async generateSystemReport(startDate: Date, endDate: Date) {
     const [newHospitals, newUsers, revenue, topHospitals] = await Promise.all([
       this.prisma.hospital.count({
@@ -209,14 +259,12 @@ export class SuperadminService {
           status: 'PAID',
           createdAt: { gte: startDate, lte: endDate },
         },
-        _sum: { totalAmount: true },
+        _sum: { amount: true },
       }),
       this.prisma.hospital.findMany({
         take: 10,
         include: {
-          _count: {
-            select: { patients: true },
-          },
+          patients: true,
         },
         orderBy: {
           patients: { _count: 'desc' },
@@ -228,10 +276,10 @@ export class SuperadminService {
       period: { startDate, endDate },
       newHospitals,
       newUsers,
-      totalRevenue: revenue._sum.totalAmount || 0,
+      totalRevenue: revenue._sum.amount ? Number(revenue._sum.amount) : 0,
       topHospitals: topHospitals.map(h => ({
         name: h.name,
-        patientCount: h._count.patients,
+        patientCount: h.patients?.length || 0,
       })),
     };
   }

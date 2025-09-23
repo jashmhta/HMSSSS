@@ -1,4 +1,6 @@
+/*[object Object]*/
 import { Injectable, Logger } from '@nestjs/common';
+
 import { ComplianceService } from './compliance.service';
 import { DataRetentionService } from './data-retention.service';
 import { AccessMonitoringService } from './access-monitoring.service';
@@ -64,10 +66,16 @@ export interface ComplianceDashboard {
   };
 }
 
+/**
+ *
+ */
 @Injectable()
 export class ComplianceDashboardService {
   private readonly logger = new Logger(ComplianceDashboardService.name);
 
+  /**
+   *
+   */
   constructor(
     private readonly complianceService: ComplianceService,
     private readonly dataRetentionService: DataRetentionService,
@@ -229,6 +237,9 @@ export class ComplianceDashboardService {
 
   // Private helper methods
 
+  /**
+   *
+   */
   private calculateComplianceScore(report: any): number {
     const { passed, failed, warnings, total } = report.summary;
 
@@ -240,6 +251,9 @@ export class ComplianceDashboardService {
     return Math.round(score);
   }
 
+  /**
+   *
+   */
   private calculateCategoryScore(checks: any[], category: string): number {
     const categoryChecks = checks.filter(c => c.category === category);
 
@@ -254,6 +268,9 @@ export class ComplianceDashboardService {
     return Math.round(score);
   }
 
+  /**
+   *
+   */
   private calculateStatus(checks: any[]): 'COMPLIANT' | 'NON_COMPLIANT' | 'AT_RISK' {
     const failed = checks.filter(c => c.status === 'FAIL').length;
     const critical = checks.filter(c => c.severity === 'CRITICAL').length;
@@ -264,12 +281,18 @@ export class ComplianceDashboardService {
     return 'COMPLIANT';
   }
 
+  /**
+   *
+   */
   private async getMfaAdoptionRate(): Promise<number> {
     // In a real implementation, this would query the database
     // For now, return a mock value
     return 75; // 75% MFA adoption
   }
 
+  /**
+   *
+   */
   private async getComplianceTrend(days: number): Promise<Array<{ date: string; score: number }>> {
     // In a real implementation, this would query historical compliance data
     // For now, return mock trend data
@@ -294,6 +317,9 @@ export class ComplianceDashboardService {
     return trend;
   }
 
+  /**
+   *
+   */
   private async getSecurityIncidents(
     days: number,
   ): Promise<Array<{ date: string; count: number }>> {
@@ -318,6 +344,9 @@ export class ComplianceDashboardService {
     return incidents;
   }
 
+  /**
+   *
+   */
   private async getTopViolations(): Promise<Array<{ violation: string; count: number }>> {
     // In a real implementation, this would query violation data
     // For now, return mock violation data
@@ -330,6 +359,9 @@ export class ComplianceDashboardService {
     ];
   }
 
+  /**
+   *
+   */
   private async getRetentionStatusSummary(): Promise<{
     healthy: number;
     warning: number;
@@ -351,6 +383,9 @@ export class ComplianceDashboardService {
     }
   }
 
+  /**
+   *
+   */
   private convertDashboardToCSV(dashboard: ComplianceDashboard): string {
     // Convert dashboard data to CSV format
     // This is a simplified implementation

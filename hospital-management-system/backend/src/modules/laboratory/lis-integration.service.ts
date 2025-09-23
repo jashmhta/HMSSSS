@@ -1,8 +1,10 @@
+/*[object Object]*/
 import { Injectable, Logger, BadRequestException, HttpException, HttpStatus } from '@nestjs/common';
-import { PrismaService } from '../../database/prisma.service';
 import { HttpService } from '@nestjs/axios';
 import { catchError, firstValueFrom, timeout } from 'rxjs';
 import { ConfigService } from '@nestjs/config';
+
+import { PrismaService } from '../../database/prisma.service';
 
 interface LISConfig {
   systemName: string;
@@ -48,10 +50,16 @@ interface LISResultResponse {
   status: string;
 }
 
+/**
+ *
+ */
 @Injectable()
 export class LISIntegrationService {
   private readonly logger = new Logger(LISIntegrationService.name);
 
+  /**
+   *
+   */
   constructor(
     private prisma: PrismaService,
     private httpService: HttpService,
@@ -129,6 +137,7 @@ export class LISIntegrationService {
       where: { orderNumber },
       include: {
         samples: true,
+        testCatalog: true,
       },
     });
 
@@ -164,10 +173,7 @@ export class LISIntegrationService {
       // Create or update result
       await this.prisma.labResult.upsert({
         where: {
-          labTestId_parameter: {
-            labTestId: labTest.id,
-            parameter: result.parameter,
-          },
+          id: `${labTest.id}-${result.parameter}`, // Use a composite ID approach
         },
         update: {
           value: result.value,
@@ -316,12 +322,18 @@ export class LISIntegrationService {
     }
   }
 
+  /**
+   *
+   */
   private async getActiveLISConfig(): Promise<any> {
     return this.prisma.lISIntegration.findFirst({
       where: { isActive: true },
     });
   }
 
+  /**
+   *
+   */
   private async sendToLIS(config: any, endpoint: string, data: any): Promise<any> {
     const url = `${config.endpoint}${endpoint}`;
     const headers = {
@@ -331,7 +343,7 @@ export class LISIntegrationService {
     };
 
     try {
-      const response = await firstValueFrom(
+      return await firstValueFrom(
         this.httpService.post(url, data, { headers }).pipe(
           timeout(config.timeout || 30000),
           catchError(error => {
@@ -342,13 +354,14 @@ export class LISIntegrationService {
           }),
         ),
       );
-
-      return response;
     } catch (error) {
       throw error;
     }
   }
 
+  /**
+   *
+   */
   private async updateLISStatus(
     integrationId: string,
     status: string,

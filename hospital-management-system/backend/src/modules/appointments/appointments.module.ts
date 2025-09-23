@@ -1,9 +1,15 @@
+/*[object Object]*/
 import { Module } from '@nestjs/common';
-import { AppointmentsService } from './appointments.service';
-import { AppointmentsController } from './appointments.controller';
+
 import { DatabaseModule } from '../../database/database.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 
+import { AppointmentsService } from './appointments.service';
+import { AppointmentsController } from './appointments.controller';
+
+/**
+ *
+ */
 @Module({
   imports: [DatabaseModule, NotificationsModule],
   controllers: [AppointmentsController],

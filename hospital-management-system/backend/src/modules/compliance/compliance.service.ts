@@ -1,4 +1,6 @@
+/*[object Object]*/
 import { Injectable, Logger } from '@nestjs/common';
+
 import { PrismaService } from '../../database/prisma.service';
 
 export interface ComplianceCheck {
@@ -36,10 +38,16 @@ export interface DataRetentionPolicy {
   nextCleanup: Date;
 }
 
+/**
+ *
+ */
 @Injectable()
 export class ComplianceService {
   private readonly logger = new Logger(ComplianceService.name);
 
+  /**
+   *
+   */
   constructor(private prisma: PrismaService) {}
 
   /**
@@ -294,11 +302,12 @@ export class ComplianceService {
               });
 
               // Delete records
-              deletedCount = await this.prisma.medicalRecord.deleteMany({
+              const deleteResult = await this.prisma.medicalRecord.deleteMany({
                 where: {
                   createdAt: { lt: cutoffDate },
                 },
               });
+              deletedCount = deleteResult.count;
 
               // Log each deletion
               for (const record of recordsToDelete) {
@@ -330,6 +339,9 @@ export class ComplianceService {
 
   // Private compliance check implementations
 
+  /**
+   *
+   */
   private async checkDataEncryption(): Promise<ComplianceCheck> {
     // Check if encryption service is configured
     const encryptionConfigured = process.env.ENCRYPTION_KEY ? true : false;
@@ -356,6 +368,9 @@ export class ComplianceService {
     };
   }
 
+  /**
+   *
+   */
   private async checkAccessControls(): Promise<ComplianceCheck> {
     // Check RLS policies are in place
     const rlsExists = true; // Assume RLS is implemented as per previous work
@@ -382,6 +397,9 @@ export class ComplianceService {
     };
   }
 
+  /**
+   *
+   */
   private async checkAuditLogging(): Promise<ComplianceCheck> {
     // Check if audit logging is implemented
     const auditImplemented = true; // We'll implement this
@@ -408,6 +426,9 @@ export class ComplianceService {
     };
   }
 
+  /**
+   *
+   */
   private async checkBackupSecurity(): Promise<ComplianceCheck> {
     // Check backup security measures
     const backupEncrypted = process.env.BACKUP_ENCRYPTION_KEY ? true : false;
@@ -434,6 +455,9 @@ export class ComplianceService {
     };
   }
 
+  /**
+   *
+   */
   private async checkPHIHandling(): Promise<ComplianceCheck> {
     // Check PHI data handling practices
     const phiHandlingGood = true; // Assume good practices for now
@@ -460,6 +484,9 @@ export class ComplianceService {
     };
   }
 
+  /**
+   *
+   */
   private async checkDataSubjectRights(): Promise<ComplianceCheck> {
     // Check GDPR data subject rights implementation
     const rightsImplemented = true; // Assume implemented
@@ -487,6 +514,9 @@ export class ComplianceService {
     };
   }
 
+  /**
+   *
+   */
   private async checkConsentManagement(): Promise<ComplianceCheck> {
     // Check consent management for GDPR
     const consentManaged = true; // Assume implemented
@@ -513,6 +543,9 @@ export class ComplianceService {
     };
   }
 
+  /**
+   *
+   */
   private async checkDataMinimization(): Promise<ComplianceCheck> {
     // Check data minimization principles
     const dataMinimized = true; // Assume good practices
@@ -539,6 +572,9 @@ export class ComplianceService {
     };
   }
 
+  /**
+   *
+   */
   private async checkDataRetention(): Promise<ComplianceCheck> {
     // Check data retention policies
     const retentionPolicies = await this.getDataRetentionPolicies();
@@ -566,6 +602,9 @@ export class ComplianceService {
     };
   }
 
+  /**
+   *
+   */
   private async checkBreachNotification(): Promise<ComplianceCheck> {
     // Check breach notification procedures
     const breachProcedures = true; // Assume implemented
@@ -592,6 +631,9 @@ export class ComplianceService {
     };
   }
 
+  /**
+   *
+   */
   private async checkMFAImplementation(): Promise<ComplianceCheck> {
     // Check MFA implementation
     const mfaEnabledUsers = await this.prisma.user.count({
@@ -621,6 +663,9 @@ export class ComplianceService {
     };
   }
 
+  /**
+   *
+   */
   private async checkPasswordPolicies(): Promise<ComplianceCheck> {
     // Check password policy compliance
     const weakPasswords = await this.prisma.user.count({
@@ -655,6 +700,9 @@ export class ComplianceService {
     };
   }
 
+  /**
+   *
+   */
   private async checkAccountLockout(): Promise<ComplianceCheck> {
     // Check account lockout implementation
     const lockedAccounts = await this.prisma.user.count({
@@ -714,9 +762,10 @@ export class ComplianceService {
         };
       }
       if (options.startDate || options.endDate) {
-        where.timestamp = {};
-        if (options.startDate) where.timestamp.gte = options.startDate;
-        if (options.endDate) where.timestamp.lte = options.endDate;
+        where.timestamp = {
+          gte: options.startDate || undefined,
+          lte: options.endDate || undefined,
+        };
       }
 
       const [logs, total] = await Promise.all([
@@ -754,11 +803,13 @@ export class ComplianceService {
     uniqueUsers: number;
     dateRange: { start: Date; end: Date };
   }> {
-    const dateFilter = startDate || endDate ? {} : undefined;
-    if (dateFilter) {
-      if (startDate) dateFilter.gte = startDate;
-      if (endDate) dateFilter.lte = endDate;
-    }
+    const dateFilter =
+      startDate || endDate
+        ? {
+            gte: startDate || undefined,
+            lte: endDate || undefined,
+          }
+        : undefined;
 
     const [totalActions, uniqueUsersResult, dateRange] = await Promise.all([
       this.prisma.auditLog.count({
@@ -919,9 +970,10 @@ export class ComplianceService {
 
       if (options.tableName) where.tableName = options.tableName;
       if (options.startDate || options.endDate) {
-        where.deletedAt = {};
-        if (options.startDate) where.deletedAt.gte = options.startDate;
-        if (options.endDate) where.deletedAt.lte = options.endDate;
+        where.deletedAt = {
+          gte: options.startDate || undefined,
+          lte: options.endDate || undefined,
+        };
       }
 
       const [logs, total] = await Promise.all([
@@ -941,6 +993,9 @@ export class ComplianceService {
     }
   }
 
+  /**
+   *
+   */
   private async updateComplianceCheckTimestamps(checks: ComplianceCheck[]): Promise<void> {
     // Store compliance check results in database
     await this.storeComplianceCheckResults(checks);

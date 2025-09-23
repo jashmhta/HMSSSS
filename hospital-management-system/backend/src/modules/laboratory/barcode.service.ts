@@ -1,10 +1,19 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '../../database/prisma.service';
-import { v4 as uuidv4 } from 'uuid';
+/*[object Object]*/
 import * as crypto from 'crypto';
 
+import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import { v4 as uuidv4 } from 'uuid';
+
+import { PrismaService } from '../../database/prisma.service';
+
+/**
+ *
+ */
 @Injectable()
 export class BarcodeService {
+  /**
+   *
+   */
   constructor(private prisma: PrismaService) {}
 
   /**
@@ -22,7 +31,7 @@ export class BarcodeService {
 
     // Generate unique barcode using timestamp, test code, and random component
     const timestamp = Date.now().toString(36);
-    const testCode = labTest.testCatalog.testCode.replace(/[^A-Z0-9]/gi, '').substring(0, 4);
+    const testCode = labTest.testCatalog.testCode.replace(/[^A-Z0-9]/gi, '').slice(0, 4);
     const random = crypto.randomBytes(2).toString('hex').toUpperCase();
 
     const barcode = `L${timestamp}${testCode}${random}`;
@@ -53,7 +62,7 @@ export class BarcodeService {
     }
 
     const timestamp = Date.now().toString(36);
-    const lotShort = reagent.lotNumber.replace(/[^A-Z0-9]/gi, '').substring(0, 4);
+    const lotShort = reagent.lotNumber.replace(/[^A-Z0-9]/gi, '').slice(0, 4);
     const random = crypto.randomBytes(2).toString('hex').toUpperCase();
 
     return `R${timestamp}${lotShort}${random}`;
@@ -72,7 +81,7 @@ export class BarcodeService {
     }
 
     const timestamp = Date.now().toString(36);
-    const serialShort = equipment.serialNumber.replace(/[^A-Z0-9]/gi, '').substring(0, 4);
+    const serialShort = equipment.serialNumber.replace(/[^A-Z0-9]/gi, '').slice(0, 4);
     const random = crypto.randomBytes(2).toString('hex').toUpperCase();
 
     return `E${timestamp}${serialShort}${random}`;
@@ -188,17 +197,17 @@ export class BarcodeService {
 
         switch (type) {
           case 'sample':
-            const sample = entity as any;
+            const sample = entity;
             patientInfo = `${sample.labTest.patient.user.firstName} ${sample.labTest.patient.user.lastName}`;
             testInfo = `${sample.labTest.testCatalog.testName} (${sample.labTest.testCatalog.testCode})`;
             label = `${barcode}\n${patientInfo}\n${testInfo}\n${sample.collectionDate?.toISOString().split('T')[0]}`;
             break;
           case 'reagent':
-            const reagent = entity as any;
+            const reagent = entity;
             label = `${barcode}\n${reagent.name}\nLot: ${reagent.lotNumber}`;
             break;
           case 'equipment':
-            const equipment = entity as any;
+            const equipment = entity;
             label = `${barcode}\n${equipment.name}\nSN: ${equipment.serialNumber}`;
             break;
         }

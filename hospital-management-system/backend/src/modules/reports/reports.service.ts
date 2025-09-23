@@ -1,5 +1,6 @@
+/*[object Object]*/
 import { Injectable } from '@nestjs/common';
-import { Injectable } from '@nestjs/common';
+
 import { PrismaService } from '../../database/prisma.service';
 
 export interface AnalyticsFilters {
@@ -54,11 +55,20 @@ export interface OccupancyAnalytics {
   peakOccupancyHours: Array<{ hour: number; occupancy: number }>;
 }
 
+/**
+ *
+ */
 @Injectable()
 export class ReportsService {
+  /**
+   *
+   */
   constructor(private prisma: PrismaService) {}
 
   // Patient Reports
+  /**
+   *
+   */
   async getPatientDemographics(startDate?: string, endDate?: string) {
     const where: any = {};
     if (startDate || endDate) {
@@ -134,6 +144,9 @@ export class ReportsService {
     };
   }
 
+  /**
+   *
+   */
   async getPatientRegistrationTrends(period: string = 'monthly', year?: number) {
     const currentYear = year || new Date().getFullYear();
     const monthlyData = [];
@@ -166,6 +179,9 @@ export class ReportsService {
   }
 
   // Appointment Reports
+  /**
+   *
+   */
   async getAppointmentSummary(startDate?: string, endDate?: string) {
     const where: any = {};
     if (startDate || endDate) {
@@ -203,6 +219,9 @@ export class ReportsService {
     };
   }
 
+  /**
+   *
+   */
   async getDoctorUtilization(startDate?: string, endDate?: string) {
     const where: any = {};
     if (startDate || endDate) {
@@ -255,6 +274,9 @@ export class ReportsService {
   }
 
   // Revenue Reports
+  /**
+   *
+   */
   async getRevenueSummary(startDate?: string, endDate?: string, groupBy: string = 'monthly') {
     const where: any = { status: 'PAID' };
     if (startDate || endDate) {
@@ -271,16 +293,27 @@ export class ReportsService {
       },
     });
 
-    let groupedData = {};
+    const groupedData = {};
 
     bills.forEach(bill => {
       let key;
-      if (groupBy === 'monthly') {
-        key = bill.createdAt.toISOString().slice(0, 7); // YYYY-MM
-      } else if (groupBy === 'daily') {
-        key = bill.createdAt.toISOString().slice(0, 10); // YYYY-MM-DD
-      } else if (groupBy === 'yearly') {
-        key = bill.createdAt.getFullYear().toString();
+      switch (groupBy) {
+        case 'monthly': {
+          key = bill.createdAt.toISOString().slice(0, 7); // YYYY-MM
+
+          break;
+        }
+        case 'daily': {
+          key = bill.createdAt.toISOString().slice(0, 10); // YYYY-MM-DD
+
+          break;
+        }
+        case 'yearly': {
+          key = bill.createdAt.getFullYear().toString();
+
+          break;
+        }
+        // No default
       }
 
       if (!groupedData[key]) {
@@ -304,6 +337,9 @@ export class ReportsService {
     };
   }
 
+  /**
+   *
+   */
   async getDepartmentRevenue(startDate?: string, endDate?: string) {
     // This would require linking bills to departments
     // For now, return a placeholder structure
@@ -313,6 +349,9 @@ export class ReportsService {
     };
   }
 
+  /**
+   *
+   */
   async getPaymentMethodsDistribution(startDate?: string, endDate?: string) {
     const where: any = { status: 'PAID' };
     if (startDate || endDate) {
@@ -354,6 +393,9 @@ export class ReportsService {
   }
 
   // Laboratory Reports
+  /**
+   *
+   */
   async getLabTestStatistics(startDate?: string, endDate?: string) {
     const where: any = {};
     if (startDate || endDate) {
@@ -381,6 +423,9 @@ export class ReportsService {
     };
   }
 
+  /**
+   *
+   */
   async getLabTurnaroundTime(startDate?: string, endDate?: string) {
     const tests = await this.prisma.labTest.findMany({
       where: {
@@ -390,22 +435,35 @@ export class ReportsService {
           lte: endDate ? new Date(endDate) : undefined,
         },
       },
-      select: {
-        orderedDate: true,
-        resultDate: true,
-        testName: true,
+      include: {
+        testCatalog: {
+          select: {
+            testName: true,
+          },
+        },
+        results: {
+          select: {
+            performedDate: true,
+          },
+          orderBy: {
+            performedDate: 'desc',
+          },
+          take: 1,
+        },
       },
     });
 
-    const turnaroundTimes = tests.map(test => {
-      const orderedTime = new Date(test.orderedDate).getTime();
-      const resultTime = new Date(test.resultDate).getTime();
-      const hours = (resultTime - orderedTime) / (1000 * 60 * 60);
-      return {
-        testName: test.testName,
-        turnaroundHours: Math.round(hours * 100) / 100,
-      };
-    });
+    const turnaroundTimes = tests
+      .filter(test => test.results.length > 0)
+      .map(test => {
+        const orderedTime = new Date(test.orderedDate).getTime();
+        const resultTime = new Date(test.results[0].performedDate).getTime();
+        const hours = (resultTime - orderedTime) / (1000 * 60 * 60);
+        return {
+          testName: test.testCatalog.testName,
+          turnaroundHours: Math.round(hours * 100) / 100,
+        };
+      });
 
     const averageTurnaround =
       turnaroundTimes.length > 0
@@ -421,6 +479,9 @@ export class ReportsService {
   }
 
   // Pharmacy Reports
+  /**
+   *
+   */
   async getPharmacyDispensingReport(startDate?: string, endDate?: string) {
     const where: any = {};
     if (startDate || endDate) {
@@ -468,6 +529,9 @@ export class ReportsService {
   }
 
   // OT/Surgery Reports
+  /**
+   *
+   */
   async getSurgeryStatistics(startDate?: string, endDate?: string) {
     const where: any = {};
     if (startDate || endDate) {
@@ -496,6 +560,9 @@ export class ReportsService {
     };
   }
 
+  /**
+   *
+   */
   async getOTUtilization(startDate?: string, endDate?: string) {
     // This would require OT schedule data
     return {
@@ -505,6 +572,9 @@ export class ReportsService {
   }
 
   // Emergency Department Reports
+  /**
+   *
+   */
   async getEmergencyTriageStats(startDate?: string, endDate?: string) {
     const where: any = {};
     if (startDate || endDate) {
@@ -550,6 +620,9 @@ export class ReportsService {
   }
 
   // Inventory Reports
+  /**
+   *
+   */
   async getInventoryStockLevels() {
     const medications = await this.prisma.medication.findMany({
       where: { isActive: true },
@@ -582,6 +655,9 @@ export class ReportsService {
     };
   }
 
+  /**
+   *
+   */
   async getInventoryExpiryAlerts(days: number = 30) {
     const expiryDate = new Date();
     expiryDate.setDate(expiryDate.getDate() + days);
@@ -619,6 +695,9 @@ export class ReportsService {
   }
 
   // Staff Performance Reports
+  /**
+   *
+   */
   async getStaffPerformanceReport(startDate?: string, endDate?: string) {
     // This would aggregate data from various staff activities
     return {
@@ -628,6 +707,9 @@ export class ReportsService {
   }
 
   // Dashboard Summary
+  /**
+   *
+   */
   async getDashboardSummary() {
     const [totalPatients, todayAppointments, pendingBills, lowStockItems, todaySurgeries] =
       await Promise.all([
@@ -670,6 +752,9 @@ export class ReportsService {
   }
 
   // Custom Report Generation
+  /**
+   *
+   */
   async generateCustomReport(type: string, filters: any, startDate?: string, endDate?: string) {
     // This would be a flexible report generator
     // For now, return a placeholder

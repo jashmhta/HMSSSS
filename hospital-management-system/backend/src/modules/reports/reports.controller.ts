@@ -1,19 +1,31 @@
+/*[object Object]*/
 import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
-import { ReportsService } from './reports.service';
+import { UserRole } from '@prisma/client';
+
 import { JwtAuthGuard } from '../../shared/guards/jwt-auth.guard';
 import { RolesGuard } from '../../modules/auth/roles.guard';
 import { Roles } from '../../shared/decorators/roles.decorator';
-import { UserRole } from '../../database/schema.prisma';
 
+import { ReportsService } from './reports.service';
+
+/**
+ *
+ */
 @ApiTags('reports')
 @ApiBearerAuth()
 @Controller('reports')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class ReportsController {
+  /**
+   *
+   */
   constructor(private readonly reportsService: ReportsService) {}
 
   // Patient Reports
+  /**
+   *
+   */
   @Get('patients/demographics')
   @Roles(UserRole.ADMIN, UserRole.DOCTOR, UserRole.SUPERADMIN)
   @ApiOperation({ summary: 'Get patient demographics report' })
@@ -25,6 +37,9 @@ export class ReportsController {
     return this.reportsService.getPatientDemographics(startDate, endDate);
   }
 
+  /**
+   *
+   */
   @Get('patients/registrations')
   @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
   @ApiOperation({ summary: 'Get patient registration trends' })
@@ -37,6 +52,9 @@ export class ReportsController {
   }
 
   // Appointment Reports
+  /**
+   *
+   */
   @Get('appointments/summary')
   @Roles(UserRole.ADMIN, UserRole.DOCTOR, UserRole.RECEPTIONIST, UserRole.SUPERADMIN)
   @ApiOperation({ summary: 'Get appointment summary report' })
@@ -48,6 +66,9 @@ export class ReportsController {
     return this.reportsService.getAppointmentSummary(startDate, endDate);
   }
 
+  /**
+   *
+   */
   @Get('appointments/utilization')
   @Roles(UserRole.ADMIN, UserRole.DOCTOR, UserRole.SUPERADMIN)
   @ApiOperation({ summary: 'Get doctor utilization report' })
@@ -60,6 +81,9 @@ export class ReportsController {
   }
 
   // Revenue Reports
+  /**
+   *
+   */
   @Get('revenue/summary')
   @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
   @ApiOperation({ summary: 'Get revenue summary report' })
@@ -72,6 +96,9 @@ export class ReportsController {
     return this.reportsService.getRevenueSummary(startDate, endDate, groupBy);
   }
 
+  /**
+   *
+   */
   @Get('revenue/department')
   @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
   @ApiOperation({ summary: 'Get department-wise revenue report' })
@@ -83,6 +110,9 @@ export class ReportsController {
     return this.reportsService.getDepartmentRevenue(startDate, endDate);
   }
 
+  /**
+   *
+   */
   @Get('revenue/payment-methods')
   @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
   @ApiOperation({ summary: 'Get payment methods distribution' })
@@ -95,6 +125,9 @@ export class ReportsController {
   }
 
   // Laboratory Reports
+  /**
+   *
+   */
   @Get('laboratory/tests')
   @Roles(UserRole.ADMIN, UserRole.LAB_TECHNICIAN, UserRole.DOCTOR, UserRole.SUPERADMIN)
   @ApiOperation({ summary: 'Get laboratory test statistics' })
@@ -106,6 +139,9 @@ export class ReportsController {
     return this.reportsService.getLabTestStatistics(startDate, endDate);
   }
 
+  /**
+   *
+   */
   @Get('laboratory/turnaround-time')
   @Roles(UserRole.ADMIN, UserRole.LAB_TECHNICIAN, UserRole.SUPERADMIN)
   @ApiOperation({ summary: 'Get lab test turnaround time report' })
@@ -118,6 +154,9 @@ export class ReportsController {
   }
 
   // Pharmacy Reports
+  /**
+   *
+   */
   @Get('pharmacy/dispensing')
   @Roles(UserRole.ADMIN, UserRole.PHARMACIST, UserRole.SUPERADMIN)
   @ApiOperation({ summary: 'Get pharmacy dispensing report' })
@@ -130,6 +169,9 @@ export class ReportsController {
   }
 
   // OT/Surgery Reports
+  /**
+   *
+   */
   @Get('ot/surgeries')
   @Roles(UserRole.ADMIN, UserRole.DOCTOR, UserRole.SUPERADMIN)
   @ApiOperation({ summary: 'Get surgery statistics report' })
@@ -141,6 +183,9 @@ export class ReportsController {
     return this.reportsService.getSurgeryStatistics(startDate, endDate);
   }
 
+  /**
+   *
+   */
   @Get('ot/utilization')
   @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
   @ApiOperation({ summary: 'Get OT utilization report' })
@@ -153,6 +198,9 @@ export class ReportsController {
   }
 
   // Emergency Department Reports
+  /**
+   *
+   */
   @Get('emergency/triage')
   @Roles(UserRole.ADMIN, UserRole.DOCTOR, UserRole.SUPERADMIN)
   @ApiOperation({ summary: 'Get emergency triage statistics' })
@@ -165,6 +213,9 @@ export class ReportsController {
   }
 
   // Inventory Reports
+  /**
+   *
+   */
   @Get('inventory/stock-levels')
   @Roles(UserRole.ADMIN, UserRole.PHARMACIST, UserRole.SUPERADMIN)
   @ApiOperation({ summary: 'Get inventory stock levels report' })
@@ -173,6 +224,9 @@ export class ReportsController {
     return this.reportsService.getInventoryStockLevels();
   }
 
+  /**
+   *
+   */
   @Get('inventory/expiry-alerts')
   @Roles(UserRole.ADMIN, UserRole.PHARMACIST, UserRole.SUPERADMIN)
   @ApiOperation({ summary: 'Get inventory expiry alerts' })
@@ -182,6 +236,9 @@ export class ReportsController {
   }
 
   // Staff Performance Reports
+  /**
+   *
+   */
   @Get('staff/performance')
   @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
   @ApiOperation({ summary: 'Get staff performance report' })
@@ -194,6 +251,9 @@ export class ReportsController {
   }
 
   // Dashboard Summary
+  /**
+   *
+   */
   @Get('dashboard/summary')
   @Roles(UserRole.ADMIN, UserRole.DOCTOR, UserRole.SUPERADMIN)
   @ApiOperation({ summary: 'Get dashboard summary data' })
@@ -203,6 +263,9 @@ export class ReportsController {
   }
 
   // Custom Report Generation
+  /**
+   *
+   */
   @Get('custom')
   @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
   @ApiOperation({ summary: 'Generate custom report' })

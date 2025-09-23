@@ -1,3 +1,4 @@
+/*[object Object]*/
 import {
   Controller,
   Get,
@@ -11,20 +12,31 @@ import {
   Request,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
-import { StaffService } from './staff.service';
+import { UserRole } from '@prisma/client';
+
 import { JwtAuthGuard } from '../../shared/guards/jwt-auth.guard';
 import { RolesGuard } from '../../modules/auth/roles.guard';
 import { Roles } from '../../shared/decorators/roles.decorator';
-import { UserRole } from '../../database/schema.prisma';
 
+import { StaffService } from './staff.service';
+
+/**
+ *
+ */
 @ApiTags('staff')
 @ApiBearerAuth()
 @Controller('staff')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class StaffController {
+  /**
+   *
+   */
   constructor(private readonly staffService: StaffService) {}
 
   // Doctor Management
+  /**
+   *
+   */
   @Post('doctors')
   @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
   @ApiOperation({ summary: 'Create a new doctor' })
@@ -36,6 +48,9 @@ export class StaffController {
     });
   }
 
+  /**
+   *
+   */
   @Get('doctors')
   @Roles(UserRole.ADMIN, UserRole.DOCTOR, UserRole.SUPERADMIN)
   @ApiOperation({ summary: 'Get all doctors' })
@@ -49,6 +64,9 @@ export class StaffController {
     return this.staffService.getDoctors(page, limit, specialization, department);
   }
 
+  /**
+   *
+   */
   @Get('doctors/:id')
   @Roles(UserRole.ADMIN, UserRole.DOCTOR, UserRole.SUPERADMIN)
   @ApiOperation({ summary: 'Get doctor by ID' })
@@ -57,6 +75,9 @@ export class StaffController {
     return this.staffService.getDoctorById(id);
   }
 
+  /**
+   *
+   */
   @Put('doctors/:id')
   @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
   @ApiOperation({ summary: 'Update doctor' })
@@ -68,6 +89,9 @@ export class StaffController {
     });
   }
 
+  /**
+   *
+   */
   @Delete('doctors/:id')
   @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
   @ApiOperation({ summary: 'Delete doctor' })
@@ -77,6 +101,9 @@ export class StaffController {
   }
 
   // Nurse Management
+  /**
+   *
+   */
   @Post('nurses')
   @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
   @ApiOperation({ summary: 'Create a new nurse' })
@@ -88,6 +115,9 @@ export class StaffController {
     });
   }
 
+  /**
+   *
+   */
   @Get('nurses')
   @Roles(UserRole.ADMIN, UserRole.DOCTOR, UserRole.NURSE, UserRole.SUPERADMIN)
   @ApiOperation({ summary: 'Get all nurses' })
@@ -101,6 +131,9 @@ export class StaffController {
     return this.staffService.getNurses(page, limit, department, shift);
   }
 
+  /**
+   *
+   */
   @Get('nurses/:id')
   @Roles(UserRole.ADMIN, UserRole.DOCTOR, UserRole.NURSE, UserRole.SUPERADMIN)
   @ApiOperation({ summary: 'Get nurse by ID' })
@@ -109,6 +142,9 @@ export class StaffController {
     return this.staffService.getNurseById(id);
   }
 
+  /**
+   *
+   */
   @Put('nurses/:id')
   @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
   @ApiOperation({ summary: 'Update nurse' })
@@ -120,6 +156,9 @@ export class StaffController {
     });
   }
 
+  /**
+   *
+   */
   @Delete('nurses/:id')
   @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
   @ApiOperation({ summary: 'Delete nurse' })
@@ -129,6 +168,9 @@ export class StaffController {
   }
 
   // Receptionist Management
+  /**
+   *
+   */
   @Post('receptionists')
   @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
   @ApiOperation({ summary: 'Create a new receptionist' })
@@ -140,6 +182,9 @@ export class StaffController {
     });
   }
 
+  /**
+   *
+   */
   @Get('receptionists')
   @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
   @ApiOperation({ summary: 'Get all receptionists' })
@@ -152,6 +197,9 @@ export class StaffController {
     return this.staffService.getReceptionists(page, limit, department);
   }
 
+  /**
+   *
+   */
   @Get('receptionists/:id')
   @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
   @ApiOperation({ summary: 'Get receptionist by ID' })
@@ -160,6 +208,9 @@ export class StaffController {
     return this.staffService.getReceptionistById(id);
   }
 
+  /**
+   *
+   */
   @Put('receptionists/:id')
   @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
   @ApiOperation({ summary: 'Update receptionist' })
@@ -171,6 +222,9 @@ export class StaffController {
     });
   }
 
+  /**
+   *
+   */
   @Delete('receptionists/:id')
   @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
   @ApiOperation({ summary: 'Delete receptionist' })
@@ -180,6 +234,9 @@ export class StaffController {
   }
 
   // Lab Technician Management
+  /**
+   *
+   */
   @Post('lab-technicians')
   @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
   @ApiOperation({ summary: 'Create a new lab technician' })
@@ -191,6 +248,9 @@ export class StaffController {
     });
   }
 
+  /**
+   *
+   */
   @Get('lab-technicians')
   @Roles(UserRole.ADMIN, UserRole.LAB_TECHNICIAN, UserRole.SUPERADMIN)
   @ApiOperation({ summary: 'Get all lab technicians' })
@@ -199,6 +259,9 @@ export class StaffController {
     return this.staffService.getLabTechnicians(page, limit);
   }
 
+  /**
+   *
+   */
   @Get('lab-technicians/:id')
   @Roles(UserRole.ADMIN, UserRole.LAB_TECHNICIAN, UserRole.SUPERADMIN)
   @ApiOperation({ summary: 'Get lab technician by ID' })
@@ -207,6 +270,9 @@ export class StaffController {
     return this.staffService.getLabTechnicianById(id);
   }
 
+  /**
+   *
+   */
   @Put('lab-technicians/:id')
   @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
   @ApiOperation({ summary: 'Update lab technician' })
@@ -218,6 +284,9 @@ export class StaffController {
     });
   }
 
+  /**
+   *
+   */
   @Delete('lab-technicians/:id')
   @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
   @ApiOperation({ summary: 'Delete lab technician' })
@@ -227,6 +296,9 @@ export class StaffController {
   }
 
   // Pharmacist Management
+  /**
+   *
+   */
   @Post('pharmacists')
   @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
   @ApiOperation({ summary: 'Create a new pharmacist' })
@@ -238,6 +310,9 @@ export class StaffController {
     });
   }
 
+  /**
+   *
+   */
   @Get('pharmacists')
   @Roles(UserRole.ADMIN, UserRole.PHARMACIST, UserRole.SUPERADMIN)
   @ApiOperation({ summary: 'Get all pharmacists' })
@@ -246,6 +321,9 @@ export class StaffController {
     return this.staffService.getPharmacists(page, limit);
   }
 
+  /**
+   *
+   */
   @Get('pharmacists/:id')
   @Roles(UserRole.ADMIN, UserRole.PHARMACIST, UserRole.SUPERADMIN)
   @ApiOperation({ summary: 'Get pharmacist by ID' })
@@ -254,6 +332,9 @@ export class StaffController {
     return this.staffService.getPharmacistById(id);
   }
 
+  /**
+   *
+   */
   @Put('pharmacists/:id')
   @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
   @ApiOperation({ summary: 'Update pharmacist' })
@@ -265,6 +346,9 @@ export class StaffController {
     });
   }
 
+  /**
+   *
+   */
   @Delete('pharmacists/:id')
   @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
   @ApiOperation({ summary: 'Delete pharmacist' })
@@ -274,6 +358,9 @@ export class StaffController {
   }
 
   // Admin Management
+  /**
+   *
+   */
   @Post('admins')
   @Roles(UserRole.SUPERADMIN)
   @ApiOperation({ summary: 'Create a new admin' })
@@ -285,6 +372,9 @@ export class StaffController {
     });
   }
 
+  /**
+   *
+   */
   @Get('admins')
   @Roles(UserRole.SUPERADMIN)
   @ApiOperation({ summary: 'Get all admins' })
@@ -293,6 +383,9 @@ export class StaffController {
     return this.staffService.getAdmins(page, limit);
   }
 
+  /**
+   *
+   */
   @Get('admins/:id')
   @Roles(UserRole.SUPERADMIN)
   @ApiOperation({ summary: 'Get admin by ID' })
@@ -301,6 +394,9 @@ export class StaffController {
     return this.staffService.getAdminById(id);
   }
 
+  /**
+   *
+   */
   @Put('admins/:id')
   @Roles(UserRole.SUPERADMIN)
   @ApiOperation({ summary: 'Update admin' })
@@ -312,6 +408,9 @@ export class StaffController {
     });
   }
 
+  /**
+   *
+   */
   @Delete('admins/:id')
   @Roles(UserRole.SUPERADMIN)
   @ApiOperation({ summary: 'Delete admin' })
@@ -321,6 +420,9 @@ export class StaffController {
   }
 
   // General Staff Statistics
+  /**
+   *
+   */
   @Get('stats')
   @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
   @ApiOperation({ summary: 'Get staff statistics' })
@@ -330,6 +432,9 @@ export class StaffController {
   }
 
   // Bulk operations
+  /**
+   *
+   */
   @Post('bulk-create')
   @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
   @ApiOperation({ summary: 'Bulk create staff members' })

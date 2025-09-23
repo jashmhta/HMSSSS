@@ -1,4 +1,6 @@
+/*[object Object]*/
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+
 import { PrismaService } from '../../database/prisma.service';
 
 interface ReagentStockUpdate {
@@ -12,8 +14,14 @@ interface ReagentStockUpdate {
   costPrice?: number;
 }
 
+/**
+ *
+ */
 @Injectable()
 export class LabInventoryService {
+  /**
+   *
+   */
   constructor(private prisma: PrismaService) {}
 
   /**

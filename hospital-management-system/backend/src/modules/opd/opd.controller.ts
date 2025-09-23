@@ -1,3 +1,4 @@
+/*[object Object]*/
 import {
   Controller,
   Get,
@@ -11,19 +12,30 @@ import {
   Request,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
-import { OPDService } from './opd.service';
+import { UserRole } from '@prisma/client';
+
 import { JwtAuthGuard } from '../../shared/guards/jwt-auth.guard';
 import { RolesGuard } from '../../modules/auth/roles.guard';
 import { Roles } from '../../shared/decorators/roles.decorator';
-import { UserRole } from '../../database/schema.prisma';
 
+import { OPDService } from './opd.service';
+
+/**
+ *
+ */
 @ApiTags('opd')
 @ApiBearerAuth()
 @Controller('opd')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class OPDController {
+  /**
+   *
+   */
   constructor(private readonly opdService: OPDService) {}
 
+  /**
+   *
+   */
   @Post('visits')
   @Roles(UserRole.DOCTOR, UserRole.NURSE, UserRole.RECEPTIONIST)
   @ApiOperation({ summary: 'Create a new OPD visit' })
@@ -35,6 +47,9 @@ export class OPDController {
     });
   }
 
+  /**
+   *
+   */
   @Get('visits')
   @Roles(UserRole.DOCTOR, UserRole.NURSE, UserRole.ADMIN, UserRole.RECEPTIONIST)
   @ApiOperation({ summary: 'Get all OPD visits' })
@@ -48,6 +63,9 @@ export class OPDController {
     return this.opdService.getOPDVisits(page, limit, search, status);
   }
 
+  /**
+   *
+   */
   @Get('visits/:id')
   @Roles(UserRole.DOCTOR, UserRole.NURSE, UserRole.ADMIN, UserRole.RECEPTIONIST)
   @ApiOperation({ summary: 'Get OPD visit by ID' })
@@ -56,6 +74,9 @@ export class OPDController {
     return this.opdService.getOPDVisitById(id);
   }
 
+  /**
+   *
+   */
   @Put('visits/:id')
   @Roles(UserRole.DOCTOR, UserRole.NURSE)
   @ApiOperation({ summary: 'Update OPD visit' })
@@ -67,6 +88,9 @@ export class OPDController {
     });
   }
 
+  /**
+   *
+   */
   @Delete('visits/:id')
   @Roles(UserRole.ADMIN, UserRole.DOCTOR)
   @ApiOperation({ summary: 'Delete OPD visit' })
@@ -75,6 +99,9 @@ export class OPDController {
     return this.opdService.deleteOPDVisit(id);
   }
 
+  /**
+   *
+   */
   @Get('queue')
   @Roles(UserRole.DOCTOR, UserRole.NURSE, UserRole.RECEPTIONIST)
   @ApiOperation({ summary: 'Get OPD queue' })
@@ -83,6 +110,9 @@ export class OPDController {
     return this.opdService.getOPDQueue();
   }
 
+  /**
+   *
+   */
   @Put('visits/:id/status')
   @Roles(UserRole.DOCTOR, UserRole.NURSE)
   @ApiOperation({ summary: 'Update visit status' })
@@ -95,6 +125,9 @@ export class OPDController {
     return this.opdService.updateVisitStatus(id, body.status, req.user.id);
   }
 
+  /**
+   *
+   */
   @Post('appointments')
   @Roles(UserRole.DOCTOR, UserRole.RECEPTIONIST, UserRole.ADMIN)
   @ApiOperation({ summary: 'Schedule an OPD appointment' })
@@ -106,6 +139,9 @@ export class OPDController {
     });
   }
 
+  /**
+   *
+   */
   @Post('visits/:appointmentId/start')
   @Roles(UserRole.DOCTOR, UserRole.NURSE)
   @ApiOperation({ summary: 'Start OPD consultation from appointment' })
@@ -114,6 +150,9 @@ export class OPDController {
     return this.opdService.startConsultation(appointmentId, req.user.id);
   }
 
+  /**
+   *
+   */
   @Post('visits/:visitId/complete')
   @Roles(UserRole.DOCTOR)
   @ApiOperation({ summary: 'Complete OPD consultation' })
@@ -125,6 +164,9 @@ export class OPDController {
     });
   }
 
+  /**
+   *
+   */
   @Get('schedule/:doctorId')
   @Roles(UserRole.DOCTOR, UserRole.RECEPTIONIST, UserRole.ADMIN)
   @ApiOperation({ summary: 'Get doctor schedule for a date' })
@@ -134,6 +176,9 @@ export class OPDController {
     return this.opdService.getDoctorSchedule(doctorId, scheduleDate);
   }
 
+  /**
+   *
+   */
   @Get('queue/wait-times')
   @Roles(UserRole.DOCTOR, UserRole.NURSE, UserRole.RECEPTIONIST)
   @ApiOperation({ summary: 'Get OPD queue with estimated wait times' })
@@ -142,6 +187,9 @@ export class OPDController {
     return this.opdService.getOPDQueueWithWaitTimes();
   }
 
+  /**
+   *
+   */
   @Post('visits/:visitId/transfer')
   @Roles(UserRole.DOCTOR, UserRole.ADMIN)
   @ApiOperation({ summary: 'Transfer patient to different doctor/department' })
@@ -153,6 +201,9 @@ export class OPDController {
     });
   }
 
+  /**
+   *
+   */
   @Get('performance')
   @Roles(UserRole.ADMIN, UserRole.DOCTOR)
   @ApiOperation({ summary: 'Get OPD performance metrics' })
@@ -166,6 +217,9 @@ export class OPDController {
     return this.opdService.getOPDPerformanceMetrics(start, end);
   }
 
+  /**
+   *
+   */
   @Get('stats')
   @Roles(UserRole.ADMIN, UserRole.DOCTOR)
   @ApiOperation({ summary: 'Get OPD statistics' })

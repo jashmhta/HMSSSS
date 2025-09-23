@@ -1,10 +1,21 @@
+/*[object Object]*/
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+
 import { PrismaService } from '../../database/prisma.service';
 
+/**
+ *
+ */
 @Injectable()
 export class AppointmentsService {
+  /**
+   *
+   */
   constructor(private prisma: PrismaService) {}
 
+  /**
+   *
+   */
   async create(data: {
     patientId: string;
     doctorId: string;
@@ -50,7 +61,7 @@ export class AppointmentsService {
         doctorId: data.doctorId,
         appointmentDate: data.appointmentDate,
         duration: data.duration || 30,
-        type: data.type || 'CONSULTATION',
+        type: (data.type as any) || 'CONSULTATION',
         reason: data.reason,
         notes: data.notes,
       },
@@ -73,6 +84,9 @@ export class AppointmentsService {
     });
   }
 
+  /**
+   *
+   */
   async findAll(filters?: {
     patientId?: string;
     doctorId?: string;
@@ -123,6 +137,9 @@ export class AppointmentsService {
     });
   }
 
+  /**
+   *
+   */
   async findOne(id: string) {
     const appointment = await this.prisma.appointment.findUnique({
       where: { id },
@@ -151,6 +168,9 @@ export class AppointmentsService {
     return appointment;
   }
 
+  /**
+   *
+   */
   async update(
     id: string,
     data: Partial<{
@@ -172,7 +192,11 @@ export class AppointmentsService {
 
     return this.prisma.appointment.update({
       where: { id },
-      data,
+      data: {
+        ...data,
+        type: data.type ? (data.type as any) : undefined,
+        status: data.status ? (data.status as any) : undefined,
+      },
       include: {
         patient: {
           include: {
@@ -192,6 +216,9 @@ export class AppointmentsService {
     });
   }
 
+  /**
+   *
+   */
   async remove(id: string) {
     const appointment = await this.prisma.appointment.findUnique({
       where: { id },
@@ -206,6 +233,9 @@ export class AppointmentsService {
     });
   }
 
+  /**
+   *
+   */
   async getDoctorSchedule(doctorId: string, date: Date) {
     const startOfDay = new Date(date);
     startOfDay.setHours(0, 0, 0, 0);
@@ -234,10 +264,108 @@ export class AppointmentsService {
     });
   }
 
-  async getPatientAppointments(patientId: string) {
-    return this.prisma.appointment.findMany({
-      where: { patientId },
+  /**
+   *
+   */
+  async getPatientAppointments(patientId: string, page: number = 1, limit: number = 10) {
+    const skip = (page - 1) * limit;
+
+    const [appointments, total] = await Promise.all([
+      this.prisma.appointment.findMany({
+        where: { patientId },
+        include: {
+          doctor: {
+            include: {
+              user: {
+                select: { firstName: true, lastName: true },
+              },
+            },
+          },
+        },
+        orderBy: { appointmentDate: 'desc' },
+        skip,
+        take: limit,
+      }),
+      this.prisma.appointment.count({ where: { patientId } }),
+    ]);
+
+    return {
+      data: appointments,
+      pagination: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  /**
+   *
+   */
+  async getAppointmentStats() {
+    const [total, scheduled, completed, cancelled] = await Promise.all([
+      this.prisma.appointment.count(),
+      this.prisma.appointment.count({ where: { status: 'SCHEDULED' } }),
+      this.prisma.appointment.count({ where: { status: 'COMPLETED' } }),
+      this.prisma.appointment.count({ where: { status: 'CANCELLED' } }),
+    ]);
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const todayAppointments = await this.prisma.appointment.count({
+      where: {
+        appointmentDate: {
+          gte: today,
+          lt: tomorrow,
+        },
+      },
+    });
+
+    return {
+      total,
+      scheduled,
+      completed,
+      cancelled,
+      todayAppointments,
+    };
+  }
+
+  /**
+   *
+   */
+  async cancel(id: string, reason: string) {
+    const appointment = await this.prisma.appointment.findUnique({
+      where: { id },
+    });
+
+    if (!appointment) {
+      throw new NotFoundException('Appointment not found');
+    }
+
+    if (appointment.status === 'CANCELLED') {
+      throw new BadRequestException('Appointment is already cancelled');
+    }
+
+    return this.prisma.appointment.update({
+      where: { id },
+      data: {
+        status: 'CANCELLED',
+        notes: reason,
+        updatedAt: new Date(),
+      },
       include: {
+        patient: {
+          include: {
+            user: {
+              select: { firstName: true, lastName: true },
+            },
+          },
+        },
         doctor: {
           include: {
             user: {
@@ -246,7 +374,6 @@ export class AppointmentsService {
           },
         },
       },
-      orderBy: { appointmentDate: 'desc' },
     });
   }
 }

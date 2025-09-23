@@ -1,11 +1,21 @@
+/*[object Object]*/
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+
 import { PrismaService } from '../../database/prisma.service';
 
+/**
+ *
+ */
 @Injectable()
 export class RadiologyService {
+  /**
+   *
+   */
   constructor(private prisma: PrismaService) {}
 
+  /**
+   *
+   */
   async create(data: {
     patientId: string;
     testName: string;
@@ -34,8 +44,6 @@ export class RadiologyService {
         modality: data.modality as any,
         orderedBy: data.orderedBy,
         scheduledDate: data.scheduledDate,
-        urgent: data.urgent || false,
-        notes: data.notes,
       },
       include: {
         patient: {
@@ -53,6 +61,9 @@ export class RadiologyService {
     });
   }
 
+  /**
+   *
+   */
   async findAll(
     page: number = 1,
     limit: number = 10,
@@ -125,6 +136,9 @@ export class RadiologyService {
     };
   }
 
+  /**
+   *
+   */
   async findOne(id: string) {
     const radiologyTest = await this.prisma.radiologyTest.findUnique({
       where: { id },
@@ -151,6 +165,9 @@ export class RadiologyService {
     return radiologyTest;
   }
 
+  /**
+   *
+   */
   async update(
     id: string,
     data: Partial<{
@@ -163,7 +180,6 @@ export class RadiologyService {
       impression: string;
       recommendations: string;
       images: string[];
-      notes: string;
     }>,
   ) {
     const radiologyTest = await this.prisma.radiologyTest.findUnique({
@@ -181,7 +197,10 @@ export class RadiologyService {
 
     return this.prisma.radiologyTest.update({
       where: { id },
-      data,
+      data: {
+        ...data,
+        status: data.status as any,
+      },
       include: {
         patient: {
           include: {
@@ -198,11 +217,13 @@ export class RadiologyService {
     });
   }
 
+  /**
+   *
+   */
   async scheduleTest(
     id: string,
     data: {
       scheduledDate: Date;
-      notes?: string;
     },
   ) {
     const radiologyTest = await this.prisma.radiologyTest.findUnique({
@@ -220,9 +241,8 @@ export class RadiologyService {
     return this.prisma.radiologyTest.update({
       where: { id },
       data: {
-        status: 'SCHEDULED',
+        status: 'SCHEDULED' as any,
         scheduledDate: data.scheduledDate,
-        notes: data.notes,
       },
       include: {
         patient: {
@@ -240,6 +260,9 @@ export class RadiologyService {
     });
   }
 
+  /**
+   *
+   */
   async startTest(id: string, performedBy: string) {
     const radiologyTest = await this.prisma.radiologyTest.findUnique({
       where: { id },
@@ -276,6 +299,9 @@ export class RadiologyService {
     });
   }
 
+  /**
+   *
+   */
   async completeTest(
     id: string,
     data: {
@@ -325,6 +351,9 @@ export class RadiologyService {
     });
   }
 
+  /**
+   *
+   */
   async cancelTest(id: string, reason: string) {
     const radiologyTest = await this.prisma.radiologyTest.findUnique({
       where: { id },
@@ -341,12 +370,14 @@ export class RadiologyService {
     return this.prisma.radiologyTest.update({
       where: { id },
       data: {
-        status: 'CANCELLED',
-        notes: reason,
+        status: 'CANCELLED' as any,
       },
     });
   }
 
+  /**
+   *
+   */
   async getRadiologyStats() {
     const [totalTests, pendingTests, completedToday, urgentTests] = await Promise.all([
       this.prisma.radiologyTest.count(),
@@ -380,6 +411,9 @@ export class RadiologyService {
     };
   }
 
+  /**
+   *
+   */
   async getTestsByModality() {
     const modalities = await this.prisma.radiologyTest.groupBy({
       by: ['modality'],
@@ -399,6 +433,9 @@ export class RadiologyService {
     }));
   }
 
+  /**
+   *
+   */
   async getScheduledTests(date: Date) {
     const startOfDay = new Date(date);
     startOfDay.setHours(0, 0, 0, 0);
@@ -432,6 +469,9 @@ export class RadiologyService {
     });
   }
 
+  /**
+   *
+   */
   private async validateStatusTransition(currentStatus: string, newStatus: string) {
     const validTransitions = {
       ORDERED: ['SCHEDULED', 'CANCELLED'],

@@ -1,14 +1,25 @@
+/*[object Object]*/
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+
 import { PrismaService } from '../../database/prisma.service';
 import { ComplianceService } from '../compliance/compliance.service';
 
+/**
+ *
+ */
 @Injectable()
 export class OPDService {
+  /**
+   *
+   */
   constructor(
     private prisma: PrismaService,
     private complianceService: ComplianceService,
   ) {}
 
+  /**
+   *
+   */
   async createOPDVisit(data: {
     patientId: string;
     doctorId: string;
@@ -57,6 +68,9 @@ export class OPDService {
     });
   }
 
+  /**
+   *
+   */
   async getOPDVisits(page: number = 1, limit: number = 10, search?: string, status?: string) {
     const skip = (page - 1) * limit;
 
@@ -107,6 +121,9 @@ export class OPDService {
     };
   }
 
+  /**
+   *
+   */
   async getOPDVisitById(id: string) {
     const visit = await this.prisma.oPDVisit.findUnique({
       where: { id },
@@ -137,6 +154,9 @@ export class OPDService {
     return visit;
   }
 
+  /**
+   *
+   */
   async updateOPDVisit(
     id: string,
     data: Partial<{
@@ -183,6 +203,9 @@ export class OPDService {
     });
   }
 
+  /**
+   *
+   */
   async deleteOPDVisit(id: string) {
     const visit = await this.prisma.oPDVisit.findUnique({
       where: { id },
@@ -197,6 +220,9 @@ export class OPDService {
     });
   }
 
+  /**
+   *
+   */
   async getOPDQueue() {
     return this.prisma.oPDVisit.findMany({
       where: {
@@ -222,6 +248,9 @@ export class OPDService {
     });
   }
 
+  /**
+   *
+   */
   async updateVisitStatus(id: string, status: string, updatedBy?: string) {
     const visit = await this.prisma.oPDVisit.findUnique({
       where: { id },
@@ -422,7 +451,7 @@ export class OPDService {
   ) {
     const visit = await this.prisma.oPDVisit.findUnique({
       where: { id: visitId },
-      include: { patient: true, appointment: true },
+      include: { patient: true },
     });
 
     if (!visit) {
@@ -449,27 +478,20 @@ export class OPDService {
       },
     });
 
-    // Update appointment status
-    if (visit.appointment) {
-      await this.prisma.appointment.update({
-        where: { id: visit.appointment.id },
-        data: {
-          status: 'COMPLETED',
-        },
-      });
-    }
+    // Note: Appointment status update removed as OPDVisit doesn't have direct appointment relation
 
     // Create prescriptions if provided
     if (consultationData.prescriptions && consultationData.prescriptions.length > 0) {
       for (const prescription of consultationData.prescriptions) {
         await this.prisma.prescription.create({
           data: {
-            patientId: visit.patientId,
-            doctorId: visit.doctorId,
-            medicationId: prescription.medicationId,
+            patient: { connect: { id: visit.patientId } },
+            doctor: { connect: { id: visit.doctorId } },
+            medication: { connect: { id: prescription.medicationId } },
             dosage: prescription.dosage,
             frequency: prescription.frequency,
             duration: prescription.duration,
+            quantity: 1, // Default quantity as it's not in the prescription interface
             instructions: prescription.instructions,
             prescribedDate: new Date(),
             status: 'ACTIVE',
@@ -521,7 +543,7 @@ export class OPDService {
     const endOfDay = new Date(date);
     endOfDay.setHours(23, 59, 59, 999);
 
-    const appointments = await this.prisma.appointment.findMany({
+    return await this.prisma.appointment.findMany({
       where: {
         doctorId,
         appointmentDate: {
@@ -543,8 +565,6 @@ export class OPDService {
       },
       orderBy: { appointmentDate: 'asc' },
     });
-
-    return appointments;
   }
 
   /**
@@ -555,9 +575,9 @@ export class OPDService {
 
     // Calculate estimated wait times based on average consultation time
     const avgConsultationTime = 30; // minutes
-    let cumulativeWaitTime = 0;
+    const cumulativeWaitTime = 0;
 
-    const queueWithWaitTimes = queue.map((visit, index) => {
+    return queue.map((visit, index) => {
       const estimatedWaitTime = index * avgConsultationTime;
       return {
         ...visit,
@@ -565,8 +585,6 @@ export class OPDService {
         estimatedConsultationTime: new Date(Date.now() + estimatedWaitTime * 60 * 1000),
       };
     });
-
-    return queueWithWaitTimes;
   }
 
   /**
@@ -674,6 +692,9 @@ export class OPDService {
 
   // Helper methods
 
+  /**
+   *
+   */
   private async generateVisitNumber(): Promise<string> {
     const today = new Date();
     const dateStr = today.toISOString().split('T')[0].replace(/-/g, '');
@@ -690,6 +711,9 @@ export class OPDService {
     return `OPD${dateStr}${(count + 1).toString().padStart(4, '0')}`;
   }
 
+  /**
+   *
+   */
   async getOPDStats() {
     const [totalVisits, todayVisits, waitingPatients, completedToday] = await Promise.all([
       this.prisma.oPDVisit.count(),

@@ -1,3 +1,4 @@
+/*[object Object]*/
 import {
   Controller,
   Get,
@@ -11,20 +12,31 @@ import {
   Request,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
-import { InventoryService } from './inventory.service';
+import { UserRole } from '@prisma/client';
+
 import { JwtAuthGuard } from '../../shared/guards/jwt-auth.guard';
 import { RolesGuard } from '../../modules/auth/roles.guard';
 import { Roles } from '../../shared/decorators/roles.decorator';
-import { UserRole } from '../../database/schema.prisma';
 
+import { InventoryService } from './inventory.service';
+
+/**
+ *
+ */
 @ApiTags('inventory')
 @ApiBearerAuth()
 @Controller('inventory')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class InventoryController {
+  /**
+   *
+   */
   constructor(private readonly inventoryService: InventoryService) {}
 
   // Medication Management
+  /**
+   *
+   */
   @Post('medications')
   @Roles(UserRole.ADMIN, UserRole.PHARMACIST)
   @ApiOperation({ summary: 'Add a new medication to inventory' })
@@ -36,6 +48,9 @@ export class InventoryController {
     });
   }
 
+  /**
+   *
+   */
   @Get('medications')
   @Roles(UserRole.ADMIN, UserRole.DOCTOR, UserRole.PHARMACIST, UserRole.NURSE)
   @ApiOperation({ summary: 'Get all medications' })
@@ -50,6 +65,9 @@ export class InventoryController {
     return this.inventoryService.getMedications(page, limit, search, category, lowStock);
   }
 
+  /**
+   *
+   */
   @Get('medications/:id')
   @Roles(UserRole.ADMIN, UserRole.DOCTOR, UserRole.PHARMACIST, UserRole.NURSE)
   @ApiOperation({ summary: 'Get medication by ID' })
@@ -58,6 +76,9 @@ export class InventoryController {
     return this.inventoryService.getMedicationById(id);
   }
 
+  /**
+   *
+   */
   @Put('medications/:id')
   @Roles(UserRole.ADMIN, UserRole.PHARMACIST)
   @ApiOperation({ summary: 'Update medication' })
@@ -69,6 +90,9 @@ export class InventoryController {
     });
   }
 
+  /**
+   *
+   */
   @Delete('medications/:id')
   @Roles(UserRole.ADMIN)
   @ApiOperation({ summary: 'Delete medication' })
@@ -78,6 +102,9 @@ export class InventoryController {
   }
 
   // Stock Management
+  /**
+   *
+   */
   @Post('medications/:id/stock/add')
   @Roles(UserRole.ADMIN, UserRole.PHARMACIST)
   @ApiOperation({ summary: 'Add stock to medication' })
@@ -90,6 +117,9 @@ export class InventoryController {
     return this.inventoryService.addStock(id, data, req.user.id);
   }
 
+  /**
+   *
+   */
   @Post('medications/:id/stock/issue')
   @Roles(UserRole.ADMIN, UserRole.PHARMACIST, UserRole.DOCTOR, UserRole.NURSE)
   @ApiOperation({ summary: 'Issue stock from medication' })
@@ -102,6 +132,9 @@ export class InventoryController {
     return this.inventoryService.issueStock(id, data, req.user.id);
   }
 
+  /**
+   *
+   */
   @Post('medications/:id/stock/adjust')
   @Roles(UserRole.ADMIN, UserRole.PHARMACIST)
   @ApiOperation({ summary: 'Adjust medication stock' })
@@ -115,6 +148,9 @@ export class InventoryController {
   }
 
   // Inventory Logs
+  /**
+   *
+   */
   @Get('logs')
   @Roles(UserRole.ADMIN, UserRole.PHARMACIST)
   @ApiOperation({ summary: 'Get inventory logs' })
@@ -138,6 +174,9 @@ export class InventoryController {
   }
 
   // Reports and Analytics
+  /**
+   *
+   */
   @Get('reports/low-stock')
   @Roles(UserRole.ADMIN, UserRole.PHARMACIST)
   @ApiOperation({ summary: 'Get low stock report' })
@@ -146,6 +185,9 @@ export class InventoryController {
     return this.inventoryService.getLowStockReport();
   }
 
+  /**
+   *
+   */
   @Get('reports/expiring-soon')
   @Roles(UserRole.ADMIN, UserRole.PHARMACIST)
   @ApiOperation({ summary: 'Get medications expiring soon' })
@@ -154,6 +196,9 @@ export class InventoryController {
     return this.inventoryService.getExpiringSoonReport(days);
   }
 
+  /**
+   *
+   */
   @Get('reports/stock-movement')
   @Roles(UserRole.ADMIN, UserRole.PHARMACIST)
   @ApiOperation({ summary: 'Get stock movement report' })
@@ -166,6 +211,9 @@ export class InventoryController {
   }
 
   // Statistics
+  /**
+   *
+   */
   @Get('stats')
   @Roles(UserRole.ADMIN, UserRole.PHARMACIST)
   @ApiOperation({ summary: 'Get inventory statistics' })
@@ -175,6 +223,9 @@ export class InventoryController {
   }
 
   // Bulk operations
+  /**
+   *
+   */
   @Post('bulk-import')
   @Roles(UserRole.ADMIN, UserRole.PHARMACIST)
   @ApiOperation({ summary: 'Bulk import medications' })

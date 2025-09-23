@@ -1,3 +1,4 @@
+/*[object Object]*/
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
@@ -34,6 +35,9 @@ import { ComplianceModule } from './modules/compliance/compliance.module';
 // Shared modules
 import { SharedModule } from './shared/shared.module';
 
+/**
+ *
+ */
 @Module({
   imports: [
     // Global configuration

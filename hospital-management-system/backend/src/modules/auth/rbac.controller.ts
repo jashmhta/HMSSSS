@@ -1,29 +1,44 @@
+/*[object Object]*/
 import { Controller, Get, UseGuards, Request } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { UserRole } from '@prisma/client';
+
+import { Roles } from '../../shared/decorators/roles.decorator';
+
 import { RBACService, RolePermissions } from './rbac.service';
 import { RolesGuard } from './roles.guard';
-import { Roles } from '../../shared/decorators/roles.decorator';
-import { UserRole } from '../../database/schema.prisma';
 
+/**
+ *
+ */
 @ApiTags('rbac')
 @ApiBearerAuth()
 @Controller('rbac')
 @UseGuards(RolesGuard)
 export class RBACController {
+  /**
+   *
+   */
   constructor(private readonly rbacService: RBACService) {}
 
+  /**
+   *
+   */
   @Get('roles')
   @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
   @ApiOperation({ summary: 'Get all roles and their permissions' })
   @ApiResponse({
     status: 200,
     description: 'Roles and permissions retrieved successfully',
-    type: [RolePermissions],
+    type: [Object],
   })
   async getAllRoles(): Promise<RolePermissions[]> {
     return this.rbacService.getAllRoles();
   }
 
+  /**
+   *
+   */
   @Get('permissions')
   @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
   @ApiOperation({ summary: 'Get permissions for current user role' })
@@ -40,6 +55,9 @@ export class RBACController {
     };
   }
 
+  /**
+   *
+   */
   @Get('hierarchy')
   @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
   @ApiOperation({ summary: 'Get role hierarchy' })

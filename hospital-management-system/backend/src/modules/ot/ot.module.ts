@@ -1,8 +1,14 @@
+/*[object Object]*/
 import { Module } from '@nestjs/common';
-import { OTService } from './ot.service';
-import { OTController } from './ot.controller';
+
 import { DatabaseModule } from '../../database/database.module';
 
+import { OTService } from './ot.service';
+import { OTController } from './ot.controller';
+
+/**
+ *
+ */
 @Module({
   imports: [DatabaseModule],
   controllers: [OTController],

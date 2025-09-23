@@ -7,7 +7,7 @@ import {
   CalendarIcon,
   DocumentTextIcon,
   BeakerIcon,
-  XRayIcon,
+  ViewfinderCircleIcon,
   CurrencyDollarIcon,
   ExclamationTriangleIcon,
   HeartIcon,
@@ -54,7 +54,7 @@ const navigationItems = [
   {
     name: "Radiology",
     href: "/radiology",
-    icon: XRayIcon,
+    icon: ViewfinderCircleIcon,
     roles: ["admin", "doctor", "radiology"],
   },
   {

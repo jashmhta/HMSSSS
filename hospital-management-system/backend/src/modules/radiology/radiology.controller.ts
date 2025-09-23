@@ -1,3 +1,4 @@
+/*[object Object]*/
 import {
   Controller,
   Get,
@@ -12,19 +13,30 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
-import { RadiologyService } from './radiology.service';
+import { UserRole } from '@prisma/client';
+
 import { JwtAuthGuard } from '../../shared/guards/jwt-auth.guard';
 import { RolesGuard } from '../../modules/auth/roles.guard';
 import { Roles } from '../../shared/decorators/roles.decorator';
-import { UserRole } from '../../database/schema.prisma';
 
+import { RadiologyService } from './radiology.service';
+
+/**
+ *
+ */
 @ApiTags('radiology')
 @ApiBearerAuth()
 @Controller('radiology')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class RadiologyController {
+  /**
+   *
+   */
   constructor(private readonly radiologyService: RadiologyService) {}
 
+  /**
+   *
+   */
   @Post('tests')
   @Roles(UserRole.ADMIN, UserRole.DOCTOR)
   @ApiOperation({ summary: 'Order a new radiology test' })
@@ -36,6 +48,9 @@ export class RadiologyController {
     });
   }
 
+  /**
+   *
+   */
   @Get('tests')
   @Roles(UserRole.ADMIN, UserRole.DOCTOR, UserRole.NURSE, UserRole.RECEPTIONIST)
   @ApiOperation({ summary: 'Get all radiology tests with filtering' })
@@ -69,6 +84,9 @@ export class RadiologyController {
     return this.radiologyService.findAll(page, limit, filters);
   }
 
+  /**
+   *
+   */
   @Get('tests/stats')
   @Roles(UserRole.ADMIN, UserRole.DOCTOR)
   @ApiOperation({ summary: 'Get radiology statistics' })
@@ -77,6 +95,9 @@ export class RadiologyController {
     return this.radiologyService.getRadiologyStats();
   }
 
+  /**
+   *
+   */
   @Get('tests/modalities')
   @Roles(UserRole.ADMIN, UserRole.DOCTOR)
   @ApiOperation({ summary: 'Get test count by modality' })
@@ -85,6 +106,9 @@ export class RadiologyController {
     return this.radiologyService.getTestsByModality();
   }
 
+  /**
+   *
+   */
   @Get('tests/scheduled/:date')
   @Roles(UserRole.ADMIN, UserRole.DOCTOR, UserRole.RECEPTIONIST)
   @ApiOperation({ summary: 'Get scheduled tests for a specific date' })
@@ -97,6 +121,9 @@ export class RadiologyController {
     return this.radiologyService.getScheduledTests(parsedDate);
   }
 
+  /**
+   *
+   */
   @Get('tests/:id')
   @Roles(UserRole.ADMIN, UserRole.DOCTOR, UserRole.NURSE, UserRole.RECEPTIONIST)
   @ApiOperation({ summary: 'Get radiology test by ID' })
@@ -105,6 +132,9 @@ export class RadiologyController {
     return this.radiologyService.findOne(id);
   }
 
+  /**
+   *
+   */
   @Patch('tests/:id')
   @Roles(UserRole.ADMIN, UserRole.DOCTOR)
   @ApiOperation({ summary: 'Update radiology test' })
@@ -113,6 +143,9 @@ export class RadiologyController {
     return this.radiologyService.update(id, updateTestDto);
   }
 
+  /**
+   *
+   */
   @Post('tests/:id/schedule')
   @Roles(UserRole.ADMIN, UserRole.RECEPTIONIST, UserRole.DOCTOR)
   @ApiOperation({ summary: 'Schedule radiology test' })
@@ -121,6 +154,9 @@ export class RadiologyController {
     return this.radiologyService.scheduleTest(id, scheduleTestDto);
   }
 
+  /**
+   *
+   */
   @Post('tests/:id/start')
   @Roles(UserRole.ADMIN, UserRole.DOCTOR)
   @ApiOperation({ summary: 'Start radiology test procedure' })
@@ -129,6 +165,9 @@ export class RadiologyController {
     return this.radiologyService.startTest(id, req.user.id);
   }
 
+  /**
+   *
+   */
   @Post('tests/:id/complete')
   @Roles(UserRole.ADMIN, UserRole.DOCTOR)
   @ApiOperation({ summary: 'Complete radiology test with report' })
@@ -140,6 +179,9 @@ export class RadiologyController {
     });
   }
 
+  /**
+   *
+   */
   @Post('tests/:id/cancel')
   @Roles(UserRole.ADMIN, UserRole.DOCTOR)
   @ApiOperation({ summary: 'Cancel radiology test' })
@@ -151,6 +193,9 @@ export class RadiologyController {
     return this.radiologyService.cancelTest(id, body.reason);
   }
 
+  /**
+   *
+   */
   @Delete('tests/:id')
   @Roles(UserRole.ADMIN)
   @ApiOperation({ summary: 'Delete radiology test' })

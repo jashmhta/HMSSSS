@@ -1,3 +1,4 @@
+/*[object Object]*/
 import {
   Controller,
   Get,
@@ -11,19 +12,30 @@ import {
   Request,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
-import { AppointmentsService } from './appointments.service';
+import { UserRole } from '@prisma/client';
+
 import { JwtAuthGuard } from '../../shared/guards/jwt-auth.guard';
 import { RolesGuard } from '../../modules/auth/roles.guard';
 import { Roles } from '../../shared/decorators/roles.decorator';
-import { UserRole } from '../../database/schema.prisma';
 
+import { AppointmentsService } from './appointments.service';
+
+/**
+ *
+ */
 @ApiTags('appointments')
 @ApiBearerAuth()
 @Controller('appointments')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class AppointmentsController {
+  /**
+   *
+   */
   constructor(private readonly appointmentsService: AppointmentsService) {}
 
+  /**
+   *
+   */
   @Post()
   @Roles(UserRole.ADMIN, UserRole.DOCTOR, UserRole.RECEPTIONIST, UserRole.PATIENT)
   @ApiOperation({ summary: 'Create a new appointment' })
@@ -32,6 +44,9 @@ export class AppointmentsController {
     return this.appointmentsService.create(createAppointmentDto);
   }
 
+  /**
+   *
+   */
   @Get()
   @Roles(UserRole.ADMIN, UserRole.DOCTOR, UserRole.NURSE, UserRole.RECEPTIONIST)
   @ApiOperation({ summary: 'Get all appointments' })
@@ -55,6 +70,9 @@ export class AppointmentsController {
     return this.appointmentsService.findAll(filters);
   }
 
+  /**
+   *
+   */
   @Get('stats')
   @Roles(UserRole.ADMIN, UserRole.DOCTOR, UserRole.RECEPTIONIST)
   @ApiOperation({ summary: 'Get appointment statistics' })
@@ -63,6 +81,9 @@ export class AppointmentsController {
     return this.appointmentsService.getAppointmentStats();
   }
 
+  /**
+   *
+   */
   @Get('doctor/:doctorId/schedule')
   @Roles(UserRole.ADMIN, UserRole.DOCTOR, UserRole.RECEPTIONIST)
   @ApiOperation({ summary: 'Get doctor schedule for a specific date' })
@@ -71,6 +92,9 @@ export class AppointmentsController {
     return this.appointmentsService.getDoctorSchedule(doctorId, new Date(date));
   }
 
+  /**
+   *
+   */
   @Get('patient/:patientId')
   @Roles(UserRole.ADMIN, UserRole.DOCTOR, UserRole.NURSE, UserRole.RECEPTIONIST, UserRole.PATIENT)
   @ApiOperation({ summary: 'Get patient appointments' })
@@ -83,6 +107,9 @@ export class AppointmentsController {
     return this.appointmentsService.getPatientAppointments(patientId, page, limit);
   }
 
+  /**
+   *
+   */
   @Get(':id')
   @Roles(UserRole.ADMIN, UserRole.DOCTOR, UserRole.NURSE, UserRole.RECEPTIONIST, UserRole.PATIENT)
   @ApiOperation({ summary: 'Get appointment by ID' })
@@ -91,6 +118,9 @@ export class AppointmentsController {
     return this.appointmentsService.findOne(id);
   }
 
+  /**
+   *
+   */
   @Patch(':id')
   @Roles(UserRole.ADMIN, UserRole.DOCTOR, UserRole.RECEPTIONIST)
   @ApiOperation({ summary: 'Update appointment' })
@@ -99,6 +129,9 @@ export class AppointmentsController {
     return this.appointmentsService.update(id, updateAppointmentDto);
   }
 
+  /**
+   *
+   */
   @Patch(':id/cancel')
   @Roles(UserRole.ADMIN, UserRole.DOCTOR, UserRole.RECEPTIONIST, UserRole.PATIENT)
   @ApiOperation({ summary: 'Cancel appointment' })
@@ -107,6 +140,9 @@ export class AppointmentsController {
     return this.appointmentsService.cancel(id, body.reason);
   }
 
+  /**
+   *
+   */
   @Delete(':id')
   @Roles(UserRole.ADMIN)
   @ApiOperation({ summary: 'Delete appointment' })

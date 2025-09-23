@@ -1,10 +1,21 @@
+/*[object Object]*/
 import { Injectable, NotFoundException } from '@nestjs/common';
+
 import { PrismaService } from '../../database/prisma.service';
 
+/**
+ *
+ */
 @Injectable()
 export class MedicalRecordsService {
+  /**
+   *
+   */
   constructor(private prisma: PrismaService) {}
 
+  /**
+   *
+   */
   async create(data: {
     patientId: string;
     doctorId: string;
@@ -57,6 +68,9 @@ export class MedicalRecordsService {
     });
   }
 
+  /**
+   *
+   */
   async findAll(filters?: {
     patientId?: string;
     doctorId?: string;
@@ -123,6 +137,9 @@ export class MedicalRecordsService {
     };
   }
 
+  /**
+   *
+   */
   async findOne(id: string) {
     const record = await this.prisma.medicalRecord.findUnique({
       where: { id },
@@ -159,6 +176,9 @@ export class MedicalRecordsService {
     return record;
   }
 
+  /**
+   *
+   */
   async findByPatient(patientId: string, page: number = 1, limit: number = 10) {
     const skip = (page - 1) * limit;
 
@@ -195,6 +215,9 @@ export class MedicalRecordsService {
     };
   }
 
+  /**
+   *
+   */
   async update(
     id: string,
     data: Partial<{
@@ -244,6 +267,9 @@ export class MedicalRecordsService {
     });
   }
 
+  /**
+   *
+   */
   async remove(id: string) {
     const record = await this.prisma.medicalRecord.findUnique({
       where: { id },
@@ -258,6 +284,9 @@ export class MedicalRecordsService {
     });
   }
 
+  /**
+   *
+   */
   async getPatientHistory(patientId: string) {
     const records = await this.prisma.medicalRecord.findMany({
       where: { patientId },
@@ -302,6 +331,9 @@ export class MedicalRecordsService {
     };
   }
 
+  /**
+   *
+   */
   async getDoctorStats(doctorId: string, startDate?: Date, endDate?: Date) {
     const where = {
       doctorId,

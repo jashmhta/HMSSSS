@@ -1,7 +1,10 @@
+/*[object Object]*/
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { ComplianceService } from './compliance.service';
+
 import { PrismaService } from '../../database/prisma.service';
+
+import { ComplianceService } from './compliance.service';
 
 export interface AccessPattern {
   userId: string;
@@ -33,6 +36,9 @@ export interface SuspiciousActivity {
   resolution?: string;
 }
 
+/**
+ *
+ */
 @Injectable()
 export class AccessMonitoringService {
   private readonly logger = new Logger(AccessMonitoringService.name);
@@ -43,6 +49,9 @@ export class AccessMonitoringService {
     unauthorizedAccess: true,
   };
 
+  /**
+   *
+   */
   constructor(
     private readonly complianceService: ComplianceService,
     private readonly prisma: PrismaService,
@@ -156,7 +165,7 @@ export class AccessMonitoringService {
           };
         }
 
-        patterns[key].count++;
+        patterns[key].count = (patterns[key].count || 0) + 1;
         patterns[key].lastAccess = log.timestamp;
 
         if (log.ipAddress && !patterns[key].ipAddresses.includes(log.ipAddress)) {
@@ -268,6 +277,9 @@ export class AccessMonitoringService {
 
   // Private methods
 
+  /**
+   *
+   */
   private getComplianceFlags(resource: string, action: string): string[] {
     const flags: string[] = [];
 
@@ -292,6 +304,9 @@ export class AccessMonitoringService {
     return flags;
   }
 
+  /**
+   *
+   */
   private async detectSuspiciousActivity(accessData: {
     userId: string;
     action: string;
@@ -372,6 +387,9 @@ export class AccessMonitoringService {
     return activities;
   }
 
+  /**
+   *
+   */
   private async getRecentFailedLogins(userId: string, minutes: number): Promise<number> {
     const startTime = new Date(Date.now() - minutes * 60 * 1000);
 
@@ -384,6 +402,9 @@ export class AccessMonitoringService {
     });
   }
 
+  /**
+   *
+   */
   private isSensitiveResource(resource: string): boolean {
     const sensitiveResources = [
       'patients',
@@ -398,6 +419,9 @@ export class AccessMonitoringService {
     return sensitiveResources.includes(resource);
   }
 
+  /**
+   *
+   */
   private isAfterHours(): boolean {
     const now = new Date();
     const hour = now.getHours();
@@ -407,6 +431,9 @@ export class AccessMonitoringService {
     return day >= 1 && day <= 5 && (hour < 8 || hour >= 18);
   }
 
+  /**
+   *
+   */
   private async createAlert(activity: SuspiciousActivity): Promise<void> {
     try {
       // In a real implementation, this would insert into an alerts table
@@ -440,6 +467,9 @@ export class AccessMonitoringService {
     }
   }
 
+  /**
+   *
+   */
   private async analyzeFailedLogins(since: Date): Promise<void> {
     try {
       const failedLoginStats = await this.prisma.auditLog.groupBy({
@@ -480,6 +510,9 @@ export class AccessMonitoringService {
     }
   }
 
+  /**
+   *
+   */
   private async analyzeUnusualPatterns(since: Date): Promise<void> {
     try {
       // Get users with high access frequency to sensitive resources
@@ -524,6 +557,9 @@ export class AccessMonitoringService {
     }
   }
 
+  /**
+   *
+   */
   private async analyzeAfterHoursAccess(since: Date): Promise<void> {
     if (!this.alertThresholds.afterHoursAccess) return;
 
@@ -542,6 +578,9 @@ export class AccessMonitoringService {
     }
   }
 
+  /**
+   *
+   */
   private async cleanupOldAlerts(): Promise<void> {
     try {
       const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);

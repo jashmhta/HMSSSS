@@ -1,10 +1,22 @@
+/*[object Object]*/
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { SurgeryPriority, AnesthesiaType, SurgeryOutcome, SurgeryStatus } from '@prisma/client';
+
 import { PrismaService } from '../../database/prisma.service';
 
+/**
+ *
+ */
 @Injectable()
 export class OTService {
+  /**
+   *
+   */
   constructor(private prisma: PrismaService) {}
 
+  /**
+   *
+   */
   async scheduleSurgery(data: {
     patientId: string;
     surgeonId: string;
@@ -59,12 +71,11 @@ export class OTService {
         procedureCode: data.procedureCode,
         scheduledDate: data.scheduledDate,
         estimatedDuration: data.estimatedDuration,
-        priority: data.priority as any,
-        anesthesiaType: data.anesthesiaType as any,
+        priority: data.priority ? (data.priority as SurgeryPriority) : SurgeryPriority.ELECTIVE,
+        anesthesiaType: data.anesthesiaType ? (data.anesthesiaType as AnesthesiaType) : undefined,
         assistants: data.assistants || [],
         nurses: data.nurses || [],
         equipment: data.equipment || [],
-        notes: data.notes,
       },
       include: {
         patient: {
@@ -92,6 +103,9 @@ export class OTService {
     });
   }
 
+  /**
+   *
+   */
   async getSurgeries(page: number = 1, limit: number = 10, status?: string, date?: string) {
     const skip = (page - 1) * limit;
 
@@ -151,6 +165,9 @@ export class OTService {
     };
   }
 
+  /**
+   *
+   */
   async getSurgeryById(id: string) {
     const surgery = await this.prisma.surgery.findUnique({
       where: { id },
@@ -187,6 +204,9 @@ export class OTService {
     return surgery;
   }
 
+  /**
+   *
+   */
   async updateSurgery(
     id: string,
     data: Partial<{
@@ -228,11 +248,21 @@ export class OTService {
     return this.prisma.surgery.update({
       where: { id },
       data: {
-        ...data,
-        priority: data.priority as any,
-        anesthesiaType: data.anesthesiaType as any,
-        outcome: data.outcome as any,
+        procedureName: data.procedureName,
+        procedureCode: data.procedureCode,
+        scheduledDate: data.scheduledDate,
+        estimatedDuration: data.estimatedDuration,
+        priority: data.priority ? (data.priority as SurgeryPriority) : undefined,
+        anesthesiaType: data.anesthesiaType ? (data.anesthesiaType as AnesthesiaType) : undefined,
+        assistants: data.assistants,
+        nurses: data.nurses,
+        equipment: data.equipment,
+        status: data.status ? (data.status as SurgeryStatus) : undefined,
+        actualStartTime: data.actualStartTime,
+        actualEndTime: data.actualEndTime,
         actualDuration,
+        complications: data.complications,
+        outcome: data.outcome ? (data.outcome as SurgeryOutcome) : undefined,
       },
       include: {
         patient: {
@@ -260,6 +290,9 @@ export class OTService {
     });
   }
 
+  /**
+   *
+   */
   async cancelSurgery(id: string, cancelledBy: string) {
     const surgery = await this.prisma.surgery.findUnique({
       where: { id },
@@ -272,12 +305,15 @@ export class OTService {
     return this.prisma.surgery.update({
       where: { id },
       data: {
-        status: 'CANCELLED',
-        notes: `Cancelled by ${cancelledBy}`,
+        status: SurgeryStatus.CANCELLED,
+        complications: `Cancelled by ${cancelledBy}`,
       },
     });
   }
 
+  /**
+   *
+   */
   async getOTSchedule(otId: string, date: Date) {
     const startOfDay = new Date(date);
     startOfDay.setHours(0, 0, 0, 0);
@@ -319,6 +355,9 @@ export class OTService {
     });
   }
 
+  /**
+   *
+   */
   async getAvailableOTs(startTime: Date, endTime: Date) {
     const occupiedOTs = await this.prisma.surgery.findMany({
       where: {
@@ -341,6 +380,9 @@ export class OTService {
     });
   }
 
+  /**
+   *
+   */
   async addPreOpNote(surgeryId: string, note: any, addedBy: string) {
     const surgery = await this.prisma.surgery.findUnique({
       where: { id: surgeryId },
@@ -365,6 +407,9 @@ export class OTService {
     });
   }
 
+  /**
+   *
+   */
   async addIntraOpNote(surgeryId: string, note: any, addedBy: string) {
     const surgery = await this.prisma.surgery.findUnique({
       where: { id: surgeryId },
@@ -389,6 +434,9 @@ export class OTService {
     });
   }
 
+  /**
+   *
+   */
   async addPostOpNote(surgeryId: string, note: any, addedBy: string) {
     const surgery = await this.prisma.surgery.findUnique({
       where: { id: surgeryId },
@@ -413,6 +461,9 @@ export class OTService {
     });
   }
 
+  /**
+   *
+   */
   async getOperatingTheaters() {
     return this.prisma.operatingTheater.findMany({
       where: { isActive: true },
@@ -420,6 +471,9 @@ export class OTService {
     });
   }
 
+  /**
+   *
+   */
   async getOTStats() {
     const [totalSurgeries, todaySurgeries, completedToday, cancelledSurgeries] = await Promise.all([
       this.prisma.surgery.count(),

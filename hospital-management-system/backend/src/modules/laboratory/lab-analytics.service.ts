@@ -1,4 +1,6 @@
+/*[object Object]*/
 import { Injectable } from '@nestjs/common';
+
 import { PrismaService } from '../../database/prisma.service';
 
 interface DateRange {
@@ -47,8 +49,14 @@ interface LabAnalytics {
   };
 }
 
+/**
+ *
+ */
 @Injectable()
 export class LabAnalyticsService {
+  /**
+   *
+   */
   constructor(private prisma: PrismaService) {}
 
   /**
@@ -106,7 +114,7 @@ export class LabAnalyticsService {
    */
   private async getDepartmentAnalytics(range: DateRange): Promise<LabAnalytics['byDepartment']> {
     const departmentStats = await this.prisma.labTest.groupBy({
-      by: ['testCatalog'],
+      by: ['testCatalogId'],
       where: {
         orderedDate: {
           gte: range.from,
@@ -122,13 +130,13 @@ export class LabAnalyticsService {
     const departmentData = await Promise.all(
       departmentStats.map(async stat => {
         const testCatalog = await this.prisma.labTestCatalog.findUnique({
-          where: { id: stat.testCatalog },
+          where: { id: stat.testCatalogId },
           select: { department: true, testName: true },
         });
 
         const completedTests = await this.prisma.labTest.findMany({
           where: {
-            testCatalogId: stat.testCatalog,
+            testCatalogId: stat.testCatalogId,
             status: 'COMPLETED',
             orderedDate: {
               gte: range.from,
@@ -147,7 +155,7 @@ export class LabAnalyticsService {
 
         return {
           department: testCatalog?.department || 'UNKNOWN',
-          testCatalogId: stat.testCatalog,
+          testCatalogId: stat.testCatalogId,
           totalTests: stat._count.id,
           completedTests: completedTests.length,
           averageTAT: avgTAT,
@@ -184,16 +192,16 @@ export class LabAnalyticsService {
 
     // Calculate final averages and percentages
     const totalTests = Object.values(departmentGroups).reduce(
-      (sum: number, dept: any) => sum + dept.totalTests,
+      (sum: number, dept: any) => sum + (dept.totalTests || 0),
       0,
     );
 
     return Object.values(departmentGroups).map((dept: any) => ({
       department: dept.department,
-      totalTests: dept.totalTests,
-      completedTests: dept.completedTests,
+      totalTests: dept.totalTests || 0,
+      completedTests: dept.completedTests || 0,
       averageTAT: dept.tatCount > 0 ? Math.round(dept.tatSum / dept.tatCount) : 0,
-      percentage: totalTests > 0 ? Math.round((dept.totalTests / totalTests) * 100) : 0,
+      percentage: totalTests > 0 ? Math.round(((dept.totalTests || 0) / totalTests) * 100) : 0,
     }));
   }
 

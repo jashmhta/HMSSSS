@@ -1,4 +1,6 @@
+/*[object Object]*/
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+
 import { PrismaService } from '../../database/prisma.service';
 
 interface QCResult {
@@ -15,8 +17,14 @@ interface QCResult {
 
 type QCLevel = 'LEVEL_1' | 'LEVEL_2' | 'LEVEL_3';
 
+/**
+ *
+ */
 @Injectable()
 export class QualityControlService {
+  /**
+   *
+   */
   constructor(private prisma: PrismaService) {}
 
   /**
@@ -96,9 +104,6 @@ export class QualityControlService {
       },
       orderBy: {
         performedDate: 'desc',
-      },
-      include: {
-        _count: false,
       },
     });
   }
@@ -289,6 +294,7 @@ export class QualityControlService {
       data: {
         name: data.name,
         lotNumber: data.lotNumber,
+        manufacturer: 'QC Manufacturer', // Default for QC materials
         expiryDate: data.expiryDate,
         quantity: 100, // Default quantity for QC material
         unit: 'vials',
@@ -310,14 +316,19 @@ export class QualityControlService {
     equipmentDueMaintenance: any[];
     expiringReagents: any[];
   }> {
-    const [qcStats, failingTests, equipmentCalibration, equipmentMaintenance, expiringReagents] =
-      await Promise.all([
-        this.getQCStatistics(undefined, 7), // Last 7 days
-        this.getFailingQCParameters(7),
-        this.getEquipmentDueForCalibration(7),
-        this.getEquipmentDueForMaintenance(7),
-        this.getExpiringReagents(30),
-      ]);
+    const [
+      qcStats,
+      failingTests,
+      equipmentDueCalibration,
+      equipmentDueMaintenance,
+      expiringReagents,
+    ] = await Promise.all([
+      this.getQCStatistics(undefined, 7), // Last 7 days
+      this.getFailingQCParameters(7),
+      this.getEquipmentDueForCalibration(7),
+      this.getEquipmentDueForMaintenance(7),
+      this.getExpiringReagents(30),
+    ]);
 
     return {
       qcStats,
@@ -435,7 +446,7 @@ export class QualityControlService {
   async generateQCTrends(testParameter: string, days: number = 90): Promise<any> {
     const results = await this.getQCResults(testParameter, days);
 
-    const trends = {
+    return {
       parameter: testParameter,
       period: `${days} days`,
       totalResults: results.length,
@@ -448,7 +459,5 @@ export class QualityControlService {
       })),
       alerts: results.filter(r => r.status === 'FAIL').length,
     };
-
-    return trends;
   }
 }

@@ -1,10 +1,17 @@
+/*[object Object]*/
 import { Module } from '@nestjs/common';
+
+import { DatabaseModule } from '../../database/database.module';
+import { ComplianceModule } from '../compliance/compliance.module';
+
 import { IPDService } from './ipd.service';
 import { IPDController } from './ipd.controller';
-import { DatabaseModule } from '../../database/database.module';
 
+/**
+ *
+ */
 @Module({
-  imports: [DatabaseModule],
+  imports: [DatabaseModule, ComplianceModule],
   controllers: [IPDController],
   providers: [IPDService],
   exports: [IPDService],

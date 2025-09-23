@@ -1,116 +1,353 @@
+/*[object Object]*/
 import {
   Injectable,
   NotFoundException,
   BadRequestException,
   ConflictException,
 } from '@nestjs/common';
+import { PrescriptionStatus } from '@prisma/client';
+
 import { PrismaService } from '../../database/prisma.service';
 import { ComplianceService } from '../compliance/compliance.service';
 
+import {
+  CreateIPDAdmissionDto,
+  ProgressNoteDto,
+  VitalSignsDto,
+  NursingNoteDto,
+  DischargePatientDto,
+  TransferPatientDto,
+  BedInfoDto,
+  AdmissionType,
+  AdmissionPriority,
+  WardType,
+  DischargeType,
+  NoteType,
+  ShiftType,
+} from './dto/ipd-admission.dto';
+
+/**
+ *
+ */
 @Injectable()
 export class IPDService {
+  /**
+   *
+   */
   constructor(
     private prisma: PrismaService,
     private complianceService: ComplianceService,
   ) {}
 
-  async admitPatient(data: any) {
-    return this.prisma.iPDAdmission.create({ data });
-  }
+  // Mock bed and ward data - in a real implementation, this would be in the database
+  private mockBeds: BedInfoDto[] = [
+    {
+      id: 'bed-1',
+      bedNumber: '101-A',
+      roomNumber: '101',
+      wardType: WardType.GENERAL,
+      status: 'AVAILABLE',
+    },
+    {
+      id: 'bed-2',
+      bedNumber: '101-B',
+      roomNumber: '101',
+      wardType: WardType.GENERAL,
+      status: 'AVAILABLE',
+    },
+    {
+      id: 'bed-3',
+      bedNumber: '201-A',
+      roomNumber: '201',
+      wardType: WardType.PRIVATE,
+      status: 'AVAILABLE',
+    },
+    {
+      id: 'bed-4',
+      bedNumber: '301-A',
+      roomNumber: '301',
+      wardType: WardType.ICU,
+      status: 'AVAILABLE',
+    },
+    {
+      id: 'bed-5',
+      bedNumber: '301-B',
+      roomNumber: '301',
+      wardType: WardType.ICU,
+      status: 'AVAILABLE',
+    },
+  ];
 
-  async getIPDAdmissions() {
-    return this.prisma.iPDAdmission.findMany({
-      include: { patient: true, doctor: true, room: true, bed: true },
+  /**
+   *
+   */
+  async admitPatient(data: CreateIPDAdmissionDto) {
+    return this.admitPatientToIPD({
+      ...data,
+      admittedBy: 'system', // This should be passed from the controller
     });
   }
 
+  /**
+   *
+   */
+  async getIPDAdmissions() {
+    // Using MedicalRecord model to store IPD admissions with specialized type
+    // Since we can't query JSON fields directly, we'll use a marker in the notes field
+    const admissions = await this.prisma.medicalRecord.findMany({
+      where: {
+        notes: {
+          contains: 'IPD_ADMISSION',
+        },
+      },
+      include: {
+        patient: {
+          include: {
+            user: {
+              select: { firstName: true, lastName: true, email: true, phone: true },
+            },
+          },
+        },
+        doctor: {
+          include: {
+            user: {
+              select: { firstName: true, lastName: true },
+            },
+          },
+        },
+      },
+      orderBy: {
+        visitDate: 'desc',
+      },
+    });
+
+    // Transform the data to match expected IPD admission format
+    return admissions.map(record => this.transformMedicalRecordToIPDAdmission(record));
+  }
+
+  /**
+   *
+   */
   async getIPDAdmissionById(id: string) {
-    const admission = await this.prisma.iPDAdmission.findUnique({
+    const record = await this.prisma.medicalRecord.findUnique({
       where: { id },
       include: {
-        patient: true,
-        doctor: true,
-        room: true,
-        bed: true,
-        progressNotes: true,
-        nursingNotes: true,
-        vitals: true,
+        patient: {
+          include: {
+            user: {
+              select: { firstName: true, lastName: true, email: true, phone: true },
+            },
+          },
+        },
+        doctor: {
+          include: {
+            user: {
+              select: { firstName: true, lastName: true },
+            },
+          },
+        },
       },
     });
-    if (!admission) throw new NotFoundException('IPD admission not found');
-    return admission;
+
+    if (!record || !this.isIPDAdmission(record)) {
+      throw new NotFoundException('IPD admission not found');
+    }
+
+    return this.transformMedicalRecordToIPDAdmission(record);
   }
 
+  /**
+   *
+   */
   async updateAdmission(id: string, data: any) {
-    return this.prisma.iPDAdmission.update({
+    const record = await this.prisma.medicalRecord.findUnique({
       where: { id },
-      data,
     });
-  }
 
-  async dischargePatient(id: string, dischargeData: any) {
-    return this.prisma.iPDAdmission.update({
+    if (!record || !this.isIPDAdmission(record)) {
+      throw new NotFoundException('IPD admission not found');
+    }
+
+    const existingTreatmentPlan = record.treatmentPlan ? JSON.parse(record.treatmentPlan) : {};
+    const updatedTreatmentPlan = {
+      ...existingTreatmentPlan,
+      ...data,
+      updatedAt: new Date().toISOString(),
+    };
+
+    const updatedRecord = await this.prisma.medicalRecord.update({
       where: { id },
       data: {
-        status: 'DISCHARGED',
-        dischargeSummary: dischargeData.summary,
-        dischargeDate: new Date(),
+        treatmentPlan: JSON.stringify(updatedTreatmentPlan),
+        updatedAt: new Date(),
       },
     });
+
+    return this.transformMedicalRecordToIPDAdmission(updatedRecord);
   }
 
+  /**
+   *
+   */
   async getBedOccupancy() {
-    return this.prisma.bed.findMany({
-      include: { room: true, currentAdmission: { include: { patient: true } } },
-    });
-  }
-
-  async assignBed(admissionId: string, bedId: string) {
-    return this.prisma.iPDAdmission.update({
-      where: { id: admissionId },
-      data: { bedId },
-    });
-  }
-
-  async addProgressNote(admissionId: string, note: any) {
-    return this.prisma.progressNote.create({
-      data: {
-        admissionId,
-        ...note,
+    // Get all active IPD admissions
+    const activeAdmissions = await this.prisma.medicalRecord.findMany({
+      where: {
+        notes: {
+          contains: 'IPD_ADMISSION',
+        },
+        diagnosis: {
+          has: 'ADMITTED', // Using diagnosis array to store status
+        },
       },
     });
+
+    // Update mock bed status based on admissions
+    this.mockBeds = this.mockBeds.map(bed => {
+      const isOccupied = activeAdmissions.some(admission => {
+        const treatmentPlan = admission.treatmentPlan ? JSON.parse(admission.treatmentPlan) : null;
+        return treatmentPlan?.bedAssignment?.bedId === bed.id;
+      });
+      return { ...bed, status: isOccupied ? 'OCCUPIED' : 'AVAILABLE' };
+    });
+
+    return this.mockBeds.map(bed => ({
+      ...bed,
+      currentAdmission:
+        bed.status === 'OCCUPIED'
+          ? activeAdmissions.find(admission => {
+              const treatmentPlan = admission.treatmentPlan
+                ? JSON.parse(admission.treatmentPlan)
+                : null;
+              return treatmentPlan?.bedAssignment?.bedId === bed.id;
+            })
+          : null,
+    }));
   }
 
-  async addNursingNote(admissionId: string, note: any) {
-    return this.prisma.nursingNote.create({
-      data: {
-        admissionId,
-        ...note,
+  /**
+   *
+   */
+  async assignBed(admissionId: string, bedId: string) {
+    const bed = this.mockBeds.find(b => b.id === bedId);
+    if (!bed || bed.status !== 'AVAILABLE') {
+      throw new BadRequestException('Bed is not available');
+    }
+
+    return this.updateAdmission(admissionId, {
+      bedAssignment: {
+        bedId: bed.id,
+        bedNumber: bed.bedNumber,
+        roomNumber: bed.roomNumber,
+        wardType: bed.wardType,
+        assignedAt: new Date(),
       },
     });
   }
 
   /**
+   *
+   */
+  async addProgressNote(admissionId: string, noteData: ProgressNoteDto & { notedBy: string }) {
+    const record = await this.prisma.medicalRecord.findUnique({
+      where: { id: admissionId },
+    });
+
+    if (!record || !this.isIPDAdmission(record)) {
+      throw new NotFoundException('IPD admission not found');
+    }
+
+    const treatmentPlan = record.treatmentPlan ? JSON.parse(record.treatmentPlan) : {};
+    const progressNotes = treatmentPlan.progressNotes || [];
+
+    const newNote = {
+      id: `note-${Date.now()}`,
+      ...noteData,
+      notedAt: new Date().toISOString(),
+    };
+
+    progressNotes.push(newNote);
+    treatmentPlan.progressNotes = progressNotes;
+    treatmentPlan.lastProgressNote = new Date().toISOString();
+
+    await this.prisma.medicalRecord.update({
+      where: { id: admissionId },
+      data: {
+        treatmentPlan: JSON.stringify(treatmentPlan),
+        updatedAt: new Date(),
+      },
+    });
+
+    // Log progress note
+    await this.complianceService.logAuditEvent({
+      userId: noteData.notedBy,
+      action: 'PROGRESS_NOTE_ADDED',
+      resource: 'medical_records',
+      resourceId: admissionId,
+      details: {
+        admissionId,
+        noteType: noteData.noteType,
+        private: noteData.private || false,
+      },
+      complianceFlags: ['HIPAA', 'PATIENT_DATA'],
+    });
+
+    return newNote;
+  }
+
+  /**
+   *
+   */
+  async addNursingNote(admissionId: string, noteData: NursingNoteDto & { notedBy: string }) {
+    const record = await this.prisma.medicalRecord.findUnique({
+      where: { id: admissionId },
+    });
+
+    if (!record || !this.isIPDAdmission(record)) {
+      throw new NotFoundException('IPD admission not found');
+    }
+
+    const treatmentPlan = record.treatmentPlan ? JSON.parse(record.treatmentPlan) : {};
+    const nursingNotes = treatmentPlan.nursingNotes || [];
+
+    const newNote = {
+      id: `nursing-${Date.now()}`,
+      ...noteData,
+      notedAt: new Date().toISOString(),
+    };
+
+    nursingNotes.push(newNote);
+    treatmentPlan.nursingNotes = nursingNotes;
+
+    await this.prisma.medicalRecord.update({
+      where: { id: admissionId },
+      data: {
+        treatmentPlan: JSON.stringify(treatmentPlan),
+        updatedAt: new Date(),
+      },
+    });
+
+    // Log nursing note
+    await this.complianceService.logAuditEvent({
+      userId: noteData.notedBy,
+      action: 'NURSING_NOTE_ADDED',
+      resource: 'medical_records',
+      resourceId: admissionId,
+      details: {
+        admissionId,
+        shift: noteData.shift,
+        activitiesCount: noteData.activities.length,
+      },
+      complianceFlags: ['HIPAA', 'PATIENT_DATA'],
+    });
+
+    return newNote;
+  }
+
+  /**
    * Admit patient to IPD with comprehensive validation
    */
-  async admitPatientToIPD(admissionData: {
-    patientId: string;
-    admittingDoctorId: string;
-    primaryDiagnosis: string;
-    admissionType: 'EMERGENCY' | 'ELECTIVE' | 'TRANSFER';
-    priority: 'ROUTINE' | 'URGENT' | 'CRITICAL';
-    expectedStayDays?: number;
-    admittingDepartment: string;
-    wardType: 'GENERAL' | 'PRIVATE' | 'ICU' | 'CCU' | 'NICU' | 'PICU';
-    insuranceInfo?: {
-      provider: string;
-      policyNumber: string;
-      approvalStatus: 'PENDING' | 'APPROVED' | 'DENIED';
-      preAuthNumber?: string;
-    };
-    admittingNotes?: string;
-    admittedBy: string;
-  }) {
+  async admitPatientToIPD(admissionData: CreateIPDAdmissionDto & { admittedBy: string }) {
     // Validate patient exists and is not already admitted
     const patient = await this.prisma.patient.findUnique({
       where: { id: admissionData.patientId },
@@ -121,10 +358,16 @@ export class IPDService {
       throw new NotFoundException('Patient not found');
     }
 
-    const existingAdmission = await this.prisma.iPDAdmission.findFirst({
+    // Check for existing active IPD admission
+    const existingAdmission = await this.prisma.medicalRecord.findFirst({
       where: {
         patientId: admissionData.patientId,
-        status: { in: ['ADMITTED', 'TRANSFERRED'] },
+        notes: {
+          contains: 'IPD_ADMISSION',
+        },
+        diagnosis: {
+          has: 'ADMITTED',
+        },
       },
     });
 
@@ -141,29 +384,51 @@ export class IPDService {
     // Generate admission number
     const admissionNumber = await this.generateAdmissionNumber();
 
-    // Create IPD admission
-    const admission = await this.prisma.iPDAdmission.create({
+    // Create IPD admission using MedicalRecord model
+    const treatmentPlanData = {
+      recordType: 'IPD_ADMISSION',
+      admissionNumber,
+      admissionType: admissionData.admissionType,
+      priority: admissionData.priority,
+      expectedStayDays: admissionData.expectedStayDays,
+      department: admissionData.admittingDepartment,
+      wardType: admissionData.wardType,
+      insuranceInfo: admissionData.insuranceInfo,
+      admittingNotes: admissionData.admittingNotes,
+      admittedBy: admissionData.admittedBy,
+      status: 'ADMITTED',
+      admissionDate: new Date().toISOString(),
+      bedAssignment: {
+        bedId: availableBed.id,
+        bedNumber: availableBed.bedNumber,
+        roomNumber: availableBed.roomNumber,
+        wardType: availableBed.wardType,
+        assignedAt: new Date().toISOString(),
+      },
+      progressNotes: [],
+      nursingNotes: [],
+      vitalSigns: [],
+      transferHistory: [],
+    };
+
+    const admission = await this.prisma.medicalRecord.create({
       data: {
         patientId: admissionData.patientId,
         doctorId: admissionData.admittingDoctorId,
-        bedId: availableBed.id,
-        admissionNumber,
-        primaryDiagnosis: admissionData.primaryDiagnosis,
-        admissionType: admissionData.admissionType,
-        priority: admissionData.priority,
-        expectedStayDays: admissionData.expectedStayDays,
-        department: admissionData.admittingDepartment,
-        wardType: admissionData.wardType,
-        insuranceInfo: admissionData.insuranceInfo,
-        admittingNotes: admissionData.admittingNotes,
-        admissionDate: new Date(),
-        status: 'ADMITTED',
+        visitDate: new Date(),
+        chiefComplaint: admissionData.primaryDiagnosis,
+        diagnosis: ['ADMITTED', admissionData.primaryDiagnosis], // Using diagnosis array for status
+        treatmentPlan: JSON.stringify(treatmentPlanData),
+        notes: `IPD_ADMISSION - ${admissionData.admissionType}`,
+        followUpDate: admissionData.expectedStayDays
+          ? new Date(Date.now() + admissionData.expectedStayDays * 24 * 60 * 60 * 1000)
+          : undefined,
       },
       include: {
         patient: {
           include: {
             user: {
-              select: { firstName: true, lastName: true, phone: true },
+              select: { firstName: true, lastName: true, email: true, phone: true },
             },
           },
         },
@@ -174,25 +439,20 @@ export class IPDService {
             },
           },
         },
-        bed: {
-          include: {
-            room: true,
-          },
-        },
       },
     });
 
-    // Update bed status
-    await this.prisma.bed.update({
-      where: { id: availableBed.id },
-      data: { status: 'OCCUPIED' },
-    });
+    // Update bed status in mock data
+    const bedIndex = this.mockBeds.findIndex(b => b.id === availableBed.id);
+    if (bedIndex !== -1) {
+      this.mockBeds[bedIndex] = { ...this.mockBeds[bedIndex], status: 'OCCUPIED' };
+    }
 
     // Log admission
     await this.complianceService.logAuditEvent({
       userId: admissionData.admittedBy,
       action: 'PATIENT_ADMITTED_IPD',
-      resource: 'ipd_admissions',
+      resource: 'medical_records',
       resourceId: admission.id,
       details: {
         admissionNumber,
@@ -204,7 +464,7 @@ export class IPDService {
       complianceFlags: ['HIPAA', 'PATIENT_DATA'],
     });
 
-    return admission;
+    return this.transformMedicalRecordToIPDAdmission(admission);
   }
 
   /**
@@ -212,78 +472,92 @@ export class IPDService {
    */
   async transferPatient(
     admissionId: string,
-    transferData: {
-      newBedId?: string;
-      newWardType?: string;
-      transferReason: string;
-      transferredBy: string;
-    },
+    transferData: TransferPatientDto & { transferredBy: string },
   ) {
-    const admission = await this.prisma.iPDAdmission.findUnique({
+    const record = await this.prisma.medicalRecord.findUnique({
       where: { id: admissionId },
-      include: { bed: true },
     });
 
-    if (!admission) {
+    if (!record || !this.isIPDAdmission(record)) {
       throw new NotFoundException('IPD admission not found');
     }
 
-    if (admission.status !== 'ADMITTED') {
+    const treatmentPlan = record.treatmentPlan ? JSON.parse(record.treatmentPlan) : {};
+    if (treatmentPlan.status !== 'ADMITTED') {
       throw new BadRequestException('Patient is not currently admitted');
     }
 
     let newBedId = transferData.newBedId;
+    let newBed = null;
 
     // Find new bed if ward type is changing
-    if (transferData.newWardType && transferData.newWardType !== admission.wardType) {
-      const availableBed = await this.findAvailableBed(transferData.newWardType);
-      if (!availableBed) {
+    if (transferData.newWardType && transferData.newWardType !== treatmentPlan.wardType) {
+      newBed = await this.findAvailableBed(transferData.newWardType);
+      if (!newBed) {
         throw new BadRequestException(`No beds available in ${transferData.newWardType} ward`);
       }
-      newBedId = availableBed.id;
+      newBedId = newBed.id;
     }
 
+    // Get current bed assignment
+    const currentBedId = treatmentPlan.bedAssignment?.bedId;
+
     // Update admission
-    const updatedAdmission = await this.prisma.iPDAdmission.update({
+    const transferHistory = treatmentPlan.transferHistory || [];
+    transferHistory.push({
+      fromBed: currentBedId,
+      toBed: newBedId,
+      reason: transferData.transferReason,
+      transferredAt: new Date().toISOString(),
+      transferredBy: transferData.transferredBy,
+    });
+
+    let updatedBedAssignment = treatmentPlan.bedAssignment;
+    if (newBedId && newBedId !== currentBedId) {
+      updatedBedAssignment = {
+        bedId: newBedId,
+        bedNumber: newBed?.bedNumber || treatmentPlan.bedAssignment.bedNumber,
+        roomNumber: newBed?.roomNumber || treatmentPlan.bedAssignment.roomNumber,
+        wardType: transferData.newWardType || treatmentPlan.wardType,
+        assignedAt: new Date().toISOString(),
+      };
+    }
+
+    treatmentPlan.wardType = transferData.newWardType || treatmentPlan.wardType;
+    treatmentPlan.bedAssignment = updatedBedAssignment;
+    treatmentPlan.transferHistory = transferHistory;
+
+    await this.prisma.medicalRecord.update({
       where: { id: admissionId },
       data: {
-        bedId: newBedId || admission.bedId,
-        wardType: transferData.newWardType || admission.wardType,
-        transferHistory: {
-          push: {
-            fromBed: admission.bedId,
-            toBed: newBedId,
-            reason: transferData.transferReason,
-            transferredAt: new Date(),
-            transferredBy: transferData.transferredBy,
-          },
-        },
+        treatmentPlan: JSON.stringify(treatmentPlan),
+        updatedAt: new Date(),
       },
     });
 
-    // Update bed statuses
-    if (newBedId && newBedId !== admission.bedId) {
+    // Update bed statuses in mock data
+    if (newBedId && newBedId !== currentBedId) {
       // Free old bed
-      await this.prisma.bed.update({
-        where: { id: admission.bedId },
-        data: { status: 'AVAILABLE' },
-      });
+      const oldBedIndex = this.mockBeds.findIndex(b => b.id === currentBedId);
+      if (oldBedIndex !== -1) {
+        this.mockBeds[oldBedIndex] = { ...this.mockBeds[oldBedIndex], status: 'AVAILABLE' };
+      }
 
       // Occupy new bed
-      await this.prisma.bed.update({
-        where: { id: newBedId },
-        data: { status: 'OCCUPIED' },
-      });
+      const newBedIndex = this.mockBeds.findIndex(b => b.id === newBedId);
+      if (newBedIndex !== -1) {
+        this.mockBeds[newBedIndex] = { ...this.mockBeds[newBedIndex], status: 'OCCUPIED' };
+      }
     }
 
     // Log transfer
     await this.complianceService.logAuditEvent({
       userId: transferData.transferredBy,
       action: 'PATIENT_TRANSFERRED_IPD',
-      resource: 'ipd_admissions',
+      resource: 'medical_records',
       resourceId: admissionId,
       details: {
-        fromBed: admission.bedId,
+        fromBed: currentBedId,
         toBed: newBedId,
         transferReason: transferData.transferReason,
         newWardType: transferData.newWardType,
@@ -291,179 +565,46 @@ export class IPDService {
       complianceFlags: ['HIPAA', 'PATIENT_ACCESS'],
     });
 
-    return updatedAdmission;
-  }
-
-  /**
-   * Add comprehensive progress note
-   */
-  async addProgressNote(
-    admissionId: string,
-    noteData: {
-      notedBy: string;
-      noteType: 'DAILY' | 'SPECIALIST_CONSULTATION' | 'PROCEDURE' | 'COMPLICATION' | 'IMPROVEMENT';
-      subjective: string; // Patient's symptoms/complaints
-      objective: string; // Physical examination findings
-      assessment: string; // Doctor's assessment
-      plan: string; // Treatment plan
-      orders?: string[]; // New orders/medications
-      followUpDate?: Date;
-      private?: boolean; // For sensitive notes
-    },
-  ) {
-    const admission = await this.prisma.iPDAdmission.findUnique({
-      where: { id: admissionId },
-    });
-
-    if (!admission) {
-      throw new NotFoundException('IPD admission not found');
-    }
-
-    const progressNote = await this.prisma.progressNote.create({
-      data: {
-        admissionId,
-        notedBy: noteData.notedBy,
-        noteType: noteData.noteType,
-        subjective: noteData.subjective,
-        objective: noteData.objective,
-        assessment: noteData.assessment,
-        plan: noteData.plan,
-        orders: noteData.orders,
-        followUpDate: noteData.followUpDate,
-        private: noteData.private || false,
-        notedAt: new Date(),
-      },
-    });
-
-    // Update admission last progress note
-    await this.prisma.iPDAdmission.update({
-      where: { id: admissionId },
-      data: {
-        lastProgressNote: new Date(),
-        updatedAt: new Date(),
-      },
-    });
-
-    // Log progress note
-    await this.complianceService.logAuditEvent({
-      userId: noteData.notedBy,
-      action: 'PROGRESS_NOTE_ADDED',
-      resource: 'progress_notes',
-      resourceId: progressNote.id,
-      details: {
-        admissionId,
-        noteType: noteData.noteType,
-        private: noteData.private,
-      },
-      complianceFlags: ['HIPAA', 'PATIENT_DATA'],
-    });
-
-    return progressNote;
+    return this.getIPDAdmissionById(admissionId);
   }
 
   /**
    * Record vital signs
    */
-  async recordVitals(
-    admissionId: string,
-    vitalsData: {
-      recordedBy: string;
-      bloodPressure?: string;
-      heartRate?: number;
-      temperature?: number;
-      respiratoryRate?: number;
-      oxygenSaturation?: number;
-      weight?: number;
-      height?: number;
-      painScore?: number; // 0-10 scale
-      consciousness?: 'ALERT' | 'CONFUSED' | 'STUPOROUS' | 'COMATOSE';
-      notes?: string;
-    },
-  ) {
-    const admission = await this.prisma.iPDAdmission.findUnique({
+  async recordVitals(admissionId: string, vitalsData: VitalSignsDto & { recordedBy: string }) {
+    const record = await this.prisma.medicalRecord.findUnique({
       where: { id: admissionId },
     });
 
-    if (!admission) {
+    if (!record || !this.isIPDAdmission(record)) {
       throw new NotFoundException('IPD admission not found');
     }
 
-    const vitals = await this.prisma.vitalSign.create({
+    const treatmentPlan = record.treatmentPlan ? JSON.parse(record.treatmentPlan) : {};
+    const vitalSigns = treatmentPlan.vitalSigns || [];
+
+    const newVitals = {
+      id: `vitals-${Date.now()}`,
+      ...vitalsData,
+      recordedAt: new Date().toISOString(),
+    };
+
+    vitalSigns.push(newVitals);
+    treatmentPlan.vitalSigns = vitalSigns;
+    treatmentPlan.lastVitals = new Date().toISOString();
+
+    await this.prisma.medicalRecord.update({
+      where: { id: admissionId },
       data: {
-        admissionId,
-        recordedBy: vitalsData.recordedBy,
-        bloodPressure: vitalsData.bloodPressure,
-        heartRate: vitalsData.heartRate,
-        temperature: vitalsData.temperature,
-        respiratoryRate: vitalsData.respiratoryRate,
-        oxygenSaturation: vitalsData.oxygenSaturation,
-        weight: vitalsData.weight,
-        height: vitalsData.height,
-        painScore: vitalsData.painScore,
-        consciousness: vitalsData.consciousness,
-        notes: vitalsData.notes,
-        recordedAt: new Date(),
+        treatmentPlan: JSON.stringify(treatmentPlan),
+        updatedAt: new Date(),
       },
     });
 
     // Check for abnormal values and create alerts
-    await this.checkVitalSignsAlerts(vitals);
+    await this.checkVitalSignsAlerts(newVitals);
 
-    return vitals;
-  }
-
-  /**
-   * Add nursing note with care activities
-   */
-  async addNursingNote(
-    admissionId: string,
-    noteData: {
-      notedBy: string;
-      shift: 'MORNING' | 'EVENING' | 'NIGHT';
-      activities: string[]; // Care activities performed
-      observations: string; // Patient observations
-      interventions: string[]; // Nursing interventions
-      patientResponse: string; // How patient responded
-      handoffNotes?: string; // Notes for next shift
-    },
-  ) {
-    const admission = await this.prisma.iPDAdmission.findUnique({
-      where: { id: admissionId },
-    });
-
-    if (!admission) {
-      throw new NotFoundException('IPD admission not found');
-    }
-
-    const nursingNote = await this.prisma.nursingNote.create({
-      data: {
-        admissionId,
-        notedBy: noteData.notedBy,
-        shift: noteData.shift,
-        activities: noteData.activities,
-        observations: noteData.observations,
-        interventions: noteData.interventions,
-        patientResponse: noteData.patientResponse,
-        handoffNotes: noteData.handoffNotes,
-        notedAt: new Date(),
-      },
-    });
-
-    // Log nursing note
-    await this.complianceService.logAuditEvent({
-      userId: noteData.notedBy,
-      action: 'NURSING_NOTE_ADDED',
-      resource: 'nursing_notes',
-      resourceId: nursingNote.id,
-      details: {
-        admissionId,
-        shift: noteData.shift,
-        activitiesCount: noteData.activities.length,
-      },
-      complianceFlags: ['HIPAA', 'PATIENT_DATA'],
-    });
-
-    return nursingNote;
+    return newVitals;
   }
 
   /**
@@ -471,79 +612,70 @@ export class IPDService {
    */
   async dischargePatient(
     admissionId: string,
-    dischargeData: {
-      dischargedBy: string;
-      dischargeType: 'REGULAR' | 'AGAINST_MEDICAL_ADVICE' | 'TRANSFER' | 'EXPIRED';
-      dischargeSummary: {
-        finalDiagnosis: string[];
-        treatmentGiven: string;
-        complications?: string[];
-        outcome: 'CURED' | 'IMPROVED' | 'UNCHANGED' | 'WORSENED';
-        followUpInstructions: string;
-        medicationsOnDischarge: Array<{
-          medicationId: string;
-          dosage: string;
-          frequency: string;
-          duration: number;
-        }>;
-        followUpDate?: Date;
-      };
-      dischargeNotes?: string;
-    },
+    dischargeData: DischargePatientDto & { dischargedBy: string },
   ) {
-    const admission = await this.prisma.iPDAdmission.findUnique({
+    const record = await this.prisma.medicalRecord.findUnique({
       where: { id: admissionId },
-      include: { bed: true, patient: true },
+      include: { patient: true, doctor: true },
     });
 
-    if (!admission) {
+    if (!record || !this.isIPDAdmission(record)) {
       throw new NotFoundException('IPD admission not found');
     }
 
-    if (admission.status === 'DISCHARGED') {
+    const treatmentPlan = record.treatmentPlan ? JSON.parse(record.treatmentPlan) : {};
+    if (treatmentPlan.status === 'DISCHARGED') {
       throw new BadRequestException('Patient is already discharged');
     }
 
     // Calculate length of stay
-    const admissionDate = admission.admissionDate;
+    const admissionDate = new Date(treatmentPlan.admissionDate);
     const dischargeDate = new Date();
     const lengthOfStay = Math.ceil(
       (dischargeDate.getTime() - admissionDate.getTime()) / (1000 * 60 * 60 * 24),
     );
 
     // Update admission with discharge information
-    const updatedAdmission = await this.prisma.iPDAdmission.update({
+    treatmentPlan.status = 'DISCHARGED';
+    treatmentPlan.dischargeDate = dischargeDate.toISOString();
+    treatmentPlan.lengthOfStay = lengthOfStay;
+    treatmentPlan.dischargeType = dischargeData.dischargeType;
+    treatmentPlan.dischargeSummary = dischargeData.dischargeSummary;
+    treatmentPlan.dischargeNotes = dischargeData.dischargeNotes;
+    treatmentPlan.dischargedBy = dischargeData.dischargedBy;
+
+    await this.prisma.medicalRecord.update({
       where: { id: admissionId },
       data: {
-        status: 'DISCHARGED',
-        dischargeDate,
-        lengthOfStay,
-        dischargeType: dischargeData.dischargeType,
-        dischargeSummary: dischargeData.dischargeSummary,
-        dischargeNotes: dischargeData.dischargeNotes,
-        dischargedBy: dischargeData.dischargedBy,
+        diagnosis: record.diagnosis.filter(d => d !== 'ADMITTED').concat(['DISCHARGED']),
+        treatmentPlan: JSON.stringify(treatmentPlan),
+        updatedAt: new Date(),
       },
     });
 
     // Free up the bed
-    await this.prisma.bed.update({
-      where: { id: admission.bedId },
-      data: { status: 'AVAILABLE' },
-    });
+    const bedId = treatmentPlan.bedAssignment?.bedId;
+    if (bedId) {
+      const bedIndex = this.mockBeds.findIndex(b => b.id === bedId);
+      if (bedIndex !== -1) {
+        this.mockBeds[bedIndex] = { ...this.mockBeds[bedIndex], status: 'AVAILABLE' };
+      }
+    }
 
     // Create discharge prescriptions
     if (dischargeData.dischargeSummary.medicationsOnDischarge.length > 0) {
       for (const med of dischargeData.dischargeSummary.medicationsOnDischarge) {
         await this.prisma.prescription.create({
           data: {
-            patientId: admission.patientId,
-            doctorId: admission.doctorId,
+            patientId: record.patientId,
+            doctorId: record.doctorId,
             medicationId: med.medicationId,
             dosage: med.dosage,
             frequency: med.frequency,
             duration: med.duration,
+            quantity: Math.max(1, med.duration), // Calculate quantity based on duration
             prescribedDate: new Date(),
-            status: 'ACTIVE',
+            status: PrescriptionStatus.ACTIVE,
           },
         });
       }
@@ -553,7 +685,7 @@ export class IPDService {
     await this.complianceService.logAuditEvent({
       userId: dischargeData.dischargedBy,
       action: 'PATIENT_DISCHARGED_IPD',
-      resource: 'ipd_admissions',
+      resource: 'medical_records',
       resourceId: admissionId,
       details: {
         dischargeType: dischargeData.dischargeType,
@@ -564,76 +696,70 @@ export class IPDService {
       complianceFlags: ['HIPAA', 'PATIENT_DATA'],
     });
 
-    return updatedAdmission;
+    return this.getIPDAdmissionById(admissionId);
   }
 
   /**
    * Get bed availability by ward type
    */
   async getBedAvailability() {
-    const beds = await this.prisma.bed.findMany({
-      include: {
-        room: {
-          include: {
-            ward: true,
-          },
-        },
-        currentAdmission: {
-          include: {
-            patient: {
-              include: {
-                user: {
-                  select: { firstName: true, lastName: true },
-                },
-              },
-            },
-          },
-        },
+    // Update bed status based on current admissions
+    await this.getBedOccupancy();
+
+    return this.mockBeds.reduce(
+      (acc, bed) => {
+        const wardType = bed.wardType;
+        if (!acc[wardType]) {
+          acc[wardType] = { total: 0, available: 0, occupied: 0 };
+        }
+
+        acc[wardType].total++;
+        if (bed.status === 'AVAILABLE') {
+          acc[wardType].available++;
+        } else {
+          acc[wardType].occupied++;
+        }
+
+        return acc;
       },
-    });
-
-    const availability = beds.reduce((acc, bed) => {
-      const wardType = bed.room.ward.type;
-      if (!acc[wardType]) {
-        acc[wardType] = { total: 0, available: 0, occupied: 0 };
-      }
-
-      acc[wardType].total++;
-      if (bed.status === 'AVAILABLE') {
-        acc[wardType].available++;
-      } else {
-        acc[wardType].occupied++;
-      }
-
-      return acc;
-    }, {});
-
-    return availability;
+      {} as Record<string, { total: number; available: number; occupied: number }>,
+    );
   }
 
   /**
    * Get IPD performance metrics
    */
   async getIPDPerformanceMetrics(startDate: Date, endDate: Date) {
-    const admissions = await this.prisma.iPDAdmission.findMany({
+    const admissions = await this.prisma.medicalRecord.findMany({
       where: {
-        admissionDate: {
+        notes: {
+          contains: 'IPD_ADMISSION',
+        },
+        visitDate: {
           gte: startDate,
           lte: endDate,
         },
       },
-      include: {
-        progressNotes: true,
-        nursingNotes: true,
-        vitalSigns: true,
-      },
     });
 
     const totalAdmissions = admissions.length;
-    const discharged = admissions.filter(a => a.status === 'DISCHARGED').length;
+    const discharged = admissions.filter(a => {
+      const treatmentPlan = a.treatmentPlan as any;
+      return treatmentPlan.status === 'DISCHARGED';
+    }).length;
+
+    const admittedWithStay = admissions.filter(a => {
+      const treatmentPlan = a.treatmentPlan as any;
+      return treatmentPlan.lengthOfStay !== undefined;
+    });
+
     const avgLengthOfStay =
-      admissions.filter(a => a.lengthOfStay).reduce((sum, a) => sum + a.lengthOfStay, 0) /
-        discharged || 0;
+      admittedWithStay.length > 0
+        ? admittedWithStay.reduce((sum, a) => {
+            const treatmentPlan = a.treatmentPlan as any;
+            return sum + (treatmentPlan.lengthOfStay || 0);
+          }, 0) / admittedWithStay.length
+        : 0;
 
     const bedOccupancyRate = await this.calculateBedOccupancyRate(startDate, endDate);
 
@@ -650,27 +776,79 @@ export class IPDService {
 
   // Helper methods
 
-  private async findAvailableBed(wardType: string) {
-    return await this.prisma.bed.findFirst({
-      where: {
-        status: 'AVAILABLE',
-        room: {
-          ward: {
-            type: wardType,
-          },
-        },
-      },
-      include: {
-        room: true,
-      },
-    });
+  /**
+   *
+   */
+  private isIPDAdmission(record: any): boolean {
+    const treatmentPlan = record.treatmentPlan;
+    return treatmentPlan?.recordType === 'IPD_ADMISSION';
   }
 
+  /**
+   *
+   */
+  private transformMedicalRecordToIPDAdmission(record: any) {
+    const treatmentPlan = record.treatmentPlan;
+    const patient = record.patient;
+    const doctor = record.doctor;
+
+    return {
+      id: record.id,
+      admissionNumber: treatmentPlan.admissionNumber || `IPD-${record.id}`,
+      patient: {
+        id: patient.id,
+        firstName: patient.user.firstName,
+        lastName: patient.user.lastName,
+        mrn: patient.mrn,
+        dateOfBirth: patient.dateOfBirth,
+        gender: patient.gender,
+      },
+      doctor: {
+        id: doctor.id,
+        firstName: doctor.user.firstName,
+        lastName: doctor.user.lastName,
+        specialization: doctor.specialization,
+      },
+      bedAssignment: treatmentPlan.bedAssignment || null,
+      primaryDiagnosis: record.chiefComplaint,
+      admissionType: treatmentPlan.admissionType,
+      priority: treatmentPlan.priority,
+      wardType: treatmentPlan.wardType,
+      department: treatmentPlan.department,
+      admissionDate: new Date(record.visitDate),
+      dischargeDate: treatmentPlan.dischargeDate
+        ? new Date(treatmentPlan.dischargeDate)
+        : undefined,
+      lengthOfStay: treatmentPlan.lengthOfStay,
+      status: treatmentPlan.status,
+      insuranceInfo: treatmentPlan.insuranceInfo,
+      admittingNotes: treatmentPlan.admittingNotes,
+      createdAt: record.createdAt,
+      updatedAt: record.updatedAt,
+    };
+  }
+
+  /**
+   *
+   */
+  private async findAvailableBed(wardType: WardType): Promise<BedInfoDto | null> {
+    const availableBed = this.mockBeds.find(
+      bed => bed.wardType === wardType && bed.status === 'AVAILABLE',
+    );
+    return availableBed || null;
+  }
+
+  /**
+   *
+   */
   private async generateAdmissionNumber(): Promise<string> {
     const year = new Date().getFullYear();
-    const count = await this.prisma.iPDAdmission.count({
+    const count = await this.prisma.medicalRecord.count({
       where: {
-        admissionDate: {
+        treatmentPlan: {
+          contains: '"recordType":"IPD_ADMISSION"',
+        },
+        visitDate: {
           gte: new Date(year, 0, 1),
           lt: new Date(year + 1, 0, 1),
         },
@@ -680,6 +858,9 @@ export class IPDService {
     return `IPD${year}${(count + 1).toString().padStart(6, '0')}`;
   }
 
+  /**
+   *
+   */
   private async checkVitalSignsAlerts(vitals: any) {
     const alerts = [];
 
@@ -688,7 +869,7 @@ export class IPDService {
       alerts.push('Abnormal heart rate');
     }
 
-    if (vitals.temperature && (vitals.temperature < 95 || vitals.temperature > 104)) {
+    if (vitals.temperature && (vitals.temperature < 35 || vitals.temperature > 40)) {
       alerts.push('Abnormal temperature');
     }
 
@@ -701,7 +882,7 @@ export class IPDService {
       await this.complianceService.logAuditEvent({
         userId: vitals.recordedBy,
         action: 'VITAL_SIGNS_ALERT',
-        resource: 'vital_signs',
+        resource: 'medical_records',
         resourceId: vitals.id,
         details: {
           alerts,
@@ -716,16 +897,20 @@ export class IPDService {
     }
   }
 
+  /**
+   *
+   */
   private async calculateBedOccupancyRate(startDate: Date, endDate: Date): Promise<number> {
-    // Simplified calculation - in real implementation, would track daily occupancy
-    const totalBeds = await this.prisma.bed.count();
-    const occupiedBeds = await this.prisma.bed.count({
-      where: { status: 'OCCUPIED' },
-    });
+    // Simplified calculation based on current mock beds
+    const totalBeds = this.mockBeds.length;
+    const occupiedBeds = this.mockBeds.filter(bed => bed.status === 'OCCUPIED').length;
 
     return totalBeds > 0 ? occupiedBeds / totalBeds : 0;
   }
 
+  /**
+   *
+   */
   private calculateDischargeOutcomes(admissions: any[]) {
     const outcomes = {
       CURED: 0,
@@ -735,9 +920,13 @@ export class IPDService {
     };
 
     admissions
-      .filter(a => a.status === 'DISCHARGED' && a.dischargeSummary?.outcome)
+      .filter(a => {
+        const treatmentPlan = a.treatmentPlan;
+        return treatmentPlan.status === 'DISCHARGED' && treatmentPlan.dischargeSummary?.outcome;
+      })
       .forEach(a => {
-        outcomes[a.dischargeSummary.outcome]++;
+        const treatmentPlan = a.treatmentPlan;
+        outcomes[treatmentPlan.dischargeSummary.outcome]++;
       });
 
     return outcomes;

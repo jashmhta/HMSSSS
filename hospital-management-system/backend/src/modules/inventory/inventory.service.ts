@@ -1,11 +1,22 @@
+/*[object Object]*/
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+
 import { PrismaService } from '../../database/prisma.service';
 
+/**
+ *
+ */
 @Injectable()
 export class InventoryService {
+  /**
+   *
+   */
   constructor(private prisma: PrismaService) {}
 
   // Medication Management
+  /**
+   *
+   */
   async createMedication(data: {
     name: string;
     genericName?: string;
@@ -43,6 +54,9 @@ export class InventoryService {
     });
   }
 
+  /**
+   *
+   */
   async getMedications(
     page: number = 1,
     limit: number = 10,
@@ -93,6 +107,9 @@ export class InventoryService {
     };
   }
 
+  /**
+   *
+   */
   async getMedicationById(id: string) {
     const medication = await this.prisma.medication.findUnique({
       where: { id },
@@ -115,6 +132,9 @@ export class InventoryService {
     return medication;
   }
 
+  /**
+   *
+   */
   async updateMedication(
     id: string,
     data: Partial<{
@@ -151,23 +171,27 @@ export class InventoryService {
     });
   }
 
+  /**
+   *
+   */
   async deleteMedication(id: string) {
     const medication = await this.prisma.medication.findUnique({
       where: { id },
-      include: {
-        prescriptions: {
-          where: {
-            status: { in: ['ACTIVE', 'PENDING'] },
-          },
-        },
-      },
     });
 
     if (!medication) {
       throw new NotFoundException('Medication not found');
     }
 
-    if (medication.prescriptions.length > 0) {
+    // Check if medication has active prescriptions (simplified for schema compatibility)
+    const hasActivePrescriptions = await this.prisma.prescription.count({
+      where: {
+        medicationId: id,
+        status: { in: ['ACTIVE', 'COMPLETED'] },
+      },
+    });
+
+    if (hasActivePrescriptions > 0) {
       throw new BadRequestException('Cannot delete medication with active prescriptions');
     }
 
@@ -179,6 +203,9 @@ export class InventoryService {
   }
 
   // Stock Management
+  /**
+   *
+   */
   async addStock(
     medicationId: string,
     data: {
@@ -190,7 +217,7 @@ export class InventoryService {
     performedBy: string,
   ) {
     const medication = await this.prisma.medication.findUnique({
-      where: { medicationId },
+      where: { id: medicationId },
     });
 
     if (!medication) {
@@ -227,6 +254,9 @@ export class InventoryService {
     });
   }
 
+  /**
+   *
+   */
   async issueStock(
     medicationId: string,
     data: {
@@ -273,6 +303,9 @@ export class InventoryService {
     });
   }
 
+  /**
+   *
+   */
   async adjustStock(
     medicationId: string,
     data: {
@@ -313,6 +346,9 @@ export class InventoryService {
   }
 
   // Inventory Logs
+  /**
+   *
+   */
   async getInventoryLogs(
     page: number = 1,
     limit: number = 10,
@@ -374,6 +410,9 @@ export class InventoryService {
   }
 
   // Reports
+  /**
+   *
+   */
   async getLowStockReport() {
     return this.prisma.medication.findMany({
       where: {
@@ -386,6 +425,9 @@ export class InventoryService {
     });
   }
 
+  /**
+   *
+   */
   async getExpiringSoonReport(days: number = 30) {
     const expiryDate = new Date();
     expiryDate.setDate(expiryDate.getDate() + days);
@@ -402,6 +444,9 @@ export class InventoryService {
     });
   }
 
+  /**
+   *
+   */
   async getStockMovementReport(startDate: string, endDate: string) {
     const logs = await this.prisma.inventoryLog.findMany({
       where: {
@@ -443,6 +488,9 @@ export class InventoryService {
   }
 
   // Statistics
+  /**
+   *
+   */
   async getInventoryStats() {
     const [totalMedications, lowStockMedications, outOfStockMedications, expiringSoon, totalValue] =
       await Promise.all([
@@ -489,6 +537,9 @@ export class InventoryService {
   }
 
   // Bulk operations
+  /**
+   *
+   */
   async bulkImportMedications(medications: any[], createdBy: string) {
     const results = [];
     const errors = [];

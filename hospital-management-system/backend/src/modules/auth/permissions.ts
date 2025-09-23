@@ -38,6 +38,7 @@ export enum Permission {
   RADIOLOGY_VIEW_ALL = 'radiology:view_all',
 
   // Billing
+  BILLING_READ = 'billing:read',
   BILLING_CREATE = 'billing:create',
   BILLING_UPDATE = 'billing:update',
   BILLING_VIEW_ALL = 'billing:view_all',
@@ -230,11 +231,17 @@ export const ROLE_PERMISSIONS = {
 };
 
 // Helper functions
+/**
+ *
+ */
 export function hasPermission(userRole: string, permission: Permission): boolean {
   const rolePermissions = ROLE_PERMISSIONS[userRole as keyof typeof ROLE_PERMISSIONS];
   return rolePermissions ? rolePermissions.includes(permission) : false;
 }
 
+/**
+ *
+ */
 export function getRolePermissions(role: string): Permission[] {
   return ROLE_PERMISSIONS[role as keyof typeof ROLE_PERMISSIONS] || [];
 }

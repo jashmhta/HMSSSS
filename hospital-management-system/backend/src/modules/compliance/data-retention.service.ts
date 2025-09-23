@@ -1,11 +1,19 @@
+/*[object Object]*/
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
+
 import { ComplianceService } from './compliance.service';
 
+/**
+ *
+ */
 @Injectable()
 export class DataRetentionService {
   private readonly logger = new Logger(DataRetentionService.name);
 
+  /**
+   *
+   */
   constructor(private readonly complianceService: ComplianceService) {}
 
   /**
@@ -94,7 +102,7 @@ export class DataRetentionService {
       const result = await this.complianceService.executeDataRetentionCleanup();
 
       this.logger.log(
-        `Manual data retention cleanup completed: ${Object.values(result.deletedRecords).reduce((sum, count) => sum + count, 0)} records deleted`,
+        `Manual data retention cleanup completed: ${Object.values(result.deletedRecords).reduce((sum: number, count: number) => sum + count, 0)} records deleted`,
       );
 
       return {
@@ -140,7 +148,7 @@ export class DataRetentionService {
         schedule: scheduleStatus,
         recentActivity: retentionLogs.logs,
         nextScheduledRun: this.getNextScheduledRun(),
-        totalRecordsDeleted: retentionLogs.logs.reduce((sum, log) => sum + 1, 0), // This is approximate
+        totalRecordsDeleted: retentionLogs.logs.reduce((sum: number, log) => sum + 1, 0), // This is approximate
       };
     } catch (error) {
       this.logger.error('Failed to get retention schedule status', error);

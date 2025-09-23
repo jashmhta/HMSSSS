@@ -1,11 +1,22 @@
+/*[object Object]*/
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+
 import { PrismaService } from '../../database/prisma.service';
 
+/**
+ *
+ */
 @Injectable()
 export class PharmacyService {
+  /**
+   *
+   */
   constructor(private prisma: PrismaService) {}
 
   // Medication Management
+  /**
+   *
+   */
   async createMedication(data: {
     name: string;
     genericName?: string;
@@ -40,6 +51,9 @@ export class PharmacyService {
     });
   }
 
+  /**
+   *
+   */
   async findAllMedications(filters?: {
     search?: string;
     category?: string;
@@ -96,6 +110,9 @@ export class PharmacyService {
     };
   }
 
+  /**
+   *
+   */
   async findMedicationById(id: string) {
     const medication = await this.prisma.medication.findUnique({
       where: { id },
@@ -136,6 +153,9 @@ export class PharmacyService {
     return medication;
   }
 
+  /**
+   *
+   */
   async updateMedication(
     id: string,
     data: Partial<{
@@ -168,6 +188,9 @@ export class PharmacyService {
     });
   }
 
+  /**
+   *
+   */
   async deleteMedication(id: string) {
     const medication = await this.prisma.medication.findUnique({
       where: { id },
@@ -183,6 +206,9 @@ export class PharmacyService {
   }
 
   // Inventory Management
+  /**
+   *
+   */
   async updateStock(
     id: string,
     quantity: number,
@@ -228,6 +254,9 @@ export class PharmacyService {
     });
   }
 
+  /**
+   *
+   */
   async getLowStockMedications() {
     return this.prisma.medication.findMany({
       where: {
@@ -240,6 +269,9 @@ export class PharmacyService {
     });
   }
 
+  /**
+   *
+   */
   async getExpiringMedications(days: number = 30) {
     const expiryDate = new Date();
     expiryDate.setDate(expiryDate.getDate() + days);
@@ -257,6 +289,9 @@ export class PharmacyService {
   }
 
   // Prescription Management
+  /**
+   *
+   */
   async createPrescription(data: {
     patientId: string;
     doctorId: string;
@@ -317,6 +352,9 @@ export class PharmacyService {
     });
   }
 
+  /**
+   *
+   */
   async dispensePrescription(id: string, pharmacistId: string) {
     const prescription = await this.prisma.prescription.findUnique({
       where: { id },
@@ -357,6 +395,9 @@ export class PharmacyService {
     return { message: 'Prescription dispensed successfully' };
   }
 
+  /**
+   *
+   */
   async getPrescriptionById(id: string) {
     const prescription = await this.prisma.prescription.findUnique({
       where: { id },
@@ -392,6 +433,9 @@ export class PharmacyService {
     return prescription;
   }
 
+  /**
+   *
+   */
   async getPatientPrescriptions(patientId: string, status?: string) {
     const where: any = { patientId };
     if (status) {
@@ -418,6 +462,9 @@ export class PharmacyService {
   }
 
   // Analytics and Reporting
+  /**
+   *
+   */
   async getPharmacyStats() {
     const [totalMedications, lowStockCount, expiringCount, totalPrescriptions] = await Promise.all([
       this.prisma.medication.count({ where: { isActive: true } }),

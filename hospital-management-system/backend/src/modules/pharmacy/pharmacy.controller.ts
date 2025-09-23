@@ -1,3 +1,4 @@
+/*[object Object]*/
 import {
   Controller,
   Get,
@@ -11,20 +12,31 @@ import {
   Request,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
-import { PharmacyService } from './pharmacy.service';
+import { UserRole } from '@prisma/client';
+
 import { JwtAuthGuard } from '../../shared/guards/jwt-auth.guard';
 import { RolesGuard } from '../../modules/auth/roles.guard';
 import { Roles } from '../../shared/decorators/roles.decorator';
-import { UserRole } from '../../database/schema.prisma';
 
+import { PharmacyService } from './pharmacy.service';
+
+/**
+ *
+ */
 @ApiTags('pharmacy')
 @ApiBearerAuth()
 @Controller('pharmacy')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class PharmacyController {
+  /**
+   *
+   */
   constructor(private readonly pharmacyService: PharmacyService) {}
 
   // Medication Management
+  /**
+   *
+   */
   @Post('medications')
   @Roles(UserRole.ADMIN, UserRole.PHARMACIST)
   @ApiOperation({ summary: 'Create a new medication' })
@@ -33,6 +45,9 @@ export class PharmacyController {
     return this.pharmacyService.createMedication(createMedicationDto);
   }
 
+  /**
+   *
+   */
   @Get('medications')
   @Roles(UserRole.ADMIN, UserRole.DOCTOR, UserRole.PHARMACIST, UserRole.NURSE)
   @ApiOperation({ summary: 'Get all medications' })
@@ -56,6 +71,9 @@ export class PharmacyController {
     return this.pharmacyService.findAllMedications(filters);
   }
 
+  /**
+   *
+   */
   @Get('medications/low-stock')
   @Roles(UserRole.ADMIN, UserRole.PHARMACIST)
   @ApiOperation({ summary: 'Get low stock medications' })
@@ -64,6 +82,9 @@ export class PharmacyController {
     return this.pharmacyService.getLowStockMedications();
   }
 
+  /**
+   *
+   */
   @Get('medications/expiring')
   @Roles(UserRole.ADMIN, UserRole.PHARMACIST)
   @ApiOperation({ summary: 'Get expiring medications' })
@@ -72,6 +93,9 @@ export class PharmacyController {
     return this.pharmacyService.getExpiringMedications(days);
   }
 
+  /**
+   *
+   */
   @Get('medications/:id')
   @Roles(UserRole.ADMIN, UserRole.DOCTOR, UserRole.PHARMACIST, UserRole.NURSE)
   @ApiOperation({ summary: 'Get medication by ID' })
@@ -80,6 +104,9 @@ export class PharmacyController {
     return this.pharmacyService.findMedicationById(id);
   }
 
+  /**
+   *
+   */
   @Patch('medications/:id')
   @Roles(UserRole.ADMIN, UserRole.PHARMACIST)
   @ApiOperation({ summary: 'Update medication' })
@@ -88,6 +115,9 @@ export class PharmacyController {
     return this.pharmacyService.updateMedication(id, updateMedicationDto);
   }
 
+  /**
+   *
+   */
   @Delete('medications/:id')
   @Roles(UserRole.ADMIN)
   @ApiOperation({ summary: 'Delete medication' })
@@ -96,6 +126,9 @@ export class PharmacyController {
     return this.pharmacyService.deleteMedication(id);
   }
 
+  /**
+   *
+   */
   @Post('medications/:id/stock')
   @Roles(UserRole.ADMIN, UserRole.PHARMACIST)
   @ApiOperation({ summary: 'Update medication stock' })
@@ -115,6 +148,9 @@ export class PharmacyController {
   }
 
   // Prescription Management
+  /**
+   *
+   */
   @Post('prescriptions')
   @Roles(UserRole.ADMIN, UserRole.DOCTOR)
   @ApiOperation({ summary: 'Create a new prescription' })
@@ -123,6 +159,9 @@ export class PharmacyController {
     return this.pharmacyService.createPrescription(createPrescriptionDto);
   }
 
+  /**
+   *
+   */
   @Post('prescriptions/:id/dispense')
   @Roles(UserRole.ADMIN, UserRole.PHARMACIST)
   @ApiOperation({ summary: 'Dispense prescription' })
@@ -131,6 +170,9 @@ export class PharmacyController {
     return this.pharmacyService.dispensePrescription(id, req.user.id);
   }
 
+  /**
+   *
+   */
   @Get('prescriptions/:id')
   @Roles(UserRole.ADMIN, UserRole.DOCTOR, UserRole.PHARMACIST, UserRole.PATIENT)
   @ApiOperation({ summary: 'Get prescription by ID' })
@@ -139,6 +181,9 @@ export class PharmacyController {
     return this.pharmacyService.getPrescriptionById(id);
   }
 
+  /**
+   *
+   */
   @Get('patients/:patientId/prescriptions')
   @Roles(UserRole.ADMIN, UserRole.DOCTOR, UserRole.PHARMACIST, UserRole.PATIENT)
   @ApiOperation({ summary: 'Get patient prescriptions' })
@@ -148,6 +193,9 @@ export class PharmacyController {
   }
 
   // Analytics
+  /**
+   *
+   */
   @Get('stats')
   @Roles(UserRole.ADMIN, UserRole.PHARMACIST)
   @ApiOperation({ summary: 'Get pharmacy statistics' })

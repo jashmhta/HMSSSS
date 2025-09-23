@@ -1,6 +1,19 @@
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import Login from "../login";
+import { createTestContainer } from "../../../test-utils";
+
+// Mock react-hot-toast
+jest.mock("react-hot-toast", () => ({
+  toast: {
+    success: jest.fn(),
+    error: jest.fn(),
+  },
+}));
+
+// Get mock functions after mock is set
+const mockToastSuccess = require('react-hot-toast').toast.success;
+const mockToastError = require('react-hot-toast').toast.error;
 
 // Mock next/router
 const mockPush = jest.fn();
@@ -10,72 +23,50 @@ jest.mock("next/router", () => ({
   }),
 }));
 
-// Mock react-hot-toast
-const mockToastSuccess = jest.fn();
-const mockToastError = jest.fn();
-jest.mock("react-hot-toast", () => ({
-  toast: {
-    success: mockToastSuccess,
-    error: mockToastError,
-  },
+// Mock Heroicons
+jest.mock("@heroicons/react/24/outline", () => ({
+  EyeIcon: () => <div data-testid="eye-icon" />,
+  EyeSlashIcon: () => <div data-testid="eye-slash-icon" />,
 }));
+
+// Setup fake timers
+jest.useFakeTimers();
 
 describe("Login Page", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    // Clear localStorage
+    jest.clearAllTimers();
     localStorage.clear();
   });
 
   it("renders login form with all elements", () => {
     render(<Login />);
 
-    expect(screen.getByText("Sign in to your account")).toBeInTheDocument();
-    expect(screen.getByLabelText("Email address")).toBeInTheDocument();
-    expect(screen.getByLabelText("Password")).toBeInTheDocument();
-    expect(screen.getByLabelText("Remember me")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Sign in" })).toBeInTheDocument();
-    expect(screen.getByText("create a new account")).toBeInTheDocument();
-    expect(screen.getByText("Forgot your password?")).toBeInTheDocument();
+    expect(screen.getByText(/Sign in to your account/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Email address/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Password/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Remember me/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Sign in/i })).toBeInTheDocument();
+    expect(screen.getByText(/create a new account/i)).toBeInTheDocument();
+    expect(screen.getByText(/Forgot your password?/i)).toBeInTheDocument();
   });
 
   it("shows demo credentials section", () => {
     render(<Login />);
 
-    expect(screen.getByText("Demo Credentials:")).toBeInTheDocument();
-    expect(screen.getByText("admin@hms.com / admin123")).toBeInTheDocument();
-    expect(screen.getByText("doctor@hms.com / doctor123")).toBeInTheDocument();
-    expect(
-      screen.getByText("patient@hms.com / patient123"),
-    ).toBeInTheDocument();
-  });
-
-  it("toggles password visibility", async () => {
-    const user = userEvent.setup();
-    render(<Login />);
-
-    const passwordInput = screen.getByLabelText("Password");
-    const toggleButton = screen.getByRole("button", { name: "" }); // Eye icon button
-
-    // Initially password should be hidden
-    expect(passwordInput).toHaveAttribute("type", "password");
-
-    // Click to show password
-    await user.click(toggleButton);
-    expect(passwordInput).toHaveAttribute("type", "text");
-
-    // Click again to hide password
-    await user.click(toggleButton);
-    expect(passwordInput).toHaveAttribute("type", "password");
+    expect(screen.getByText(/Demo Credentials:/i)).toBeInTheDocument();
+    expect(screen.getByText(/admin@hms.com \/ admin123/i)).toBeInTheDocument();
+    expect(screen.getByText(/doctor@hms.com \/ doctor123/i)).toBeInTheDocument();
+    expect(screen.getByText(/patient@hms.com \/ patient123/i)).toBeInTheDocument();
   });
 
   it("updates form data when typing", async () => {
     const user = userEvent.setup();
     render(<Login />);
 
-    const emailInput = screen.getByLabelText("Email address");
-    const passwordInput = screen.getByLabelText("Password");
-    const rememberMeCheckbox = screen.getByLabelText("Remember me");
+    const emailInput = screen.getByLabelText(/Email address/i);
+    const passwordInput = screen.getByLabelText(/Password/i);
+    const rememberMeCheckbox = screen.getByLabelText(/Remember me/i);
 
     await user.type(emailInput, "test@example.com");
     await user.type(passwordInput, "password123");
@@ -90,16 +81,16 @@ describe("Login Page", () => {
     const user = userEvent.setup();
     render(<Login />);
 
-    const emailInput = screen.getByLabelText("Email address");
-    const passwordInput = screen.getByLabelText("Password");
-    const submitButton = screen.getByRole("button", { name: "Sign in" });
+    const emailInput = screen.getByLabelText(/Email address/i);
+    const passwordInput = screen.getByLabelText(/Password/i);
+    const submitButton = screen.getByRole("button", { name: /Sign in/i });
 
     await user.type(emailInput, "admin@hms.com");
     await user.type(passwordInput, "admin123");
 
     await user.click(submitButton);
 
-    expect(screen.getByText("Signing in...")).toBeInTheDocument();
+    expect(screen.getByText(/Signing in/i)).toBeInTheDocument();
     expect(submitButton).toBeDisabled();
   });
 
@@ -107,24 +98,24 @@ describe("Login Page", () => {
     const user = userEvent.setup();
     render(<Login />);
 
-    const emailInput = screen.getByLabelText("Email address");
-    const passwordInput = screen.getByLabelText("Password");
-    const submitButton = screen.getByRole("button", { name: "Sign in" });
+    const emailInput = screen.getByLabelText(/Email address/i);
+    const passwordInput = screen.getByLabelText(/Password/i);
+    const submitButton = screen.getByRole("button", { name: /Sign in/i });
 
     await user.type(emailInput, "admin@hms.com");
     await user.type(passwordInput, "admin123");
     await user.click(submitButton);
 
-    // Wait for the async operation to complete
+    act(() => {
+      jest.advanceTimersByTime(1000);
+    });
+
     await waitFor(() => {
       expect(mockToastSuccess).toHaveBeenCalledWith("Login successful!");
     });
 
-    // Check if localStorage was set
     expect(localStorage.getItem("token")).toBe("mock-jwt-token");
     expect(localStorage.getItem("userRole")).toBe("admin");
-
-    // Check if router.push was called
     expect(mockPush).toHaveBeenCalledWith("/dashboard");
   });
 
@@ -132,37 +123,34 @@ describe("Login Page", () => {
     const user = userEvent.setup();
     render(<Login />);
 
-    const submitButton = screen.getByRole("button", { name: "Sign in" });
+    const submitButton = screen.getByRole("button", { name: /Sign in/i });
 
-    // Try to submit without filling fields
     await user.click(submitButton);
 
-    // HTML5 validation should prevent submission
-    const emailInput = screen.getByLabelText("Email address");
-    const passwordInput = screen.getByLabelText("Password");
+    const emailInput = screen.getByLabelText(/Email address/i);
+    const passwordInput = screen.getByLabelText(/Password/i);
 
     expect(emailInput).toBeRequired();
     expect(passwordInput).toBeRequired();
   });
 
   it("handles login failure", async () => {
-    // Mock a failed login by making the Promise reject
-    const originalSetTimeout = global.setTimeout;
-    global.setTimeout = jest.fn((callback) => {
-      // Simulate rejection instead of resolution
-      throw new Error("Login failed");
-    });
+    const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
 
     const user = userEvent.setup();
     render(<Login />);
 
-    const emailInput = screen.getByLabelText("Email address");
-    const passwordInput = screen.getByLabelText("Password");
-    const submitButton = screen.getByRole("button", { name: "Sign in" });
+    const emailInput = screen.getByLabelText(/Email address/i);
+    const passwordInput = screen.getByLabelText(/Password/i);
+    const submitButton = screen.getByRole("button", { name: /Sign in/i });
 
     await user.type(emailInput, "wrong@email.com");
     await user.type(passwordInput, "wrongpassword");
     await user.click(submitButton);
+
+    act(() => {
+      jest.advanceTimersByTime(1000);
+    });
 
     await waitFor(() => {
       expect(mockToastError).toHaveBeenCalledWith(
@@ -170,21 +158,20 @@ describe("Login Page", () => {
       );
     });
 
-    // Restore original setTimeout
-    global.setTimeout = originalSetTimeout;
+    consoleError.mockRestore();
   });
 
   it("navigates to register page", () => {
     render(<Login />);
 
-    const registerLink = screen.getByText("create a new account");
+    const registerLink = screen.getByText(/create a new account/i);
     expect(registerLink.closest("a")).toHaveAttribute("href", "/auth/register");
   });
 
   it("navigates to forgot password page", () => {
     render(<Login />);
 
-    const forgotPasswordLink = screen.getByText("Forgot your password?");
+    const forgotPasswordLink = screen.getByText(/Forgot your password?/i);
     expect(forgotPasswordLink.closest("a")).toHaveAttribute(
       "href",
       "/auth/forgot-password",

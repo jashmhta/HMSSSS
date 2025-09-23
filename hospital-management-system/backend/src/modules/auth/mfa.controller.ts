@@ -1,3 +1,4 @@
+/*[object Object]*/
 import {
   Controller,
   Post,
@@ -10,20 +11,31 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
-import { MFAService } from './mfa.service';
-import { AuthService } from './auth.service';
+
 import { JwtAuthGuard } from '../../shared/guards/jwt-auth.guard';
 
+import { MFAService } from './mfa.service';
+import { AuthService } from './auth.service';
+
+/**
+ *
+ */
 @ApiTags('mfa')
 @ApiBearerAuth()
 @Controller('mfa')
 @UseGuards(JwtAuthGuard)
 export class MFAController {
+  /**
+   *
+   */
   constructor(
     private readonly mfaService: MFAService,
     private readonly authService: AuthService,
   ) {}
 
+  /**
+   *
+   */
   @Post('setup')
   @ApiOperation({ summary: 'Setup MFA for user' })
   @ApiResponse({ status: 200, description: 'MFA setup data' })
@@ -35,6 +47,9 @@ export class MFAController {
     };
   }
 
+  /**
+   *
+   */
   @Post('enable')
   @ApiOperation({ summary: 'Enable MFA with verification' })
   @ApiResponse({ status: 200, description: 'MFA enabled successfully' })
@@ -50,6 +65,9 @@ export class MFAController {
     return this.mfaService.enableMFA(req.user.id, secret);
   }
 
+  /**
+   *
+   */
   @Post('verify')
   @ApiOperation({ summary: 'Verify MFA token during login' })
   @ApiResponse({ status: 200, description: 'MFA verified successfully' })
@@ -58,6 +76,9 @@ export class MFAController {
     return this.authService.verifyMFA(tempToken, mfaToken);
   }
 
+  /**
+   *
+   */
   @Post('verify-backup')
   @ApiOperation({ summary: 'Verify backup code during login' })
   @ApiResponse({ status: 200, description: 'Backup code verified successfully' })
@@ -66,6 +87,9 @@ export class MFAController {
     return this.authService.verifyBackupCode(tempToken, backupCode);
   }
 
+  /**
+   *
+   */
   @Post('regenerate-backup')
   @ApiOperation({ summary: 'Regenerate backup codes' })
   @ApiResponse({ status: 200, description: 'Backup codes regenerated' })
@@ -73,6 +97,9 @@ export class MFAController {
     return this.mfaService.regenerateBackupCodes(req.user.id);
   }
 
+  /**
+   *
+   */
   @Get('status')
   @ApiOperation({ summary: 'Get MFA status for user' })
   @ApiResponse({ status: 200, description: 'MFA status' })
@@ -80,6 +107,9 @@ export class MFAController {
     return this.mfaService.getMFAStatus(req.user.id);
   }
 
+  /**
+   *
+   */
   @Delete('disable')
   @ApiOperation({ summary: 'Disable MFA for user' })
   @ApiResponse({ status: 200, description: 'MFA disabled successfully' })

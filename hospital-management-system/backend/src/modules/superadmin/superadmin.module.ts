@@ -1,8 +1,14 @@
+/*[object Object]*/
 import { Module } from '@nestjs/common';
-import { SuperadminService } from './superadmin.service';
-import { SuperadminController } from './superadmin.controller';
+
 import { DatabaseModule } from '../../database/database.module';
 
+import { SuperadminService } from './superadmin.service';
+import { SuperadminController } from './superadmin.controller';
+
+/**
+ *
+ */
 @Module({
   imports: [DatabaseModule],
   controllers: [SuperadminController],

@@ -1,8 +1,11 @@
+/*[object Object]*/
 import { Test, TestingModule } from '@nestjs/testing';
-import { RadiologyService } from './radiology.service';
-import { PrismaService } from '../../database/prisma.service';
 import { NotFoundException, BadRequestException } from '@nestjs/common';
 import { RadiologyTestStatus, RadiologyModality } from '@prisma/client';
+
+import { PrismaService } from '../../database/prisma.service';
+
+import { RadiologyService } from './radiology.service';
 
 describe('RadiologyService', () => {
   let service: RadiologyService;

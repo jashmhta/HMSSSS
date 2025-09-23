@@ -1,15 +1,26 @@
+/*[object Object]*/
 import { Injectable, CanActivate, ExecutionContext, ForbiddenException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { UserRole } from '../../database/schema.prisma';
+import { UserRole } from '@prisma/client';
+
 import { RBACService } from './rbac.service';
 
+/**
+ *
+ */
 @Injectable()
 export class RolesGuard implements CanActivate {
+  /**
+   *
+   */
   constructor(
     private reflector: Reflector,
     private rbacService: RBACService,
   ) {}
 
+  /**
+   *
+   */
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const requiredRoles = this.reflector.getAllAndOverride<UserRole[]>('roles', [
       context.getHandler(),
@@ -35,7 +46,7 @@ export class RolesGuard implements CanActivate {
 
     // Check role-based access
     if (requiredRoles) {
-      const hasRole = requiredRoles.some(role => user.role === role);
+      const hasRole = requiredRoles.includes(user.role);
       if (!hasRole) {
         throw new ForbiddenException('Insufficient role permissions');
       }

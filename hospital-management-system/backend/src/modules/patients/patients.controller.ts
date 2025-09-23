@@ -1,3 +1,4 @@
+/*[object Object]*/
 import {
   Controller,
   Get,
@@ -11,19 +12,30 @@ import {
   Request,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
-import { PatientsService } from './patients.service';
+import { UserRole } from '@prisma/client';
+
 import { JwtAuthGuard } from '../../shared/guards/jwt-auth.guard';
 import { RolesGuard } from '../../modules/auth/roles.guard';
 import { Roles } from '../../shared/decorators/roles.decorator';
-import { UserRole } from '../../database/schema.prisma';
 
+import { PatientsService } from './patients.service';
+
+/**
+ *
+ */
 @ApiTags('patients')
 @ApiBearerAuth()
 @Controller('patients')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class PatientsController {
+  /**
+   *
+   */
   constructor(private readonly patientsService: PatientsService) {}
 
+  /**
+   *
+   */
   @Post('register')
   @Roles(UserRole.ADMIN, UserRole.RECEPTIONIST)
   @ApiOperation({ summary: 'Register a new patient with comprehensive validation' })
@@ -35,6 +47,9 @@ export class PatientsController {
     });
   }
 
+  /**
+   *
+   */
   @Post('check-in/:mrn')
   @Roles(UserRole.ADMIN, UserRole.RECEPTIONIST, UserRole.DOCTOR, UserRole.NURSE)
   @ApiOperation({ summary: 'Check in a returning patient' })
@@ -50,6 +65,9 @@ export class PatientsController {
     });
   }
 
+  /**
+   *
+   */
   @Post()
   @Roles(UserRole.ADMIN, UserRole.RECEPTIONIST, UserRole.DOCTOR)
   @ApiOperation({ summary: 'Create a new patient (legacy)' })
@@ -61,6 +79,9 @@ export class PatientsController {
     });
   }
 
+  /**
+   *
+   */
   @Get('search')
   @Roles(
     UserRole.ADMIN,
@@ -76,6 +97,9 @@ export class PatientsController {
     return this.patientsService.searchPatients(searchCriteria);
   }
 
+  /**
+   *
+   */
   @Get()
   @Roles(
     UserRole.ADMIN,
@@ -95,6 +119,9 @@ export class PatientsController {
     return this.patientsService.findAll(page, limit, search);
   }
 
+  /**
+   *
+   */
   @Get('stats')
   @Roles(UserRole.ADMIN, UserRole.DOCTOR)
   @ApiOperation({ summary: 'Get patient statistics' })
@@ -103,6 +130,9 @@ export class PatientsController {
     return this.patientsService.getPatientStats();
   }
 
+  /**
+   *
+   */
   @Get(':id')
   @Roles(
     UserRole.ADMIN,
@@ -118,6 +148,9 @@ export class PatientsController {
     return this.patientsService.findOne(id);
   }
 
+  /**
+   *
+   */
   @Get(':id/medical-summary')
   @Roles(UserRole.ADMIN, UserRole.DOCTOR, UserRole.NURSE)
   @ApiOperation({ summary: 'Get patient medical history summary' })
@@ -126,6 +159,9 @@ export class PatientsController {
     return this.patientsService.getPatientMedicalSummary(id);
   }
 
+  /**
+   *
+   */
   @Patch(':id')
   @Roles(UserRole.ADMIN, UserRole.DOCTOR, UserRole.NURSE, UserRole.RECEPTIONIST)
   @ApiOperation({ summary: 'Update patient information' })
@@ -134,6 +170,9 @@ export class PatientsController {
     return this.patientsService.updatePatientInfo(id, updateData, req.user.id);
   }
 
+  /**
+   *
+   */
   @Patch(':id')
   @Roles(UserRole.ADMIN, UserRole.DOCTOR, UserRole.NURSE, UserRole.RECEPTIONIST)
   @ApiOperation({ summary: 'Update patient (legacy)' })
@@ -142,6 +181,9 @@ export class PatientsController {
     return this.patientsService.update(id, updatePatientDto);
   }
 
+  /**
+   *
+   */
   @Delete(':id')
   @Roles(UserRole.ADMIN)
   @ApiOperation({ summary: 'Delete patient' })

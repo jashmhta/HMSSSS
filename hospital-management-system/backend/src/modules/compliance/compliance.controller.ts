@@ -1,3 +1,4 @@
+/*[object Object]*/
 import {
   Controller,
   Get,
@@ -10,9 +11,11 @@ import {
   HttpException,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { UserRole } from '@prisma/client';
+
 import { RolesGuard } from '../auth/roles.guard';
-import { Roles } from '../auth/roles.decorator';
-import { UserRole } from '../../database/prisma.service';
+import { Roles } from '../../shared/decorators/roles.decorator';
+
 import {
   ComplianceService,
   ComplianceCheck,
@@ -27,6 +30,9 @@ import {
 } from './access-monitoring.service';
 import { ComplianceDashboardService, ComplianceDashboard } from './compliance-dashboard.service';
 
+/**
+ *
+ */
 @ApiTags('Compliance')
 @ApiBearerAuth()
 @Controller('compliance')
@@ -34,6 +40,9 @@ import { ComplianceDashboardService, ComplianceDashboard } from './compliance-da
 export class ComplianceController {
   private readonly logger = new Logger(ComplianceController.name);
 
+  /**
+   *
+   */
   constructor(
     private readonly complianceService: ComplianceService,
     private readonly dataRetentionService: DataRetentionService,
@@ -41,6 +50,9 @@ export class ComplianceController {
     private readonly dashboardService: ComplianceDashboardService,
   ) {}
 
+  /**
+   *
+   */
   @Get('report')
   @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
   @ApiOperation({ summary: 'Get comprehensive compliance report' })
@@ -139,13 +151,19 @@ export class ComplianceController {
     }
   }
 
+  /**
+   *
+   */
   @Get('checks')
   @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
   @ApiOperation({ summary: 'Run and get all compliance checks' })
   @ApiResponse({
     status: 200,
     description: 'Compliance checks executed successfully',
-    type: [ComplianceCheck],
+    schema: {
+      type: 'array',
+      items: { $ref: '#/components/schemas/ComplianceCheck' },
+    },
   })
   async runComplianceChecks(): Promise<ComplianceCheck[]> {
     try {
@@ -175,13 +193,19 @@ export class ComplianceController {
     }
   }
 
+  /**
+   *
+   */
   @Get('retention-policies')
   @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
   @ApiOperation({ summary: 'Get data retention policies' })
   @ApiResponse({
     status: 200,
     description: 'Data retention policies retrieved successfully',
-    type: [DataRetentionPolicy],
+    schema: {
+      type: 'array',
+      items: { $ref: '#/components/schemas/DataRetentionPolicy' },
+    },
   })
   async getDataRetentionPolicies(): Promise<DataRetentionPolicy[]> {
     try {
@@ -195,6 +219,9 @@ export class ComplianceController {
     }
   }
 
+  /**
+   *
+   */
   @Post('retention-cleanup')
   @Roles(UserRole.SUPERADMIN)
   @ApiOperation({ summary: 'Execute data retention cleanup (Super Admin only)' })
@@ -223,7 +250,7 @@ export class ComplianceController {
         details: {
           policiesProcessed: result.policies.length,
           totalDeletedRecords: Object.values(result.deletedRecords).reduce(
-            (sum, count) => sum + count,
+            (sum: number, count: number) => sum + count,
             0,
           ),
           errors: result.errors.length,
@@ -241,6 +268,9 @@ export class ComplianceController {
     }
   }
 
+  /**
+   *
+   */
   @Get('hipaa-status')
   @Roles(UserRole.ADMIN, UserRole.DOCTOR, UserRole.NURSE)
   @ApiOperation({ summary: 'Get HIPAA compliance status' })
@@ -285,6 +315,9 @@ export class ComplianceController {
     }
   }
 
+  /**
+   *
+   */
   @Get('gdpr-status')
   @Roles(UserRole.ADMIN, UserRole.DOCTOR, UserRole.NURSE)
   @ApiOperation({ summary: 'Get GDPR compliance status' })
@@ -329,6 +362,9 @@ export class ComplianceController {
     }
   }
 
+  /**
+   *
+   */
   @Post('audit-log')
   @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
   @ApiOperation({ summary: 'Log audit event manually' })
@@ -358,6 +394,9 @@ export class ComplianceController {
     }
   }
 
+  /**
+   *
+   */
   @Get('audit-logs')
   @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
   @ApiOperation({ summary: 'Get audit logs with filtering' })
@@ -392,6 +431,9 @@ export class ComplianceController {
     }
   }
 
+  /**
+   *
+   */
   @Get('data-access-log/:userId')
   @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
   @ApiOperation({ summary: 'Get data access log for a user' })
@@ -420,6 +462,9 @@ export class ComplianceController {
     }
   }
 
+  /**
+   *
+   */
   @Get('data-retention-logs')
   @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
   @ApiOperation({ summary: 'Get data retention logs' })
@@ -453,6 +498,9 @@ export class ComplianceController {
     }
   }
 
+  /**
+   *
+   */
   @Post('retention/manual-cleanup')
   @Roles(UserRole.SUPERADMIN)
   @ApiOperation({ summary: 'Manually trigger data retention cleanup (Super Admin only)' })
@@ -476,7 +524,7 @@ export class ComplianceController {
         resourceId: 'retention-cleanup',
         details: {
           recordsDeleted: Object.values(result.result.deletedRecords).reduce(
-            (sum, count) => sum + count,
+            (sum: number, count: number) => sum + count,
             0,
           ),
           tablesProcessed: result.result.policies.length,
@@ -498,6 +546,9 @@ export class ComplianceController {
     }
   }
 
+  /**
+   *
+   */
   @Get('retention/schedule-status')
   @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
   @ApiOperation({ summary: 'Get data retention schedule and status' })
@@ -517,6 +568,9 @@ export class ComplianceController {
     }
   }
 
+  /**
+   *
+   */
   @Get('retention/validate-policies')
   @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
   @ApiOperation({ summary: 'Validate data retention policy configuration' })
@@ -536,6 +590,9 @@ export class ComplianceController {
     }
   }
 
+  /**
+   *
+   */
   @Get('access/patterns/:userId')
   @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
   @ApiOperation({ summary: 'Get access patterns for a user' })
@@ -556,6 +613,9 @@ export class ComplianceController {
     }
   }
 
+  /**
+   *
+   */
   @Get('access/alerts')
   @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
   @ApiOperation({ summary: 'Get active security alerts' })
@@ -572,6 +632,9 @@ export class ComplianceController {
     }
   }
 
+  /**
+   *
+   */
   @Post('access/alerts/:alertId/resolve')
   @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
   @ApiOperation({ summary: 'Resolve a security alert' })
@@ -601,6 +664,9 @@ export class ComplianceController {
     }
   }
 
+  /**
+   *
+   */
   @Get('access/metrics')
   @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
   @ApiOperation({ summary: 'Get security metrics and statistics' })
@@ -618,6 +684,9 @@ export class ComplianceController {
     }
   }
 
+  /**
+   *
+   */
   @Post('access/monitor')
   @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
   @ApiOperation({ summary: 'Manually trigger access monitoring for testing' })
@@ -650,6 +719,9 @@ export class ComplianceController {
     }
   }
 
+  /**
+   *
+   */
   @Get('security-dashboard')
   @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
   @ApiOperation({ summary: 'Get security and compliance dashboard data' })
@@ -744,6 +816,9 @@ export class ComplianceController {
     }
   }
 
+  /**
+   *
+   */
   @Get('dashboard')
   @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
   @ApiOperation({ summary: 'Get comprehensive compliance dashboard' })
@@ -763,6 +838,9 @@ export class ComplianceController {
     }
   }
 
+  /**
+   *
+   */
   @Get('dashboard/widgets')
   @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
   @ApiOperation({ summary: 'Get dashboard widgets data' })
@@ -782,6 +860,9 @@ export class ComplianceController {
     }
   }
 
+  /**
+   *
+   */
   @Get('dashboard/export')
   @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
   @ApiOperation({ summary: 'Export dashboard data for reporting' })

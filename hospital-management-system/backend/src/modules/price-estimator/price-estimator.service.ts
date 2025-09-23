@@ -1,10 +1,21 @@
+/*[object Object]*/
 import { Injectable } from '@nestjs/common';
+
 import { PrismaService } from '../../database/prisma.service';
 
+/**
+ *
+ */
 @Injectable()
 export class PriceEstimatorService {
+  /**
+   *
+   */
   constructor(private prisma: PrismaService) {}
 
+  /**
+   *
+   */
   async estimatePrice(estimationRequest: any) {
     const { services, patientType, insuranceCoverage, hospitalId } = estimationRequest;
 
@@ -42,6 +53,9 @@ export class PriceEstimatorService {
     };
   }
 
+  /**
+   *
+   */
   private async calculateServiceEstimate(service: any, patientType: string, hospitalId: string) {
     const { type, code, quantity = 1, duration } = service;
 
@@ -51,41 +65,41 @@ export class PriceEstimatorService {
     switch (type) {
       case 'OPD_CONSULTATION':
         const consultation = await this.prisma.servicePricing.findFirst({
-          where: { code: 'OPD_CONSULTATION', hospitalId },
+          where: { serviceCode: 'OPD_CONSULTATION' },
         });
-        basePrice = consultation?.price || 500;
+        basePrice = consultation?.basePrice?.toNumber() || 500;
         description = 'OPD Consultation';
         break;
 
       case 'LAB_TEST':
         const labTest = await this.prisma.servicePricing.findFirst({
-          where: { code, hospitalId },
+          where: { serviceCode: code },
         });
-        basePrice = labTest?.price || 300;
+        basePrice = labTest?.basePrice?.toNumber() || 300;
         description = `Laboratory Test - ${code}`;
         break;
 
       case 'RADIOLOGY':
         const radiology = await this.prisma.servicePricing.findFirst({
-          where: { code, hospitalId },
+          where: { serviceCode: code },
         });
-        basePrice = radiology?.price || 1500;
+        basePrice = radiology?.basePrice?.toNumber() || 1500;
         description = `Radiology - ${code}`;
         break;
 
       case 'SURGERY':
         const surgery = await this.prisma.servicePricing.findFirst({
-          where: { code, hospitalId },
+          where: { serviceCode: code },
         });
-        basePrice = surgery?.price || 50000;
+        basePrice = surgery?.basePrice?.toNumber() || 50000;
         description = `Surgical Procedure - ${code}`;
         break;
 
       case 'ROOM_CHARGES':
         const roomRate = await this.prisma.servicePricing.findFirst({
-          where: { code: `ROOM_${patientType}`, hospitalId },
+          where: { serviceCode: `ROOM_${patientType}` },
         });
-        basePrice = roomRate?.price || (patientType === 'PRIVATE' ? 5000 : 2000);
+        basePrice = roomRate?.basePrice?.toNumber() || (patientType === 'PRIVATE' ? 5000 : 2000);
         if (duration) {
           basePrice *= duration; // per day
         }
@@ -94,17 +108,17 @@ export class PriceEstimatorService {
 
       case 'MEDICINE':
         const medicine = await this.prisma.medicine.findFirst({
-          where: { code },
+          where: { id: code },
         });
-        basePrice = medicine?.price || 100;
+        basePrice = medicine?.unitPrice?.toNumber() || 100;
         description = `Medicine - ${medicine?.name || code}`;
         break;
 
       case 'PROCEDURE':
         const procedure = await this.prisma.servicePricing.findFirst({
-          where: { code, hospitalId },
+          where: { serviceCode: code },
         });
-        basePrice = procedure?.price || 2000;
+        basePrice = procedure?.basePrice?.toNumber() || 2000;
         description = `Medical Procedure - ${code}`;
         break;
 
@@ -127,6 +141,9 @@ export class PriceEstimatorService {
     };
   }
 
+  /**
+   *
+   */
   private getPatientTypeMultiplier(patientType: string): number {
     switch (patientType) {
       case 'GENERAL':
@@ -144,55 +161,57 @@ export class PriceEstimatorService {
     }
   }
 
+  /**
+   *
+   */
   private calculateInsuranceDiscount(totalAmount: number, insuranceCoverage: any): number {
     const { coveragePercentage, maxCoverageAmount } = insuranceCoverage;
 
-    const coverageAmount = Math.min(
-      totalAmount * (coveragePercentage / 100),
-      maxCoverageAmount || totalAmount,
-    );
-
-    return coverageAmount;
+    return Math.min(totalAmount * (coveragePercentage / 100), maxCoverageAmount || totalAmount);
   }
 
-  async getServicePricing(hospitalId: string) {
+  /**
+   *
+   */
+  async getServicePricing() {
     return this.prisma.servicePricing.findMany({
-      where: { hospitalId },
+      where: { isActive: true },
       orderBy: { category: 'asc' },
     });
   }
 
-  async updateServicePricing(hospitalId: string, pricingData: any) {
-    const { code, price, category } = pricingData;
+  /**
+   *
+   */
+  async updateServicePricing(pricingData: any) {
+    const { serviceCode, basePrice, category, serviceType, serviceName } = pricingData;
 
     return this.prisma.servicePricing.upsert({
-      where: {
-        code_hospitalId: {
-          code,
-          hospitalId,
-        },
-      },
-      update: { price, category },
+      where: { serviceCode },
+      update: { basePrice, category, serviceType, serviceName },
       create: {
-        code,
-        price,
+        serviceCode,
+        basePrice,
         category,
-        hospitalId,
+        serviceType,
+        serviceName,
       },
     });
   }
 
-  async getPackageEstimate(packageCode: string, patientType: string, hospitalId: string) {
+  /**
+   *
+   */
+  async getPackageEstimate(packageCode: string, patientType: string) {
     const packageData = await this.prisma.servicePackage.findUnique({
-      where: { code: packageCode },
-      include: { services: true },
+      where: { packageCode },
     });
 
     if (!packageData) {
       throw new Error('Package not found');
     }
 
-    const services = packageData.services.map(service => ({
+    const services = JSON.parse(packageData.services.toString()).map(service => ({
       type: service.type,
       code: service.code,
       quantity: service.quantity,
@@ -201,21 +220,16 @@ export class PriceEstimatorService {
     return this.estimatePrice({
       services,
       patientType,
-      hospitalId,
     });
   }
 
+  /**
+   *
+   */
   async getPopularPackages() {
     return this.prisma.servicePackage.findMany({
       where: { isActive: true },
-      include: {
-        _count: {
-          select: { bookings: true },
-        },
-      },
-      orderBy: {
-        bookings: { _count: 'desc' },
-      },
+      orderBy: { name: 'asc' },
       take: 10,
     });
   }

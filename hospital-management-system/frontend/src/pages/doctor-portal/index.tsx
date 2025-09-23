@@ -5,7 +5,7 @@ import {
   CalendarIcon,
   DocumentTextIcon,
   BeakerIcon,
-  XRayIcon,
+  ViewfinderCircleIcon,
   HeartIcon,
   ClockIcon,
   CheckCircleIcon,
@@ -241,7 +241,7 @@ const DoctorPortal: React.FC<DoctorPortalProps> = ({ doctorId = "1" }) => {
       case "review_lab":
         return BeakerIcon;
       case "review_radiology":
-        return XRayIcon;
+        return ViewfinderCircleIcon;
       case "prescription":
         return HeartIcon;
       case "referral":

@@ -1,8 +1,14 @@
+/*[object Object]*/
 import { Module } from '@nestjs/common';
-import { PriceEstimatorService } from './price-estimator.service';
-import { PriceEstimatorController } from './price-estimator.controller';
+
 import { DatabaseModule } from '../../database/database.module';
 
+import { PriceEstimatorService } from './price-estimator.service';
+import { PriceEstimatorController } from './price-estimator.controller';
+
+/**
+ *
+ */
 @Module({
   imports: [DatabaseModule],
   controllers: [PriceEstimatorController],

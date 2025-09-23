@@ -1,3 +1,4 @@
+/*[object Object]*/
 import {
   Controller,
   Get,
@@ -11,19 +12,30 @@ import {
   Request,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
-import { OTService } from './ot.service';
+import { UserRole } from '@prisma/client';
+
 import { JwtAuthGuard } from '../../shared/guards/jwt-auth.guard';
 import { RolesGuard } from '../../modules/auth/roles.guard';
 import { Roles } from '../../shared/decorators/roles.decorator';
-import { UserRole } from '../../database/schema.prisma';
 
+import { OTService } from './ot.service';
+
+/**
+ *
+ */
 @ApiTags('ot')
 @ApiBearerAuth()
 @Controller('ot')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class OTController {
+  /**
+   *
+   */
   constructor(private readonly otService: OTService) {}
 
+  /**
+   *
+   */
   @Post('surgeries')
   @Roles(UserRole.DOCTOR, UserRole.ADMIN)
   @ApiOperation({ summary: 'Schedule a new surgery' })
@@ -35,6 +47,9 @@ export class OTController {
     });
   }
 
+  /**
+   *
+   */
   @Get('surgeries')
   @Roles(UserRole.DOCTOR, UserRole.NURSE, UserRole.ADMIN)
   @ApiOperation({ summary: 'Get all surgeries' })
@@ -48,6 +63,9 @@ export class OTController {
     return this.otService.getSurgeries(page, limit, status, date);
   }
 
+  /**
+   *
+   */
   @Get('surgeries/:id')
   @Roles(UserRole.DOCTOR, UserRole.NURSE, UserRole.ADMIN)
   @ApiOperation({ summary: 'Get surgery by ID' })
@@ -56,6 +74,9 @@ export class OTController {
     return this.otService.getSurgeryById(id);
   }
 
+  /**
+   *
+   */
   @Put('surgeries/:id')
   @Roles(UserRole.DOCTOR, UserRole.NURSE)
   @ApiOperation({ summary: 'Update surgery' })
@@ -67,6 +88,9 @@ export class OTController {
     });
   }
 
+  /**
+   *
+   */
   @Delete('surgeries/:id')
   @Roles(UserRole.ADMIN, UserRole.DOCTOR)
   @ApiOperation({ summary: 'Cancel surgery' })
@@ -75,6 +99,9 @@ export class OTController {
     return this.otService.cancelSurgery(id, req.user.id);
   }
 
+  /**
+   *
+   */
   @Get('schedule/:otId')
   @Roles(UserRole.DOCTOR, UserRole.NURSE, UserRole.ADMIN)
   @ApiOperation({ summary: 'Get OT schedule' })
@@ -83,6 +110,9 @@ export class OTController {
     return this.otService.getOTSchedule(otId, new Date(date));
   }
 
+  /**
+   *
+   */
   @Get('available')
   @Roles(UserRole.DOCTOR, UserRole.ADMIN)
   @ApiOperation({ summary: 'Get available OTs' })
@@ -91,6 +121,9 @@ export class OTController {
     return this.otService.getAvailableOTs(new Date(startTime), new Date(endTime));
   }
 
+  /**
+   *
+   */
   @Post('surgeries/:id/pre-op-notes')
   @Roles(UserRole.DOCTOR, UserRole.NURSE)
   @ApiOperation({ summary: 'Add pre-operative notes' })
@@ -99,6 +132,9 @@ export class OTController {
     return this.otService.addPreOpNote(id, note, req.user.id);
   }
 
+  /**
+   *
+   */
   @Post('surgeries/:id/intra-op-notes')
   @Roles(UserRole.DOCTOR, UserRole.NURSE)
   @ApiOperation({ summary: 'Add intra-operative notes' })
@@ -107,6 +143,9 @@ export class OTController {
     return this.otService.addIntraOpNote(id, note, req.user.id);
   }
 
+  /**
+   *
+   */
   @Post('surgeries/:id/post-op-notes')
   @Roles(UserRole.DOCTOR, UserRole.NURSE)
   @ApiOperation({ summary: 'Add post-operative notes' })
@@ -115,6 +154,9 @@ export class OTController {
     return this.otService.addPostOpNote(id, note, req.user.id);
   }
 
+  /**
+   *
+   */
   @Get('theaters')
   @Roles(UserRole.DOCTOR, UserRole.NURSE, UserRole.ADMIN)
   @ApiOperation({ summary: 'Get all operating theaters' })
@@ -123,6 +165,9 @@ export class OTController {
     return this.otService.getOperatingTheaters();
   }
 
+  /**
+   *
+   */
   @Get('stats')
   @Roles(UserRole.ADMIN, UserRole.DOCTOR)
   @ApiOperation({ summary: 'Get OT statistics' })

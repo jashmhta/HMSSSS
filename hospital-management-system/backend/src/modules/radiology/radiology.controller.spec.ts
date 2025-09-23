@@ -1,12 +1,17 @@
+/*[object Object]*/
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
 import * as request from 'supertest';
-import { RadiologyModule } from './radiology.module';
+import { JwtService } from '@nestjs/jwt';
+
 import { DatabaseModule } from '../../database/database.module';
 import { AuthModule } from '../../modules/auth/auth.module';
 import { PatientsModule } from '../../modules/patients/patients.module';
 import { SharedModule } from '../../shared/shared.module';
+import { PrismaService } from '../../database/prisma.service';
 import { testUtils } from '../../../test/test-utils';
+
+import { RadiologyModule } from './radiology.module';
 
 describe('RadiologyController (e2e)', () => {
   let app: INestApplication;
@@ -14,6 +19,8 @@ describe('RadiologyController (e2e)', () => {
   let testUser: any;
   let testPatient: any;
   let testRadiologyTest: any;
+  let prisma: PrismaService;
+  let jwtService: JwtService;
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -23,21 +30,27 @@ describe('RadiologyController (e2e)', () => {
     app = moduleFixture.createNestApplication();
     await app.init();
 
+    prisma = moduleFixture.get(PrismaService);
+    jwtService = moduleFixture.get(JwtService);
+
     // Setup test data
-    testUser = await testUtils.createTestUser({
-      role: 'DOCTOR',
-      email: 'doctor@test.com',
-    });
-    testPatient = await testUtils.createTestPatient(testUser.id);
-    authToken = await testUtils.getAuthToken(testUser);
+    testUser = await testUtils.createTestUser(
+      {
+        role: 'DOCTOR',
+        email: 'doctor@test.com',
+      },
+      prisma,
+    );
+    testPatient = await testUtils.createTestPatient(testUser.id, prisma);
+    authToken = await testUtils.getAuthToken(testUser, jwtService);
   });
 
   afterAll(async () => {
-    await testUtils.teardownTestApp();
+    await testUtils.teardownTestApp(app, prisma);
   });
 
   beforeEach(async () => {
-    await testUtils.cleanDatabase();
+    await testUtils.cleanDatabase(prisma);
   });
 
   describe('/radiology/tests (POST)', () => {
@@ -61,15 +74,13 @@ describe('RadiologyController (e2e)', () => {
         .send(createTestDto)
         .expect(201);
 
-      expect(response.body).toHaveRequiredFields([
-        'id',
-        'patientId',
-        'testName',
-        'testCode',
-        'modality',
-        'status',
-        'orderedDate',
-      ]);
+      expect(response.body).toHaveProperty('id');
+      expect(response.body).toHaveProperty('patientId');
+      expect(response.body).toHaveProperty('testName');
+      expect(response.body).toHaveProperty('testCode');
+      expect(response.body).toHaveProperty('modality');
+      expect(response.body).toHaveProperty('status');
+      expect(response.body).toHaveProperty('orderedDate');
       expect(response.body.status).toBe('ORDERED');
       expect(response.body.patientId).toBe(testPatient.id);
       expect(response.body.modality).toBe('XRAY');
@@ -84,11 +95,14 @@ describe('RadiologyController (e2e)', () => {
     });
 
     it('should return 403 when user lacks permission', async () => {
-      const patientUser = await testUtils.createTestUser({
-        role: 'PATIENT',
-        email: 'patient@test.com',
-      });
-      const patientToken = await testUtils.getAuthToken(patientUser);
+      const patientUser = await testUtils.createTestUser(
+        {
+          role: 'PATIENT',
+          email: 'patient@test.com',
+        },
+        prisma,
+      );
+      const patientToken = await testUtils.getAuthToken(patientUser, jwtService);
       createTestDto.patientId = testPatient.id;
 
       await request(app.getHttpServer())
@@ -113,7 +127,17 @@ describe('RadiologyController (e2e)', () => {
     beforeEach(async () => {
       // Create multiple test radiology tests
       for (let i = 0; i < 5; i++) {
-        await testUtils.createTestRadiologyTest(testPatient.id, testUser.id, {
+        await prisma.radiologyTest.create({
+          data: {
+            patientId: testPatient.id,
+            orderedBy: testUser.id,
+            testName: `Test ${i}`,
+            testCode: `RT${i}`,
+            modality: i % 2 === 0 ? 'XRAY' : 'MRI',
+            urgent: i === 0,
+            orderedDate: new Date(),
+            status: 'ORDERED',
+          },
           testName: `Test ${i}`,
           testCode: `RT${i}`,
           modality: i % 2 === 0 ? 'XRAY' : 'MRI',
@@ -178,7 +202,17 @@ describe('RadiologyController (e2e)', () => {
 
   describe('/radiology/tests/:id (GET)', () => {
     it('should return radiology test by ID', async () => {
-      const createdTest = await testUtils.createTestRadiologyTest(testPatient.id, testUser.id);
+      const createdTest = await prisma.radiologyTest.create({
+        data: {
+          patientId: testPatient.id,
+          orderedBy: testUser.id,
+          testName: 'Test Radiology',
+          testCode: 'TR001',
+          modality: 'XRAY',
+          orderedDate: new Date(),
+          status: 'ORDERED',
+        },
+      });
 
       const response = await request(app.getHttpServer())
         .get(`/radiology/tests/${createdTest.id}`)

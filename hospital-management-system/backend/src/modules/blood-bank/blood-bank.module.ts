@@ -1,8 +1,14 @@
+/*[object Object]*/
 import { Module } from '@nestjs/common';
-import { BloodBankService } from './blood-bank.service';
-import { BloodBankController } from './blood-bank.controller';
+
 import { DatabaseModule } from '../../database/database.module';
 
+import { BloodBankService } from './blood-bank.service';
+import { BloodBankController } from './blood-bank.controller';
+
+/**
+ *
+ */
 @Module({
   imports: [DatabaseModule],
   controllers: [BloodBankController],

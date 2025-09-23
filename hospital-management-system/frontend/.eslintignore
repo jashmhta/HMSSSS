@@ -1,0 +1,215 @@
+# Frontend ESLint ignore patterns for Hospital Management System
+# =================================================
+
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build outputs
+.next/
+out/
+build/
+dist/
+coverage/
+
+# Public static assets
+public/
+
+# Environment files
+.env*
+!.env.example
+!.env.test
+
+# Logs
+logs/
+*.log
+
+# Runtime data
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory used by tools like istanbul
+coverage/
+*.lcov
+
+# nyc test coverage
+.nyc_output
+
+# Dependency directories
+jspm_packages/
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+
+# Microbundle cache
+.rpt2_cache/
+.rts2_cache_cjs/
+.rts2_cache_es/
+.rts2_cache_umd/
+
+# Optional REPL history
+.node_repl_history
+
+# Output of 'npm pack'
+*.tgz
+
+# Yarn Integrity file
+.yarn-integrity
+
+# dotenv environment variables file
+.env
+.env.test
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# parcel-bundler cache (https://parceljs.org/)
+.cache
+.parcel-cache
+
+# Nuxt.js build / generate output
+.nuxt
+
+# Gatsby files
+.cache/
+public
+
+# Storybook build outputs
+.out
+.storybook-out
+storybook-static
+
+# Temporary folders
+tmp/
+temp/
+
+# Editor directories and files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Test data files
+**/test-data/
+**/fixtures/
+**/mocks/
+**/__mocks__/
+
+# Storybook files
+**/*.stories.js
+**/*.stories.ts
+**/*.stories.mdx
+.storybook/
+
+# Cypress test files
+cypress/
+cypress.config.*
+
+# Playwright test files
+playwright.config.*
+playwright-report/
+test-results/
+
+# Jest/Testing
+test-results/
+playwright-report/
+coverage/
+
+# Next.js specific
+.next/export/
+
+# Generated files
+**/generated/
+**/autogen/
+
+# CSS/SASS/Less build outputs
+*.css.map
+*.scss.map
+*.less.map
+
+# Font files
+**/fonts/**/*.ttf
+**/fonts/**/*.woff
+**/fonts/**/*.woff2
+**/fonts/**/*.eot
+**/fonts/**/*.otf
+
+# Image files
+**/images/**/*.png
+**/images/**/*.jpg
+**/images/**/*.jpeg
+**/images/**/*.gif
+**/images/**/*.svg
+**/images/**/*.webp
+**/images/**/*.ico
+
+# Video files
+**/videos/**/*.mp4
+**/videos/**/*.webm
+**/videos/**/*.mov
+
+# Audio files
+**/audio/**/*.mp3
+**/audio/**/*.wav
+**/audio/**/*.ogg
+
+# Configuration files that might use CommonJS
+webpack.config.js
+babel.config.js
+postcss.config.js
+tailwind.config.js
+
+# TypeScript declaration files
+**/*.d.ts
+
+# Bundle analyzer reports
+stats.html
+stats.json
+
+# PWA files
+**/service-worker.js
+**/firebase-messaging-sw.js
+**/workbox-*.js
+
+# GraphQL
+**/*.graphql
+**/*.gql
+
+# i18n/translation files
+**/locales/**/*.json
+**/i18n/**/*.json
+**/lang/**/*.json
+
+# Public certificates
+**/*.pem
+**/*.key
+**/*.crt
+**/*.csr
+
+# Archive files
+*.zip
+*.tar.gz
+*.rar
+
+# Backup files
+*.bak
+*.backup
+*.old

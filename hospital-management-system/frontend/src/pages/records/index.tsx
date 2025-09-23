@@ -6,11 +6,11 @@ import {
   PlusIcon,
   EyeIcon,
   PencilIcon,
-  DownloadIcon,
+  ArrowDownTrayIcon,
   ClipboardDocumentListIcon,
   HeartIcon,
   BeakerIcon,
-  XRayIcon,
+  ViewfinderCircleIcon,
   UserIcon,
   CalendarIcon,
 } from "@heroicons/react/24/outline";
@@ -159,7 +159,7 @@ const MedicalRecords: React.FC = () => {
       case "lab":
         return BeakerIcon;
       case "radiology":
-        return XRayIcon;
+        return ViewfinderCircleIcon;
       case "prescription":
         return HeartIcon;
       case "procedure":
@@ -498,7 +498,7 @@ const MedicalRecords: React.FC = () => {
                               key={index}
                               className="inline-flex items-center px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
                             >
-                              <DownloadIcon className="h-3 w-3 mr-1" />
+                              <ArrowDownTrayIcon className="h-3 w-3 mr-1" />
                               {attachment}
                             </button>
                           ))}

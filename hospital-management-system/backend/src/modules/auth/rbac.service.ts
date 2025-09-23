@@ -1,6 +1,8 @@
+/*[object Object]*/
 import { Injectable, ForbiddenException } from '@nestjs/common';
+import { UserRole } from '@prisma/client';
+
 import { PrismaService } from '../../database/prisma.service';
-import { UserRole } from '../../database/schema.prisma';
 
 export interface Permission {
   id: string;
@@ -16,6 +18,9 @@ export interface RolePermissions {
   description: string;
 }
 
+/**
+ *
+ */
 @Injectable()
 export class RBACService {
   private readonly rolePermissions: Record<UserRole, Permission[]> = {
@@ -607,6 +612,9 @@ export class RBACService {
     ],
   };
 
+  /**
+   *
+   */
   constructor(private prisma: PrismaService) {}
 
   /**
@@ -682,7 +690,7 @@ export class RBACService {
     }
 
     // Superadmin and admin can access all patient data
-    if ([UserRole.SUPERADMIN, UserRole.ADMIN].includes(user.role)) {
+    if (user.role === UserRole.SUPERADMIN || user.role === UserRole.ADMIN) {
       return true;
     }
 
@@ -728,14 +736,20 @@ export class RBACService {
 
     // Nurses can access patients in their care
     if (user.role === UserRole.NURSE) {
-      const currentAdmission = await this.prisma.iPDAdmission.findFirst({
+      // Check if patient has current appointments or medical records
+      const currentAppointment = await this.prisma.appointment.findFirst({
         where: {
           patientId,
-          status: 'ADMITTED',
+          appointmentDate: {
+            gte: new Date(Date.now() - 24 * 60 * 60 * 1000), // Last 24 hours
+          },
+          status: {
+            in: ['SCHEDULED', 'CONFIRMED', 'IN_PROGRESS'],
+          },
         },
       });
 
-      if (currentAdmission) {
+      if (currentAppointment) {
         return true;
       }
     }
@@ -751,13 +765,13 @@ export class RBACService {
     }
 
     // Lab technicians and pharmacists have limited access
-    if ([UserRole.LAB_TECHNICIAN, UserRole.PHARMACIST].includes(user.role)) {
+    if (user.role === UserRole.LAB_TECHNICIAN || user.role === UserRole.PHARMACIST) {
       // Check if they have active orders for this patient
       if (user.role === UserRole.LAB_TECHNICIAN) {
         const activeTest = await this.prisma.labTest.findFirst({
           where: {
             patientId,
-            status: { in: ['ORDERED', 'SPECIMEN_COLLECTED', 'IN_PROGRESS'] },
+            status: { in: ['ORDERED', 'SAMPLE_COLLECTED', 'IN_PROGRESS'] },
           },
         });
         if (activeTest) return true;
@@ -818,7 +832,12 @@ export class RBACService {
     // Business rule: After-hours access restrictions
     if (
       this.isAfterHours() &&
-      ![UserRole.DOCTOR, UserRole.NURSE, UserRole.ADMIN, UserRole.SUPERADMIN].includes(user.role)
+      !(
+        user.role === UserRole.DOCTOR ||
+        user.role === UserRole.NURSE ||
+        user.role === UserRole.ADMIN ||
+        user.role === UserRole.SUPERADMIN
+      )
     ) {
       throw new ForbiddenException('Access restricted during non-business hours');
     }
@@ -850,6 +869,9 @@ export class RBACService {
 
   // Private helper methods
 
+  /**
+   *
+   */
   private getRoleDescription(role: UserRole): string {
     const descriptions = {
       [UserRole.SUPERADMIN]: 'Full system access and control',
@@ -865,6 +887,9 @@ export class RBACService {
     return descriptions[role] || 'Unknown role';
   }
 
+  /**
+   *
+   */
   private isAfterHours(): boolean {
     const now = new Date();
     const hour = now.getHours();

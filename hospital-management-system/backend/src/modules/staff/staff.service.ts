@@ -1,11 +1,22 @@
+/*[object Object]*/
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+
 import { PrismaService } from '../../database/prisma.service';
 
+/**
+ *
+ */
 @Injectable()
 export class StaffService {
+  /**
+   *
+   */
   constructor(private prisma: PrismaService) {}
 
   // Doctor Management
+  /**
+   *
+   */
   async createDoctor(data: {
     userId: string;
     licenseNumber: string;
@@ -61,6 +72,9 @@ export class StaffService {
     });
   }
 
+  /**
+   *
+   */
   async getDoctors(
     page: number = 1,
     limit: number = 10,
@@ -71,10 +85,10 @@ export class StaffService {
 
     const where: any = {};
     if (specialization) {
-      where.specialization = { contains: specialization, mode: 'insensitive' };
+      where.specialization = { contains: specialization };
     }
     if (department) {
-      where.department = { contains: department, mode: 'insensitive' };
+      where.department = { contains: department };
     }
 
     const [doctors, total] = await Promise.all([
@@ -110,6 +124,9 @@ export class StaffService {
     };
   }
 
+  /**
+   *
+   */
   async getDoctorById(id: string) {
     const doctor = await this.prisma.doctor.findUnique({
       where: { id },
@@ -152,6 +169,9 @@ export class StaffService {
     return doctor;
   }
 
+  /**
+   *
+   */
   async updateDoctor(
     id: string,
     data: Partial<{
@@ -202,6 +222,9 @@ export class StaffService {
     });
   }
 
+  /**
+   *
+   */
   async deleteDoctor(id: string) {
     const doctor = await this.prisma.doctor.findUnique({
       where: { id },
@@ -230,6 +253,9 @@ export class StaffService {
   }
 
   // Nurse Management
+  /**
+   *
+   */
   async createNurse(data: {
     userId: string;
     licenseNumber: string;
@@ -275,12 +301,15 @@ export class StaffService {
     });
   }
 
+  /**
+   *
+   */
   async getNurses(page: number = 1, limit: number = 10, department?: string, shift?: string) {
     const skip = (page - 1) * limit;
 
     const where: any = {};
     if (department) {
-      where.department = { contains: department, mode: 'insensitive' };
+      where.department = { contains: department };
     }
     if (shift) {
       where.shift = shift;
@@ -319,6 +348,9 @@ export class StaffService {
     };
   }
 
+  /**
+   *
+   */
   async getNurseById(id: string) {
     const nurse = await this.prisma.nurse.findUnique({
       where: { id },
@@ -343,6 +375,9 @@ export class StaffService {
     return nurse;
   }
 
+  /**
+   *
+   */
   async updateNurse(
     id: string,
     data: Partial<{
@@ -391,6 +426,9 @@ export class StaffService {
     });
   }
 
+  /**
+   *
+   */
   async deleteNurse(id: string) {
     const nurse = await this.prisma.nurse.findUnique({
       where: { id },
@@ -408,6 +446,9 @@ export class StaffService {
   // Similar methods for Receptionist, LabTechnician, Pharmacist, Admin
   // I'll implement them concisely
 
+  /**
+   *
+   */
   async createReceptionist(data: { userId: string; department: string; createdBy?: string }) {
     const existing = await this.prisma.receptionist.findUnique({
       where: { userId: data.userId },
@@ -437,9 +478,12 @@ export class StaffService {
     });
   }
 
+  /**
+   *
+   */
   async getReceptionists(page: number = 1, limit: number = 10, department?: string) {
     const skip = (page - 1) * limit;
-    const where = department ? { department: { contains: department, mode: 'insensitive' } } : {};
+    const where = department ? { department: { contains: department } } : {};
 
     const [receptionists, total] = await Promise.all([
       this.prisma.receptionist.findMany({
@@ -474,6 +518,9 @@ export class StaffService {
     };
   }
 
+  /**
+   *
+   */
   async getReceptionistById(id: string) {
     const receptionist = await this.prisma.receptionist.findUnique({
       where: { id },
@@ -498,6 +545,9 @@ export class StaffService {
     return receptionist;
   }
 
+  /**
+   *
+   */
   async updateReceptionist(
     id: string,
     data: Partial<{
@@ -531,6 +581,9 @@ export class StaffService {
     });
   }
 
+  /**
+   *
+   */
   async deleteReceptionist(id: string) {
     const receptionist = await this.prisma.receptionist.findUnique({
       where: { id },
@@ -546,6 +599,9 @@ export class StaffService {
   }
 
   // Lab Technician methods
+  /**
+   *
+   */
   async createLabTechnician(data: {
     userId: string;
     licenseNumber: string;
@@ -589,6 +645,9 @@ export class StaffService {
     });
   }
 
+  /**
+   *
+   */
   async getLabTechnicians(page: number = 1, limit: number = 10) {
     const skip = (page - 1) * limit;
 
@@ -624,6 +683,9 @@ export class StaffService {
     };
   }
 
+  /**
+   *
+   */
   async getLabTechnicianById(id: string) {
     const technician = await this.prisma.labTechnician.findUnique({
       where: { id },
@@ -648,6 +710,9 @@ export class StaffService {
     return technician;
   }
 
+  /**
+   *
+   */
   async updateLabTechnician(
     id: string,
     data: Partial<{
@@ -692,6 +757,9 @@ export class StaffService {
     });
   }
 
+  /**
+   *
+   */
   async deleteLabTechnician(id: string) {
     const technician = await this.prisma.labTechnician.findUnique({
       where: { id },
@@ -707,6 +775,9 @@ export class StaffService {
   }
 
   // Pharmacist methods
+  /**
+   *
+   */
   async createPharmacist(data: { userId: string; licenseNumber: string; createdBy?: string }) {
     const existing = await this.prisma.pharmacist.findUnique({
       where: { userId: data.userId },
@@ -744,6 +815,9 @@ export class StaffService {
     });
   }
 
+  /**
+   *
+   */
   async getPharmacists(page: number = 1, limit: number = 10) {
     const skip = (page - 1) * limit;
 
@@ -779,6 +853,9 @@ export class StaffService {
     };
   }
 
+  /**
+   *
+   */
   async getPharmacistById(id: string) {
     const pharmacist = await this.prisma.pharmacist.findUnique({
       where: { id },
@@ -803,6 +880,9 @@ export class StaffService {
     return pharmacist;
   }
 
+  /**
+   *
+   */
   async updatePharmacist(
     id: string,
     data: Partial<{
@@ -846,6 +926,9 @@ export class StaffService {
     });
   }
 
+  /**
+   *
+   */
   async deletePharmacist(id: string) {
     const pharmacist = await this.prisma.pharmacist.findUnique({
       where: { id },
@@ -861,6 +944,9 @@ export class StaffService {
   }
 
   // Admin methods
+  /**
+   *
+   */
   async createAdmin(data: {
     userId: string;
     department: string;
@@ -896,6 +982,9 @@ export class StaffService {
     });
   }
 
+  /**
+   *
+   */
   async getAdmins(page: number = 1, limit: number = 10) {
     const skip = (page - 1) * limit;
 
@@ -931,6 +1020,9 @@ export class StaffService {
     };
   }
 
+  /**
+   *
+   */
   async getAdminById(id: string) {
     const admin = await this.prisma.admin.findUnique({
       where: { id },
@@ -955,6 +1047,9 @@ export class StaffService {
     return admin;
   }
 
+  /**
+   *
+   */
   async updateAdmin(
     id: string,
     data: Partial<{
@@ -989,6 +1084,9 @@ export class StaffService {
     });
   }
 
+  /**
+   *
+   */
   async deleteAdmin(id: string) {
     const admin = await this.prisma.admin.findUnique({
       where: { id },
@@ -1004,6 +1102,9 @@ export class StaffService {
   }
 
   // Staff Statistics
+  /**
+   *
+   */
   async getStaffStats() {
     const [
       totalDoctors,
@@ -1045,6 +1146,9 @@ export class StaffService {
   }
 
   // Bulk operations
+  /**
+   *
+   */
   async bulkCreateStaff(staff: any[], createdBy: string) {
     const results = [];
     const errors = [];

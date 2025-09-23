@@ -1,0 +1,30 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+# Pre-commit hooks for Hospital Management System
+# Enterprise-grade quality assurance
+
+echo "🔍 Running pre-commit checks..."
+
+# Run lint-staged
+npx lint-staged
+
+# Run backend linting
+echo "📦 Linting backend..."
+cd backend
+npm run lint -- --max-warnings=0
+if [ $? -ne 0 ]; then
+    echo "❌ Backend linting failed"
+    exit 1
+fi
+
+# Run frontend linting
+echo "🌐 Linting frontend..."
+cd ../frontend
+npm run lint -- --max-warnings=0
+if [ $? -ne 0 ]; then
+    echo "❌ Frontend linting failed"
+    exit 1
+fi
+
+echo "✅ All pre-commit checks passed!"

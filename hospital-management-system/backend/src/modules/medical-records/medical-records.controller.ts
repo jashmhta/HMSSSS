@@ -1,3 +1,4 @@
+/*[object Object]*/
 import {
   Controller,
   Get,
@@ -10,19 +11,30 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
-import { MedicalRecordsService } from './medical-records.service';
+import { UserRole } from '@prisma/client';
+
 import { JwtAuthGuard } from '../../shared/guards/jwt-auth.guard';
 import { RolesGuard } from '../../modules/auth/roles.guard';
 import { Roles } from '../../shared/decorators/roles.decorator';
-import { UserRole } from '../../database/schema.prisma';
 
+import { MedicalRecordsService } from './medical-records.service';
+
+/**
+ *
+ */
 @ApiTags('medical-records')
 @ApiBearerAuth()
 @Controller('medical-records')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class MedicalRecordsController {
+  /**
+   *
+   */
   constructor(private readonly medicalRecordsService: MedicalRecordsService) {}
 
+  /**
+   *
+   */
   @Post()
   @Roles(UserRole.ADMIN, UserRole.DOCTOR)
   @ApiOperation({ summary: 'Create a new medical record' })
@@ -31,6 +43,9 @@ export class MedicalRecordsController {
     return this.medicalRecordsService.create(createMedicalRecordDto);
   }
 
+  /**
+   *
+   */
   @Get()
   @Roles(UserRole.ADMIN, UserRole.DOCTOR, UserRole.NURSE)
   @ApiOperation({ summary: 'Get all medical records' })
@@ -54,6 +69,9 @@ export class MedicalRecordsController {
     return this.medicalRecordsService.findAll(filters);
   }
 
+  /**
+   *
+   */
   @Get('patient/:patientId')
   @Roles(UserRole.ADMIN, UserRole.DOCTOR, UserRole.NURSE, UserRole.PATIENT)
   @ApiOperation({ summary: 'Get patient medical records' })
@@ -66,6 +84,9 @@ export class MedicalRecordsController {
     return this.medicalRecordsService.findByPatient(patientId, page, limit);
   }
 
+  /**
+   *
+   */
   @Get('patient/:patientId/history')
   @Roles(UserRole.ADMIN, UserRole.DOCTOR, UserRole.NURSE, UserRole.PATIENT)
   @ApiOperation({ summary: 'Get patient medical history summary' })
@@ -74,6 +95,9 @@ export class MedicalRecordsController {
     return this.medicalRecordsService.getPatientHistory(patientId);
   }
 
+  /**
+   *
+   */
   @Get('doctor/:doctorId/stats')
   @Roles(UserRole.ADMIN, UserRole.DOCTOR)
   @ApiOperation({ summary: 'Get doctor medical records statistics' })
@@ -88,6 +112,9 @@ export class MedicalRecordsController {
     return this.medicalRecordsService.getDoctorStats(doctorId, start, end);
   }
 
+  /**
+   *
+   */
   @Get(':id')
   @Roles(UserRole.ADMIN, UserRole.DOCTOR, UserRole.NURSE, UserRole.PATIENT)
   @ApiOperation({ summary: 'Get medical record by ID' })
@@ -96,6 +123,9 @@ export class MedicalRecordsController {
     return this.medicalRecordsService.findOne(id);
   }
 
+  /**
+   *
+   */
   @Patch(':id')
   @Roles(UserRole.ADMIN, UserRole.DOCTOR)
   @ApiOperation({ summary: 'Update medical record' })
@@ -104,6 +134,9 @@ export class MedicalRecordsController {
     return this.medicalRecordsService.update(id, updateMedicalRecordDto);
   }
 
+  /**
+   *
+   */
   @Delete(':id')
   @Roles(UserRole.ADMIN)
   @ApiOperation({ summary: 'Delete medical record' })
