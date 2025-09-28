@@ -2,10 +2,10 @@
 import { registerAs } from '@nestjs/config';
 
 export default registerAs('security', () => ({
-  // JWT Configuration
+  // JWT Configuration - ZERO TOLERANCE FOR HARDCODED SECRETS
   jwt: {
-    secret: process.env.JWT_SECRET || 'fallback-secret-key',
-    refreshSecret: process.env.JWT_REFRESH_SECRET || 'fallback-refresh-secret',
+    secret: process.env.JWT_SECRET,
+    refreshSecret: process.env.JWT_REFRESH_SECRET,
     expiresIn: process.env.JWT_EXPIRES_IN || '24h',
     refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d',
     issuer: process.env.JWT_ISSUER || 'hospital-management-system',
@@ -17,24 +17,24 @@ export default registerAs('security', () => ({
     rounds: parseInt(process.env.BCRYPT_ROUNDS) || 12,
   },
 
-  // Encryption Configuration
+  // Encryption Configuration - ENTERPRISE-GRADE SECURITY REQUIRED
   encryption: {
-    key: process.env.ENCRYPTION_KEY || 'fallback-encryption-key-32-bytes-long',
+    key: process.env.ENCRYPTION_KEY,
     algorithm: 'aes-256-gcm',
   },
 
-  // Session Configuration
+  // Session Configuration - SECURE BY DEFAULT
   session: {
-    secret: process.env.SESSION_SECRET || 'fallback-session-secret',
+    secret: process.env.SESSION_SECRET,
     maxAge: parseInt(process.env.SESSION_MAX_AGE) || 86400000, // 24 hours
     rolling: true,
     resave: false,
     saveUninitialized: false,
   },
 
-  // CSRF Protection
+  // CSRF Protection - ZERO TOLERANCE FOR VULNERABILITIES
   csrf: {
-    secret: process.env.CSRF_SECRET || 'fallback-csrf-secret',
+    secret: process.env.CSRF_SECRET,
     cookieName: '_csrf',
     headerName: 'x-csrf-token',
   },
@@ -48,7 +48,7 @@ export default registerAs('security', () => ({
     /**
      *
      */
-    keyGenerator: (req: any) => req.ip,
+    keyGenerator: (req: { ip: string }) => req.ip,
   },
 
   // CORS Configuration

@@ -32,6 +32,11 @@ import { InventoryModule } from './modules/inventory/inventory.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { ComplianceModule } from './modules/compliance/compliance.module';
 
+// Interoperability modules
+import { FhirHl7Module } from './modules/fhir-hl7/fhir-hl7.module';
+import { PacsModule } from './modules/pacs/pacs.module';
+import { DrugInteractionsModule } from './modules/drug-interactions/drug-interactions.module';
+
 // Shared modules
 import { SharedModule } from './shared/shared.module';
 
@@ -100,6 +105,11 @@ import { SharedModule } from './shared/shared.module';
     InventoryModule,
     ReportsModule,
     ComplianceModule,
+
+    // Interoperability modules
+    FhirHl7Module,
+    PacsModule,
+    DrugInteractionsModule,
 
     // Shared utilities
     SharedModule,

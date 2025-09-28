@@ -2,7 +2,12 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
 import * as request from 'supertest';
 import { AppModule } from '../../src/app.module';
-import { TestApp, setupTestEnvironment, teardownTestEnvironment, createAuthHelper } from '../test-helpers';
+import {
+  TestApp,
+  setupTestEnvironment,
+  teardownTestEnvironment,
+  createAuthHelper,
+} from '../test-helpers';
 import { TestSecurity, TestDataBuilder } from '../test-helpers';
 
 describe('Security Tests', () => {
@@ -75,7 +80,8 @@ describe('Security Tests', () => {
       TestSecurity.expectAuthenticationRequired(response);
 
       // Try to access with expired token
-      const expiredToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyLCJleHAiOjE1MTYyMzkwMjJ9.invalid';
+      const expiredToken =
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyLCJleHAiOjE1MTYyMzkwMjJ9.invalid';
       const expiredResponse = await app.get('/api/patients', {
         Authorization: `Bearer ${expiredToken}`,
       });
@@ -143,21 +149,33 @@ describe('Security Tests', () => {
       const adminHeaders = authHelper.getAuthHeaders('ADMIN');
 
       // Create a patient
-      const patientResponse = await app.post('/api/patients', TestDataBuilder.patient(), adminHeaders);
+      const patientResponse = await app.post(
+        '/api/patients',
+        TestDataBuilder.patient(),
+        adminHeaders,
+      );
       expect(patientResponse.status).toBe(201);
       const patientId = patientResponse.body.data.id;
 
       // Patient should not be able to update other patients
-      const updateResponse = await app.put(`/api/patients/${patientId}`, {
-        firstName: 'Hacked',
-      }, patientHeaders);
+      const updateResponse = await app.put(
+        `/api/patients/${patientId}`,
+        {
+          firstName: 'Hacked',
+        },
+        patientHeaders,
+      );
 
       expect([403, 404]).toContain(updateResponse.status);
 
       // Admin should be able to update
-      const adminUpdateResponse = await app.put(`/api/patients/${patientId}`, {
-        firstName: 'Updated',
-      }, adminHeaders);
+      const adminUpdateResponse = await app.put(
+        `/api/patients/${patientId}`,
+        {
+          firstName: 'Updated',
+        },
+        adminHeaders,
+      );
 
       expect(adminUpdateResponse.status).toBe(200);
     });
@@ -170,8 +188,8 @@ describe('Security Tests', () => {
       // Test SQL injection
       const sqlInjection = TestDataBuilder.patient({
         firstName: "'; DROP TABLE patients; --",
-        lastName: "Test",
-        email: "test@example.com",
+        lastName: 'Test',
+        email: 'test@example.com',
       });
 
       const response = await app.post('/api/patients', sqlInjection, authHeaders);
@@ -280,13 +298,10 @@ describe('Security Tests', () => {
       const authHeaders = authHelper.getAuthHeaders('ADMIN');
 
       // Send invalid content type
-      const response = await app.post('/api/patients',
-        '<?xml version="1.0"?><malicious/>',
-        {
-          ...authHeaders,
-          'Content-Type': 'application/xml',
-        }
-      );
+      const response = await app.post('/api/patients', '<?xml version="1.0"?><malicious/>', {
+        ...authHeaders,
+        'Content-Type': 'application/xml',
+      });
 
       expect([415, 400]).toContain(response.status);
     });
@@ -297,15 +312,19 @@ describe('Security Tests', () => {
       const authHeaders = authHelper.getAuthHeaders('ADMIN');
 
       // Create user with sensitive data
-      const userResponse = await app.post('/api/users', {
-        email: 'sensitive@test.com',
-        password: 'Sensitive123!',
-        firstName: 'Sensitive',
-        lastName: 'User',
-        role: 'PATIENT',
-        ssn: '123-45-6789', // Should be encrypted
-        creditCard: '4111111111111111', // Should be encrypted
-      }, authHeaders);
+      const userResponse = await app.post(
+        '/api/users',
+        {
+          email: 'sensitive@test.com',
+          password: 'Sensitive123!',
+          firstName: 'Sensitive',
+          lastName: 'User',
+          role: 'PATIENT',
+          ssn: '123-45-6789', // Should be encrypted
+          creditCard: '4111111111111111', // Should be encrypted
+        },
+        authHeaders,
+      );
 
       expect(userResponse.status).toBe(201);
 
@@ -323,13 +342,17 @@ describe('Security Tests', () => {
       const authHeaders = authHelper.getAuthHeaders('ADMIN');
 
       // Create user with password
-      const response = await app.post('/api/users', {
-        email: 'logtest@test.com',
-        password: 'Password123!',
-        firstName: 'Log',
-        lastName: 'Test',
-        role: 'PATIENT',
-      }, authHeaders);
+      const response = await app.post(
+        '/api/users',
+        {
+          email: 'logtest@test.com',
+          password: 'Password123!',
+          firstName: 'Log',
+          lastName: 'Test',
+          role: 'PATIENT',
+        },
+        authHeaders,
+      );
 
       expect(response.status).toBe(201);
 
@@ -342,11 +365,18 @@ describe('Security Tests', () => {
       const authHeaders = authHelper.getAuthHeaders('ADMIN');
 
       // Create appointment
-      const appointmentResponse = await app.post('/api/appointments', TestDataBuilder.appointment(), authHeaders);
+      const appointmentResponse = await app.post(
+        '/api/appointments',
+        TestDataBuilder.appointment(),
+        authHeaders,
+      );
       expect(appointmentResponse.status).toBe(201);
 
       // Try to delete appointment immediately (should not be allowed by retention policy)
-      const deleteResponse = await app.delete(`/api/appointments/${appointmentResponse.body.data.id}`, authHeaders);
+      const deleteResponse = await app.delete(
+        `/api/appointments/${appointmentResponse.body.data.id}`,
+        authHeaders,
+      );
 
       // Depending on policy, this might be allowed or blocked
       expect([200, 403, 400]).toContain(deleteResponse.status);
@@ -375,9 +405,13 @@ describe('Security Tests', () => {
       const token = loginResponse.body.access_token;
 
       // Logout
-      const logoutResponse = await app.post('/auth/logout', {}, {
-        Authorization: `Bearer ${token}`,
-      });
+      const logoutResponse = await app.post(
+        '/auth/logout',
+        {},
+        {
+          Authorization: `Bearer ${token}`,
+        },
+      );
 
       expect(logoutResponse.status).toBe(200);
 
@@ -400,9 +434,13 @@ describe('Security Tests', () => {
       const originalToken = loginResponse.body.access_token;
 
       // Logout
-      await app.post('/auth/logout', {}, {
-        Authorization: `Bearer ${originalToken}`,
-      });
+      await app.post(
+        '/auth/logout',
+        {},
+        {
+          Authorization: `Bearer ${originalToken}`,
+        },
+      );
 
       // Login again
       const secondLoginResponse = await app.post('/auth/login', {
@@ -425,7 +463,11 @@ describe('Security Tests', () => {
       // Try to upload executable file
       const maliciousFile = Buffer.from('malicious content');
       const formData = new FormData();
-      formData.append('file', new Blob([maliciousFile], { type: 'application/exe' }), 'malware.exe');
+      formData.append(
+        'file',
+        new Blob([maliciousFile], { type: 'application/exe' }),
+        'malware.exe',
+      );
 
       const response = await fetch(`${app.getApp().getHttpServer()}/api/upload`, {
         method: 'POST',
@@ -463,7 +505,11 @@ describe('Security Tests', () => {
       // Try to upload file with malicious name
       const maliciousFile = Buffer.from('test content');
       const formData = new FormData();
-      formData.append('file', new Blob([maliciousFile], { type: 'text/plain' }), '../../../malicious.txt');
+      formData.append(
+        'file',
+        new Blob([maliciousFile], { type: 'text/plain' }),
+        '../../../malicious.txt',
+      );
 
       const response = await fetch(`${app.getApp().getHttpServer()}/api/upload`, {
         method: 'POST',
@@ -486,12 +532,14 @@ describe('Security Tests', () => {
           app.post('/auth/login', {
             email: 'test@example.com',
             password: 'wrongpassword',
-          })
+          }),
         );
       }
 
       const results = await Promise.allSettled(requests);
-      const rateLimited = results.filter(r => r.status === 'rejected' && r.reason.response.status === 429).length;
+      const rateLimited = results.filter(
+        r => r.status === 'rejected' && r.reason.response.status === 429,
+      ).length;
 
       expect(rateLimited).toBeGreaterThan(0);
     });
@@ -550,7 +598,10 @@ describe('Security Tests', () => {
       const authHeaders = authHelper.getAuthHeaders('ADMIN');
 
       // Try SQL injection in query parameters
-      const response = await app.get('/api/patients?search=\'; DROP TABLE patients; --', authHeaders);
+      const response = await app.get(
+        "/api/patients?search='; DROP TABLE patients; --",
+        authHeaders,
+      );
 
       expect([400, 404, 500]).toContain(response.status);
       expect(response.body).not.toHaveProperty('stack');

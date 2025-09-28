@@ -1,10 +1,12 @@
 'use client';
 
 import React from 'react';
-import { motion } from 'framer-motion';
-import { cn } from '@/lib/utils';
 
-interface GlassEffectProps {
+import { motion } from 'framer-motion';
+
+import { cn } from '../../lib/utils';
+
+interface IGlassEffectProps {
   children: React.ReactNode;
   className?: string;
   intensity?: 'light' | 'medium' | 'heavy';
@@ -35,7 +37,7 @@ export function GlassEffect({
   border = true,
   hover = false,
   glow = false,
-}: GlassEffectProps) {
+}: IGlassEffectProps) {
   return (
     <motion.div
       className={cn(
@@ -45,7 +47,7 @@ export function GlassEffect({
         border && 'border border-white/20',
         glow && 'shadow-lg shadow-white/10',
         hover && 'hover:bg-white/30 hover:border-white/30 hover:shadow-xl hover:shadow-white/20',
-        className
+        className,
       )}
       whileHover={hover ? { scale: 1.02 } : {}}
       whileTap={hover ? { scale: 0.98 } : {}}
@@ -60,19 +62,19 @@ export function GlassEffect({
             'linear-gradient(45deg, transparent, rgba(255,255,255,0.05), transparent)',
             'linear-gradient(225deg, transparent, rgba(255,255,255,0.08), transparent)',
             'linear-gradient(45deg, transparent, rgba(255,255,255,0.05), transparent)',
-          ]
+          ],
         }}
         transition={{
           duration: 8,
           repeat: Infinity,
-          ease: "linear"
+          ease: 'linear',
         }}
       />
     </motion.div>
   );
 }
 
-interface NeumorphicProps {
+interface INeumorphicProps {
   children: React.ReactNode;
   className?: string;
   variant?: 'flat' | 'concave' | 'convex';
@@ -88,7 +90,7 @@ export function Neumorphic({
   size = 'md',
   hover = false,
   press = true,
-}: NeumorphicProps) {
+}: INeumorphicProps) {
   const sizeClasses = {
     sm: 'p-2',
     md: 'p-4',
@@ -110,7 +112,7 @@ export function Neumorphic({
         sizeClasses[size],
         variantClasses[variant],
         hover && 'hover:shadow-xl hover:shadow-gray-400/50 dark:hover:shadow-gray-600/50',
-        className
+        className,
       )}
       whileHover={hover ? { y: -2 } : {}}
       whileTap={press ? { scale: 0.98 } : {}}
@@ -130,7 +132,7 @@ export function Neumorphic({
   );
 }
 
-interface FloatingCardProps {
+interface IFloatingCardProps {
   children: React.ReactNode;
   className?: string;
   delay?: number;
@@ -142,7 +144,7 @@ export function FloatingCard({
   className = '',
   delay = 0,
   duration = 6,
-}: FloatingCardProps) {
+}: IFloatingCardProps) {
   return (
     <motion.div
       className={cn('relative', className)}
@@ -154,7 +156,7 @@ export function FloatingCard({
         duration,
         delay,
         repeat: Infinity,
-        ease: "easeInOut"
+        ease: 'easeInOut',
       }}
     >
       {children}
@@ -162,7 +164,7 @@ export function FloatingCard({
   );
 }
 
-interface GlowingButtonProps {
+interface IGlowingButtonProps {
   children: React.ReactNode;
   onClick?: () => void;
   className?: string;
@@ -178,7 +180,7 @@ export function GlowingButton({
   variant = 'primary',
   size = 'md',
   glow = true,
-}: GlowingButtonProps) {
+}: IGlowingButtonProps) {
   const variantClasses = {
     primary: 'bg-blue-500 hover:bg-blue-600 text-white',
     secondary: 'bg-purple-500 hover:bg-purple-600 text-white',
@@ -201,7 +203,7 @@ export function GlowingButton({
         variantClasses[variant],
         sizeClasses[size],
         glow && 'shadow-lg hover:shadow-xl',
-        className
+        className,
       )}
       whileHover={{ scale: 1.05 }}
       whileTap={{ scale: 0.95 }}
@@ -216,7 +218,7 @@ export function GlowingButton({
           transition={{
             duration: 2,
             repeat: Infinity,
-            ease: "linear"
+            ease: 'linear',
           }}
         />
       )}
@@ -239,7 +241,7 @@ export function GlowingButton({
           transition={{
             duration: 2,
             repeat: Infinity,
-            ease: "easeInOut"
+            ease: 'easeInOut',
           }}
         />
       )}

@@ -1,9 +1,12 @@
 'use client';
 
 import React from 'react';
+
 import { motion } from 'framer-motion';
-import { Skeleton, LoadingCard } from './LoadingStates';
+
 import { cn } from '@/lib/utils';
+
+import { Skeleton, LoadingCard } from './LoadingStates';
 
 // Patient Management Skeletons
 export function PatientListSkeleton({ count = 5 }: { count?: number }) {
@@ -148,7 +151,7 @@ export function AppointmentCalendarSkeleton() {
               width="100%"
               height={60}
               className={cn(
-                i % 7 === 0 || i % 7 === 6 ? 'bg-gray-50 dark:bg-gray-900' : ''
+                i % 7 === 0 || i % 7 === 6 ? 'bg-gray-50 dark:bg-gray-900' : '',
               )}
             />
           ))}
@@ -327,7 +330,7 @@ export function DashboardSkeleton() {
                   <Skeleton variant="text" width="60%" height={14} />
                   <Skeleton variant="text" width="40%" height={12} />
                 </div>
-                <Skeleton variant="text" width={20%" height={12} />
+                 <Skeleton variant="text" width="20%" height={12} />
               </div>
             ))}
           </div>
@@ -439,7 +442,7 @@ export function BillingSkeleton() {
 }
 
 // Smart Loading Component
-export interface SmartSkeletonProps {
+export interface ISmartSkeletonProps {
   isLoading: boolean;
   children: React.ReactNode;
   skeleton?: React.ReactNode;
@@ -455,7 +458,7 @@ export function SmartSkeleton({
   delay = 200,
   fallback,
   className = '',
-}: SmartSkeletonProps) {
+}: ISmartSkeletonProps) {
   const [showSkeleton, setShowSkeleton] = React.useState(false);
 
   React.useEffect(() => {

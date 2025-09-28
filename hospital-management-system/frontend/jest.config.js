@@ -26,12 +26,6 @@ const customJestConfig = {
     '\\.(woff|woff2|eot|ttf|otf)$': '<rootDir>/__mocks__/fileMock.js',
   },
   testEnvironment: 'jsdom',
-  testEnvironmentOptions: {
-    url: 'http://localhost:3000',
-    pretendToBeVisual: true,
-    resources: 'usable',
-    runScripts: 'dangerously',
-  },
   collectCoverageFrom: [
     'src/**/*.{js,jsx,ts,tsx}',
     '!src/**/*.d.ts',

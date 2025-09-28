@@ -11,6 +11,14 @@ import { PrismaService } from '../../database/prisma.service';
 import { RBACService } from '../auth/rbac.service';
 import { ComplianceService } from '../compliance/compliance.service';
 
+import {
+  PreAuthorizationRequestDto,
+  ClaimSubmissionDto,
+  AppealRequestDto,
+  PreAuthStatus,
+  ClaimStatus,
+} from './dto/insurance.dto';
+
 export interface BillItem {
   itemType:
     | 'CONSULTATION'
@@ -918,5 +926,233 @@ export class BillingService {
     }
 
     return Number(invoice.amount);
+  }
+
+  // Insurance Pre-Authorization and Claims Management
+
+  /**
+   * Submit pre-authorization request
+   */
+  async submitPreAuthorization(data: PreAuthorizationRequestDto & { submittedBy: string }) {
+    const preAuthRequest = {
+      id: `preauth-${Date.now()}`,
+      ...data,
+      status: PreAuthStatus.PENDING,
+      submittedAt: new Date(),
+      submittedBy: data.submittedBy,
+    };
+
+    // In a real implementation, this would be saved to database
+    // For now, we'll simulate processing
+
+    // Log compliance event
+    await this.complianceService.logComplianceEvent({
+      userId: data.submittedBy,
+      action: 'PRE_AUTH_SUBMITTED',
+      resource: 'insurance_pre_auth',
+      resourceId: preAuthRequest.id,
+      eventType: 'PRE_AUTH_SUBMITTED',
+      details: {
+        patientId: data.patientId,
+        encounterId: data.encounterId,
+        estimatedCost: data.estimatedCost,
+        insuranceProvider: data.insuranceProvider.name,
+      },
+      complianceFlags: ['INSURANCE_PROCESSING', 'PATIENT_FINANCIAL_DATA'],
+    });
+
+    return preAuthRequest;
+  }
+
+  /**
+   * Get pre-authorization requests
+   */
+  async getPreAuthorizations(query: any) {
+    // In a real implementation, this would query the database
+    // For now, return mock data
+    return {
+      requests: [],
+      total: 0,
+      page: query.page || 1,
+      limit: query.limit || 10,
+    };
+  }
+
+  /**
+   * Update pre-authorization status
+   */
+  async updatePreAuthorization(id: string, data: any & { updatedBy: string }) {
+    // In a real implementation, this would update the database
+    const updatedRequest = {
+      id,
+      ...data,
+      updatedAt: new Date(),
+      updatedBy: data.updatedBy,
+    };
+
+    // Log compliance event
+    await this.complianceService.logComplianceEvent({
+      userId: data.updatedBy,
+      action: 'PRE_AUTH_UPDATED',
+      resource: 'insurance_pre_auth',
+      resourceId: id,
+      eventType: 'PRE_AUTH_UPDATED',
+      details: {
+        preAuthId: id,
+        newStatus: data.status,
+        approvedAmount: data.approvedAmount,
+      },
+      complianceFlags: ['INSURANCE_PROCESSING'],
+    });
+
+    return updatedRequest;
+  }
+
+  /**
+   * Submit insurance claim
+   */
+  async submitInsuranceClaim(data: ClaimSubmissionDto & { submittedBy: string }) {
+    const claim = {
+      id: `claim-${Date.now()}`,
+      ...data.claimData,
+      status: ClaimStatus.SUBMITTED,
+      submittedAt: new Date(),
+      submittedBy: data.submittedBy,
+      submissionMethod: data.submissionMethod,
+    };
+
+    // Log compliance event
+    await this.complianceService.logComplianceEvent({
+      userId: data.submittedBy,
+      action: 'CLAIM_SUBMITTED',
+      resource: 'insurance_claim',
+      resourceId: claim.id,
+      eventType: 'CLAIM_SUBMITTED',
+      details: {
+        patientId: data.claimData.patientId,
+        billId: data.claimData.billId,
+        claimAmount: data.claimData.claimAmount,
+        insuranceProvider: data.claimData.insuranceProvider.name,
+      },
+      complianceFlags: ['INSURANCE_PROCESSING', 'PATIENT_FINANCIAL_DATA'],
+    });
+
+    return claim;
+  }
+
+  /**
+   * Get insurance claims
+   */
+  async getInsuranceClaims(query: any) {
+    // In a real implementation, this would query the database
+    // For now, return mock data
+    return {
+      claims: [],
+      total: 0,
+      page: query.page || 1,
+      limit: query.limit || 10,
+    };
+  }
+
+  /**
+   * Update insurance claim status
+   */
+  async updateInsuranceClaim(id: string, data: any & { updatedBy: string }) {
+    // In a real implementation, this would update the database
+    const updatedClaim = {
+      id,
+      ...data,
+      updatedAt: new Date(),
+      updatedBy: data.updatedBy,
+    };
+
+    // Log compliance event
+    await this.complianceService.logComplianceEvent({
+      userId: data.updatedBy,
+      action: 'CLAIM_UPDATED',
+      resource: 'insurance_claim',
+      resourceId: id,
+      eventType: 'CLAIM_UPDATED',
+      details: {
+        claimId: id,
+        newStatus: data.status,
+        approvedAmount: data.approvedAmount,
+      },
+      complianceFlags: ['INSURANCE_PROCESSING'],
+    });
+
+    return updatedClaim;
+  }
+
+  /**
+   * Submit claim appeal
+   */
+  async submitClaimAppeal(claimId: string, data: AppealRequestDto & { submittedBy: string }) {
+    const appeal = {
+      id: `appeal-${Date.now()}`,
+      claimId,
+      ...data,
+      status: 'SUBMITTED',
+      submittedAt: new Date(),
+      submittedBy: data.submittedBy,
+    };
+
+    // Log compliance event
+    await this.complianceService.logComplianceEvent({
+      userId: data.submittedBy,
+      action: 'CLAIM_APPEAL_SUBMITTED',
+      resource: 'insurance_claim_appeal',
+      resourceId: appeal.id,
+      eventType: 'CLAIM_APPEAL_SUBMITTED',
+      details: {
+        claimId,
+        appealLevel: data.appealLevel,
+        originalClaimId: data.originalClaimId,
+      },
+      complianceFlags: ['INSURANCE_PROCESSING', 'PATIENT_FINANCIAL_DATA'],
+    });
+
+    return appeal;
+  }
+
+  /**
+   * Get insurance analytics
+   */
+  async getInsuranceAnalytics(startDate: Date, endDate: Date) {
+    // In a real implementation, this would aggregate data from database
+    return {
+      period: {
+        startDate,
+        endDate,
+      },
+      preAuthorizations: {
+        total: 0,
+        approved: 0,
+        denied: 0,
+        pending: 0,
+        approvalRate: 0,
+        averageProcessingTime: 0,
+      },
+      claims: {
+        total: 0,
+        submitted: 0,
+        approved: 0,
+        denied: 0,
+        paid: 0,
+        approvalRate: 0,
+        averageProcessingTime: 0,
+        totalClaimedAmount: 0,
+        totalApprovedAmount: 0,
+        totalPaidAmount: 0,
+      },
+      appeals: {
+        total: 0,
+        successful: 0,
+        denied: 0,
+        successRate: 0,
+      },
+      topDenialReasons: [],
+      averagePaymentTime: 0,
+    };
   }
 }

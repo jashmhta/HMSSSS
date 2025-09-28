@@ -127,21 +127,30 @@ describe('RadiologyController (e2e)', () => {
     beforeEach(async () => {
       // Create multiple test radiology tests
       for (let i = 0; i < 5; i++) {
+        // First create a test catalog entry
+        const testCatalog = await prisma.radiologyTestCatalog.create({
+          data: {
+            testName: `Test ${i}`,
+            testCode: `RT${i}`,
+            category: 'CHEST',
+            modality: i % 2 === 0 ? 'XRAY' : 'MRI',
+            description: `Test description ${i}`,
+            cost: 100.0,
+            estimatedDuration: 30,
+            isActive: true,
+          },
+        });
+
         await prisma.radiologyTest.create({
           data: {
             patientId: testPatient.id,
+            testCatalogId: testCatalog.id,
             orderedBy: testUser.id,
-            testName: `Test ${i}`,
-            testCode: `RT${i}`,
-            modality: i % 2 === 0 ? 'XRAY' : 'MRI',
-            urgent: i === 0,
-            orderedDate: new Date(),
             status: 'ORDERED',
+            clinicalInfo: `Clinical info ${i}`,
+            bodyPart: 'CHEST',
+            priority: 'ROUTINE',
           },
-          testName: `Test ${i}`,
-          testCode: `RT${i}`,
-          modality: i % 2 === 0 ? 'XRAY' : 'MRI',
-          urgent: i === 0,
         });
       }
     });
@@ -202,15 +211,28 @@ describe('RadiologyController (e2e)', () => {
 
   describe('/radiology/tests/:id (GET)', () => {
     it('should return radiology test by ID', async () => {
+      const testCatalog = await prisma.radiologyTestCatalog.create({
+        data: {
+          testName: 'Test Radiology',
+          testCode: 'TR001',
+          category: 'CHEST',
+          modality: 'XRAY',
+          description: 'Test radiology description',
+          cost: 100.0,
+          estimatedDuration: 30,
+          isActive: true,
+        },
+      });
+
       const createdTest = await prisma.radiologyTest.create({
         data: {
           patientId: testPatient.id,
+          testCatalogId: testCatalog.id,
           orderedBy: testUser.id,
-          testName: 'Test Radiology',
-          testCode: 'TR001',
-          modality: 'XRAY',
-          orderedDate: new Date(),
           status: 'ORDERED',
+          clinicalInfo: 'Test clinical info',
+          bodyPart: 'CHEST',
+          priority: 'ROUTINE',
         },
       });
 
@@ -234,7 +256,11 @@ describe('RadiologyController (e2e)', () => {
 
   describe('/radiology/tests/:id/schedule (POST)', () => {
     it('should schedule test successfully', async () => {
-      const radiologyTest = await testUtils.createTestRadiologyTest(testPatient.id, testUser.id);
+      const radiologyTest = await testUtils.createTestRadiologyTest(
+        testPatient.id,
+        testUser.id,
+        prisma,
+      );
 
       const scheduleDto = {
         scheduledDate: new Date('2024-12-01T14:00:00Z'),
@@ -254,9 +280,14 @@ describe('RadiologyController (e2e)', () => {
     });
 
     it('should return 400 when trying to schedule non-ordered test', async () => {
-      const radiologyTest = await testUtils.createTestRadiologyTest(testPatient.id, testUser.id, {
-        status: 'COMPLETED',
-      });
+      const radiologyTest = await testUtils.createTestRadiologyTest(
+        testPatient.id,
+        testUser.id,
+        prisma,
+        {
+          status: 'COMPLETED',
+        },
+      );
 
       const scheduleDto = {
         scheduledDate: new Date('2024-12-01T14:00:00Z'),
@@ -272,9 +303,14 @@ describe('RadiologyController (e2e)', () => {
 
   describe('/radiology/tests/:id/start (POST)', () => {
     it('should start test successfully', async () => {
-      const radiologyTest = await testUtils.createTestRadiologyTest(testPatient.id, testUser.id, {
-        status: 'SCHEDULED',
-      });
+      const radiologyTest = await testUtils.createTestRadiologyTest(
+        testPatient.id,
+        testUser.id,
+        prisma,
+        {
+          status: 'SCHEDULED',
+        },
+      );
 
       const response = await request(app.getHttpServer())
         .post(`/radiology/tests/${radiologyTest.id}/start`)
@@ -287,9 +323,14 @@ describe('RadiologyController (e2e)', () => {
     });
 
     it('should return 400 when trying to start unscheduled test', async () => {
-      const radiologyTest = await testUtils.createTestRadiologyTest(testPatient.id, testUser.id, {
-        status: 'ORDERED',
-      });
+      const radiologyTest = await testUtils.createTestRadiologyTest(
+        testPatient.id,
+        testUser.id,
+        prisma,
+        {
+          status: 'ORDERED',
+        },
+      );
 
       await request(app.getHttpServer())
         .post(`/radiology/tests/${radiologyTest.id}/start`)
@@ -300,9 +341,14 @@ describe('RadiologyController (e2e)', () => {
 
   describe('/radiology/tests/:id/complete (POST)', () => {
     it('should complete test successfully', async () => {
-      const radiologyTest = await testUtils.createTestRadiologyTest(testPatient.id, testUser.id, {
-        status: 'IN_PROGRESS',
-      });
+      const radiologyTest = await testUtils.createTestRadiologyTest(
+        testPatient.id,
+        testUser.id,
+        prisma,
+        {
+          status: 'IN_PROGRESS',
+        },
+      );
 
       const completeDto = {
         findings:
@@ -328,9 +374,14 @@ describe('RadiologyController (e2e)', () => {
     });
 
     it('should return 400 when trying to complete non-in-progress test', async () => {
-      const radiologyTest = await testUtils.createTestRadiologyTest(testPatient.id, testUser.id, {
-        status: 'SCHEDULED',
-      });
+      const radiologyTest = await testUtils.createTestRadiologyTest(
+        testPatient.id,
+        testUser.id,
+        prisma,
+        {
+          status: 'SCHEDULED',
+        },
+      );
 
       const completeDto = {
         findings: 'Normal findings',
@@ -348,7 +399,11 @@ describe('RadiologyController (e2e)', () => {
 
   describe('/radiology/tests/:id/cancel (POST)', () => {
     it('should cancel test successfully', async () => {
-      const radiologyTest = await testUtils.createTestRadiologyTest(testPatient.id, testUser.id);
+      const radiologyTest = await testUtils.createTestRadiologyTest(
+        testPatient.id,
+        testUser.id,
+        prisma,
+      );
 
       const cancelDto = {
         reason: 'Patient requested cancellation',
@@ -365,9 +420,14 @@ describe('RadiologyController (e2e)', () => {
     });
 
     it('should return 400 when trying to cancel completed test', async () => {
-      const radiologyTest = await testUtils.createTestRadiologyTest(testPatient.id, testUser.id, {
-        status: 'COMPLETED',
-      });
+      const radiologyTest = await testUtils.createTestRadiologyTest(
+        testPatient.id,
+        testUser.id,
+        prisma,
+        {
+          status: 'COMPLETED',
+        },
+      );
 
       const cancelDto = {
         reason: 'Test cancellation',
@@ -384,13 +444,19 @@ describe('RadiologyController (e2e)', () => {
   describe('/radiology/tests/stats (GET)', () => {
     beforeEach(async () => {
       // Create test data for statistics
-      await testUtils.createTestRadiologyTest(testPatient.id, testUser.id, { status: 'COMPLETED' });
-      await testUtils.createTestRadiologyTest(testPatient.id, testUser.id, { status: 'ORDERED' });
-      await testUtils.createTestRadiologyTest(testPatient.id, testUser.id, { status: 'SCHEDULED' });
-      await testUtils.createTestRadiologyTest(testPatient.id, testUser.id, {
+      await testUtils.createTestRadiologyTest(testPatient.id, testUser.id, prisma, {
+        status: 'COMPLETED',
+      });
+      await testUtils.createTestRadiologyTest(testPatient.id, testUser.id, prisma, {
+        status: 'ORDERED',
+      });
+      await testUtils.createTestRadiologyTest(testPatient.id, testUser.id, prisma, {
+        status: 'SCHEDULED',
+      });
+      await testUtils.createTestRadiologyTest(testPatient.id, testUser.id, prisma, {
         status: 'IN_PROGRESS',
       });
-      await testUtils.createTestRadiologyTest(testPatient.id, testUser.id, {
+      await testUtils.createTestRadiologyTest(testPatient.id, testUser.id, prisma, {
         status: 'ORDERED',
         urgent: true,
       });
@@ -489,7 +555,11 @@ describe('RadiologyController (e2e)', () => {
     });
 
     it('should handle concurrent scheduling requests', async () => {
-      const radiologyTest = await testUtils.createTestRadiologyTest(testPatient.id, testUser.id);
+      const radiologyTest = await testUtils.createTestRadiologyTest(
+        testPatient.id,
+        testUser.id,
+        prisma,
+      );
 
       // Attempt to schedule from multiple concurrent requests
       const promises = [];
@@ -517,14 +587,18 @@ describe('RadiologyController (e2e)', () => {
 
   describe('Security Tests', () => {
     it("should prevent unauthorized access to other patients' radiology tests", async () => {
-      const otherUser = await testUtils.createTestUser({
-        role: 'DOCTOR',
-        email: 'other-doctor@test.com',
-      });
-      const otherPatient = await testUtils.createTestPatient(otherUser.id);
+      const otherUser = await testUtils.createTestUser(
+        {
+          role: 'DOCTOR',
+          email: 'other-doctor@test.com',
+        },
+        prisma,
+      );
+      const otherPatient = await testUtils.createTestPatient(otherUser.id, prisma);
       const otherRadiologyTest = await testUtils.createTestRadiologyTest(
         otherPatient.id,
         otherUser.id,
+        prisma,
       );
 
       // Try to access other doctor's patient's radiology test

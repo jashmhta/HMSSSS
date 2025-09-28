@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 
-interface User {
+interface IUser {
   id: string;
   email: string;
   firstName: string;
@@ -8,24 +8,24 @@ interface User {
   role: string;
 }
 
-interface AuthState {
-  user: User | null;
+interface IAuthState {
+  user: IUser | null;
   isAuthenticated: boolean;
   isLoading: boolean;
 }
 
-interface UseAuthReturn {
-  user: User | null;
+interface IUseAuthReturn {
+  user: IUser | null;
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (credentials: { email: string; password: string; rememberMe?: boolean }) => Promise<void>;
   logout: () => void;
   register: (userData: { email: string; password: string; firstName: string; lastName: string }) => Promise<void>;
-  updateUser: (userData: Partial<User>) => Promise<void>;
+  updateUser: (userData: Partial<IUser>) => Promise<void>;
 }
 
-export const useAuth = (): UseAuthReturn => {
-  const [state, setState] = useState<AuthState>({
+export const useAuth = (): IUseAuthReturn => {
+  const [state, setState] = useState<IAuthState>({
     user: null,
     isAuthenticated: false,
     isLoading: false,
@@ -39,7 +39,7 @@ export const useAuth = (): UseAuthReturn => {
       await new Promise(resolve => setTimeout(resolve, 1000));
 
       // Mock successful login
-      const user: User = {
+      const user: IUser = {
         id: '1',
         email: credentials.email,
         firstName: 'Test',
@@ -78,7 +78,7 @@ export const useAuth = (): UseAuthReturn => {
       // Simulate API call
       await new Promise(resolve => setTimeout(resolve, 1000));
 
-      const user: User = {
+      const user: IUser = {
         id: '1',
         email: userData.email,
         firstName: userData.firstName,
@@ -97,7 +97,7 @@ export const useAuth = (): UseAuthReturn => {
     }
   };
 
-  const updateUser = async (userData: Partial<User>) => {
+  const updateUser = async (userData: Partial<IUser>) => {
     setState(prev => ({ ...prev, isLoading: true }));
 
     try {

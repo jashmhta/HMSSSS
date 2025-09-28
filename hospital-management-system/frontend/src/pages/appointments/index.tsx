@@ -1,17 +1,16 @@
-import React, { useState, useEffect } from "react";
-import Link from "next/link";
+import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
+
 import {
   CalendarIcon,
   ClockIcon,
   UserIcon,
   PlusIcon,
-  MagnifyingGlassIcon,
-  FunnelIcon,
-  PencilIcon,
+   MagnifyingGlassIcon,
+   PencilIcon,
   EyeIcon,
-  CheckCircleIcon,
-  XCircleIcon,
-} from "@heroicons/react/24/outline";
+   CheckCircleIcon,
+} from '@heroicons/react/24/outline';
 import {
   format,
   startOfWeek,
@@ -19,7 +18,7 @@ import {
   eachDayOfInterval,
   isSameDay,
   addDays,
-} from "date-fns";
+} from 'date-fns';
 
 interface Appointment {
   id: string;
@@ -31,8 +30,8 @@ interface Appointment {
   date: string;
   time: string;
   duration: number;
-  type: "consultation" | "follow-up" | "procedure" | "emergency";
-  status: "scheduled" | "confirmed" | "in-progress" | "completed" | "cancelled";
+  type: 'consultation' | 'follow-up' | 'procedure' | 'emergency';
+  status: 'scheduled' | 'confirmed' | 'in-progress' | 'completed' | 'cancelled';
   notes?: string;
   room?: string;
 }
@@ -41,11 +40,11 @@ const Appointments: React.FC = () => {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState(new Date());
-  const [viewMode, setViewMode] = useState<"day" | "week" | "month">("week");
+  const [viewMode, setViewMode] = useState<'day' | 'week' | 'month'>('week');
   const [filterStatus, setFilterStatus] = useState<
-    "all" | "scheduled" | "confirmed" | "completed" | "cancelled"
-  >("all");
-  const [searchTerm, setSearchTerm] = useState("");
+    'all' | 'scheduled' | 'confirmed' | 'completed' | 'cancelled'
+  >('all');
+  const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
     // Simulate API call
@@ -54,71 +53,71 @@ const Appointments: React.FC = () => {
         setTimeout(() => {
           const mockAppointments: Appointment[] = [
             {
-              id: "1",
-              patientId: "1",
-              patientName: "John Doe",
-              doctorId: "1",
-              doctorName: "Dr. Sarah Johnson",
-              specialty: "Cardiology",
-              date: "2025-09-21",
-              time: "10:00",
+              id: '1',
+              patientId: '1',
+              patientName: 'John Doe',
+              doctorId: '1',
+              doctorName: 'Dr. Sarah Johnson',
+              specialty: 'Cardiology',
+              date: '2025-09-21',
+              time: '10:00',
               duration: 30,
-              type: "consultation",
-              status: "confirmed",
-              notes: "Follow-up for hypertension",
-              room: "Room 101",
+              type: 'consultation',
+              status: 'confirmed',
+              notes: 'Follow-up for hypertension',
+              room: 'Room 101',
             },
             {
-              id: "2",
-              patientId: "2",
-              patientName: "Jane Smith",
-              doctorId: "2",
-              doctorName: "Dr. Michael Chen",
-              specialty: "General Medicine",
-              date: "2025-09-21",
-              time: "11:30",
+              id: '2',
+              patientId: '2',
+              patientName: 'Jane Smith',
+              doctorId: '2',
+              doctorName: 'Dr. Michael Chen',
+              specialty: 'General Medicine',
+              date: '2025-09-21',
+              time: '11:30',
               duration: 45,
-              type: "follow-up",
-              status: "scheduled",
-              notes: "Annual checkup",
-              room: "Room 102",
+              type: 'follow-up',
+              status: 'scheduled',
+              notes: 'Annual checkup',
+              room: 'Room 102',
             },
             {
-              id: "3",
-              patientId: "3",
-              patientName: "Robert Johnson",
-              doctorId: "3",
-              doctorName: "Dr. Emily Davis",
-              specialty: "Orthopedics",
-              date: "2025-09-22",
-              time: "14:00",
+              id: '3',
+              patientId: '3',
+              patientName: 'Robert Johnson',
+              doctorId: '3',
+              doctorName: 'Dr. Emily Davis',
+              specialty: 'Orthopedics',
+              date: '2025-09-22',
+              time: '14:00',
               duration: 60,
-              type: "procedure",
-              status: "confirmed",
-              notes: "Knee surgery consultation",
-              room: "Room 201",
+              type: 'procedure',
+              status: 'confirmed',
+              notes: 'Knee surgery consultation',
+              room: 'Room 201',
             },
             {
-              id: "4",
-              patientId: "4",
-              patientName: "Alice Brown",
-              doctorId: "1",
-              doctorName: "Dr. Sarah Johnson",
-              specialty: "Cardiology",
-              date: "2025-09-23",
-              time: "09:00",
+              id: '4',
+              patientId: '4',
+              patientName: 'Alice Brown',
+              doctorId: '1',
+              doctorName: 'Dr. Sarah Johnson',
+              specialty: 'Cardiology',
+              date: '2025-09-23',
+              time: '09:00',
               duration: 30,
-              type: "consultation",
-              status: "completed",
-              notes: "ECG results review",
-              room: "Room 101",
+              type: 'consultation',
+              status: 'completed',
+              notes: 'ECG results review',
+              room: 'Room 101',
             },
           ];
           setAppointments(mockAppointments);
           setLoading(false);
         }, 1000);
       } catch (error) {
-        console.error("Failed to fetch appointments:", error);
+        console.error('Failed to fetch appointments:', error);
         setLoading(false);
       }
     };
@@ -128,33 +127,33 @@ const Appointments: React.FC = () => {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "scheduled":
-        return "bg-yellow-100 text-yellow-800";
-      case "confirmed":
-        return "bg-blue-100 text-blue-800";
-      case "in-progress":
-        return "bg-purple-100 text-purple-800";
-      case "completed":
-        return "bg-green-100 text-green-800";
-      case "cancelled":
-        return "bg-red-100 text-red-800";
+      case 'scheduled':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'confirmed':
+        return 'bg-blue-100 text-blue-800';
+      case 'in-progress':
+        return 'bg-purple-100 text-purple-800';
+      case 'completed':
+        return 'bg-green-100 text-green-800';
+      case 'cancelled':
+        return 'bg-red-100 text-red-800';
       default:
-        return "bg-gray-100 text-gray-800";
+        return 'bg-gray-100 text-gray-800';
     }
   };
 
   const getTypeColor = (type: string) => {
     switch (type) {
-      case "consultation":
-        return "bg-blue-500";
-      case "follow-up":
-        return "bg-green-500";
-      case "procedure":
-        return "bg-purple-500";
-      case "emergency":
-        return "bg-red-500";
+      case 'consultation':
+        return 'bg-blue-500';
+      case 'follow-up':
+        return 'bg-green-500';
+      case 'procedure':
+        return 'bg-purple-500';
+      case 'emergency':
+        return 'bg-red-500';
       default:
-        return "bg-gray-500";
+        return 'bg-gray-500';
     }
   };
 
@@ -165,7 +164,7 @@ const Appointments: React.FC = () => {
         .includes(searchTerm.toLowerCase()) ||
       appointment.doctorName.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus =
-      filterStatus === "all" || appointment.status === filterStatus;
+      filterStatus === 'all' || appointment.status === filterStatus;
     return matchesSearch && matchesStatus;
   });
 
@@ -184,7 +183,7 @@ const Appointments: React.FC = () => {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto" />
           <p className="mt-4 text-gray-600">Loading appointments...</p>
         </div>
       </div>
@@ -267,7 +266,7 @@ const Appointments: React.FC = () => {
             ← Previous Week
           </button>
           <h2 className="text-xl font-semibold text-gray-900">
-            {format(selectedDate, "MMMM yyyy")}
+            {format(selectedDate, 'MMMM yyyy')}
           </h2>
           <button
             onClick={() => setSelectedDate(addDays(selectedDate, 7))}
@@ -286,18 +285,18 @@ const Appointments: React.FC = () => {
             return (
               <div
                 key={index}
-                className={`min-h-32 border rounded-lg p-3 ${isToday ? "bg-blue-50 border-blue-200" : "bg-gray-50"}`}
+                className={`min-h-32 border rounded-lg p-3 ${isToday ? 'bg-blue-50 border-blue-200' : 'bg-gray-50'}`}
               >
                 <div className="text-center mb-2">
                   <div
-                    className={`text-sm font-medium ${isToday ? "text-blue-600" : "text-gray-900"}`}
+                    className={`text-sm font-medium ${isToday ? 'text-blue-600' : 'text-gray-900'}`}
                   >
-                    {format(day, "EEE")}
+                    {format(day, 'EEE')}
                   </div>
                   <div
-                    className={`text-lg ${isToday ? "text-blue-600 font-bold" : "text-gray-700"}`}
+                    className={`text-lg ${isToday ? 'text-blue-600 font-bold' : 'text-gray-700'}`}
                   >
-                    {format(day, "d")}
+                    {format(day, 'd')}
                   </div>
                 </div>
 
@@ -342,7 +341,7 @@ const Appointments: React.FC = () => {
                 <div className="flex items-center space-x-4">
                   <div
                     className={`w-3 h-3 rounded-full ${getTypeColor(appointment.type)}`}
-                  ></div>
+                   />
                   <div>
                     <div className="flex items-center space-x-2">
                       <h3 className="text-lg font-medium text-gray-900">
@@ -361,7 +360,7 @@ const Appointments: React.FC = () => {
                       </div>
                       <div className="flex items-center">
                         <CalendarIcon className="h-4 w-4 mr-1" />
-                        {format(new Date(appointment.date), "MMM d, yyyy")}
+                        {format(new Date(appointment.date), 'MMM d, yyyy')}
                       </div>
                       <div className="flex items-center">
                         <ClockIcon className="h-4 w-4 mr-1" />
@@ -396,7 +395,7 @@ const Appointments: React.FC = () => {
                     <PencilIcon className="h-4 w-4 mr-1" />
                     Edit
                   </Link>
-                  {appointment.status === "scheduled" && (
+                  {appointment.status === 'scheduled' && (
                     <button className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
                       <CheckCircleIcon className="h-4 w-4 mr-1" />
                       Confirm
@@ -415,9 +414,9 @@ const Appointments: React.FC = () => {
               No appointments found
             </h3>
             <p className="mt-1 text-sm text-gray-500">
-              {searchTerm || filterStatus !== "all"
-                ? "Try adjusting your search or filter criteria."
-                : "Get started by scheduling your first appointment."}
+              {searchTerm || filterStatus !== 'all'
+                ? 'Try adjusting your search or filter criteria.'
+                : 'Get started by scheduling your first appointment.'}
             </p>
             <div className="mt-6">
               <Link
@@ -444,25 +443,25 @@ const Appointments: React.FC = () => {
           </div>
           <div className="text-center">
             <div className="text-3xl font-bold text-green-600">
-              {appointments.filter((a) => a.status === "confirmed").length}
+              {appointments.filter((a) => a.status === 'confirmed').length}
             </div>
             <div className="text-sm text-gray-500">Confirmed</div>
           </div>
           <div className="text-center">
             <div className="text-3xl font-bold text-yellow-600">
-              {appointments.filter((a) => a.status === "scheduled").length}
+              {appointments.filter((a) => a.status === 'scheduled').length}
             </div>
             <div className="text-sm text-gray-500">Scheduled</div>
           </div>
           <div className="text-center">
             <div className="text-3xl font-bold text-purple-600">
-              {appointments.filter((a) => a.status === "completed").length}
+              {appointments.filter((a) => a.status === 'completed').length}
             </div>
             <div className="text-sm text-gray-500">Completed</div>
           </div>
           <div className="text-center">
             <div className="text-3xl font-bold text-red-600">
-              {appointments.filter((a) => a.status === "cancelled").length}
+              {appointments.filter((a) => a.status === 'cancelled').length}
             </div>
             <div className="text-sm text-gray-500">Cancelled</div>
           </div>

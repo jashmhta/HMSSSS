@@ -126,24 +126,24 @@ metadata:
   namespace: ultimate-hms
   labels:
     app: hospital-management-system
-spec:
-   podSelector: {}
-   policyTypes:
-   - Ingress
-   - Egress
-   ingress:
-   - from:
-     - namespaceSelector:
-         matchLabels:
-           name: istio-system
-     - namespaceSelector:
-           matchLabels:
-             name: kube-system
-     - namespaceSelector:
-           matchLabels:
-             name: ultimate-hms
-     - podSelector: {}
-     ports:
+ spec:
+    podSelector: {}
+    policyTypes:
+    - Ingress
+    - Egress
+    ingress:
+    - from:
+      - namespaceSelector:
+          matchLabels:
+            name: istio-system
+      - namespaceSelector:
+          matchLabels:
+            name: kube-system
+      - namespaceSelector:
+          matchLabels:
+            name: ultimate-hms
+      - podSelector: {}
+      ports:
      - protocol: TCP
        port: 8080
      - protocol: TCP

@@ -1,18 +1,19 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
+
 import { motion, AnimatePresence } from 'framer-motion';
 
 type Theme = 'light' | 'dark' | 'auto';
 
-interface ThemeContextType {
+interface IThemeContextType {
   theme: Theme;
   setTheme: (theme: Theme) => void;
   toggleTheme: () => void;
   isDark: boolean;
 }
 
-const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
+const ThemeContext = createContext<IThemeContextType | undefined>(undefined);
 
 export function useTheme() {
   const context = useContext(ThemeContext);
@@ -22,11 +23,11 @@ export function useTheme() {
   return context;
 }
 
-interface ThemeProviderProps {
+interface IThemeProviderProps {
   children: React.ReactNode;
 }
 
-export function ThemeProvider({ children }: ThemeProviderProps) {
+export function ThemeProvider({ children }: IThemeProviderProps) {
   const [theme, setTheme] = useState<Theme>('auto');
   const [isDark, setIsDark] = useState(false);
 
@@ -107,11 +108,11 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
   );
 }
 
-interface ThemeToggleProps {
+interface IThemeToggleProps {
   className?: string;
 }
 
-export function ThemeToggle({ className = '' }: ThemeToggleProps) {
+export function ThemeToggle({ className = '' }: IThemeToggleProps) {
   const { theme, toggleTheme, isDark } = useTheme();
 
   const getThemeIcon = () => {
@@ -171,12 +172,12 @@ export function ThemeToggle({ className = '' }: ThemeToggleProps) {
         className="absolute -top-1 -right-1 w-2 h-2 bg-green-400 rounded-full"
         animate={{
           scale: [1, 1.2, 1],
-          opacity: [0.7, 1, 0.7]
+          opacity: [0.7, 1, 0.7],
         }}
         transition={{
           duration: 2,
           repeat: Infinity,
-          ease: "easeInOut"
+          ease: 'easeInOut',
         }}
       />
     </motion.button>

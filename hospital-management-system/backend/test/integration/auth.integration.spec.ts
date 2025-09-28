@@ -2,8 +2,20 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
 import * as request from 'supertest';
 import { AppModule } from '../../src/app.module';
-import { TestApp, setupTestEnvironment, teardownTestEnvironment, createAuthHelper, TestDataBuilder, TestAssertions, TestSecurity } from '../test-helpers';
-import { TestDatabaseManager, setupTestDatabase, teardownTestDatabase } from '../test-database.config';
+import {
+  TestApp,
+  setupTestEnvironment,
+  teardownTestEnvironment,
+  createAuthHelper,
+  TestDataBuilder,
+  TestAssertions,
+  TestSecurity,
+} from '../test-helpers';
+import {
+  TestDatabaseManager,
+  setupTestDatabase,
+  teardownTestDatabase,
+} from '../test-database.config';
 
 describe('Authentication Integration Tests', () => {
   let app: TestApp;
@@ -118,7 +130,9 @@ describe('Authentication Integration Tests', () => {
       }
 
       const results = await Promise.allSettled(requests);
-      const rateLimited = results.filter(r => r.status === 'rejected' && r.reason.response.status === 429).length;
+      const rateLimited = results.filter(
+        r => r.status === 'rejected' && r.reason.response.status === 429,
+      ).length;
 
       expect(rateLimited).toBeGreaterThan(0);
     });
@@ -214,9 +228,13 @@ describe('Authentication Integration Tests', () => {
 
       const token = loginResponse.body.access_token;
 
-      const response = await app.post('/auth/logout', {}, {
-        Authorization: `Bearer ${token}`,
-      });
+      const response = await app.post(
+        '/auth/logout',
+        {},
+        {
+          Authorization: `Bearer ${token}`,
+        },
+      );
 
       TestAssertions.expectSuccess(response, 200);
 
@@ -235,9 +253,13 @@ describe('Authentication Integration Tests', () => {
     });
 
     it('should reject logout with invalid token', async () => {
-      const response = await app.post('/auth/logout', {}, {
-        Authorization: 'Bearer invalid-token',
-      });
+      const response = await app.post(
+        '/auth/logout',
+        {},
+        {
+          Authorization: 'Bearer invalid-token',
+        },
+      );
 
       TestSecurity.expectAuthenticationRequired(response);
     });
@@ -430,7 +452,11 @@ describe('Authentication Integration Tests', () => {
 
       const response = await app.post('/auth/change-password', passwordData, authHeaders);
 
-      TestAssertions.expectError(response, 400, 'New password must be different from current password');
+      TestAssertions.expectError(
+        response,
+        400,
+        'New password must be different from current password',
+      );
     });
   });
 
@@ -546,10 +572,14 @@ describe('Authentication Integration Tests', () => {
         // Generate test token (in real app, this would come from authenticator app)
         const testToken = '123456'; // Mock token
 
-        const response = await app.post('/auth/2fa/verify', {
-          token: testToken,
-          secret: secret,
-        }, authHeaders);
+        const response = await app.post(
+          '/auth/2fa/verify',
+          {
+            token: testToken,
+            secret: secret,
+          },
+          authHeaders,
+        );
 
         TestAssertions.expectSuccess(response, 200);
         expect(response.body).toHaveProperty('backupCodes');
@@ -559,10 +589,14 @@ describe('Authentication Integration Tests', () => {
       it('should reject invalid 2FA token', async () => {
         const authHeaders = authHelper.getAuthHeaders('ADMIN');
 
-        const response = await app.post('/auth/2fa/verify', {
-          token: 'invalid-token',
-          secret: 'test-secret',
-        }, authHeaders);
+        const response = await app.post(
+          '/auth/2fa/verify',
+          {
+            token: 'invalid-token',
+            secret: 'test-secret',
+          },
+          authHeaders,
+        );
 
         TestAssertions.expectError(response, 401, 'Invalid 2FA token');
       });
@@ -673,13 +707,17 @@ describe('Authentication Integration Tests', () => {
     it('should enforce rate limiting on sensitive endpoints', async () => {
       const requests = [];
       for (let i = 0; i < 10; i++) {
-        requests.push(app.post('/auth/forgot-password', {
-          email: 'test@test.com',
-        }));
+        requests.push(
+          app.post('/auth/forgot-password', {
+            email: 'test@test.com',
+          }),
+        );
       }
 
       const results = await Promise.allSettled(requests);
-      const rateLimited = results.filter(r => r.status === 'rejected' && r.reason.response.status === 429).length;
+      const rateLimited = results.filter(
+        r => r.status === 'rejected' && r.reason.response.status === 429,
+      ).length;
 
       expect(rateLimited).toBeGreaterThan(0);
     });

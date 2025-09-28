@@ -37,7 +37,7 @@ module.exports = {
     '@typescript-eslint/interface-name-prefix': 'off',
     '@typescript-eslint/explicit-function-return-type': 'warn',
     '@typescript-eslint/explicit-module-boundary-types': 'warn',
-    '@typescript-eslint/no-explicit-any': 'warn',
+    '@typescript-eslint/no-explicit-any': 'error',
     '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
     '@typescript-eslint/no-floating-promises': 'error',
     '@typescript-eslint/prefer-nullish-coalescing': 'warn',
@@ -116,13 +116,6 @@ module.exports = {
       ],
     }],
   },
-  ignorePatterns: [
-    'dist/**/*',
-    'node_modules/**/*',
-    'coverage/**/*',
-    '.nyc_output/**/*',
-    '*.d.ts',
-  ],
   overrides: [
     {
       files: ['**/*.spec.ts', '**/*.test.ts'],

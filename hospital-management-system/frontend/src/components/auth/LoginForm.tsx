@@ -1,15 +1,18 @@
 import React, { useState } from 'react';
-import { useAuth } from '../../hooks/useAuth';
 
-interface FormData {
+// eslint-disable-next-line import/no-relative-parent-imports
+import { useAuth } from '@/hooks/useAuth';
+
+interface IFormData {
   email: string;
   password: string;
   rememberMe: boolean;
 }
 
-const LoginForm: React.FC = () => {
+// eslint-disable-next-line max-lines-per-function
+const useLoginForm = () => {
   const { login, isLoading } = useAuth();
-  const [formData, setFormData] = useState<FormData>({
+  const [formData, setFormData] = useState<IFormData>({
     email: '',
     password: '',
     rememberMe: false,
@@ -39,8 +42,8 @@ const LoginForm: React.FC = () => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
 
     if (!validateForm()) {
       return;
@@ -57,8 +60,8 @@ const LoginForm: React.FC = () => {
     }
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value, type, checked } = e.target;
+  const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value, type, checked } = event.target;
     setFormData(prev => ({
       ...prev,
       [name]: type === 'checkbox' ? checked : value,
@@ -82,6 +85,33 @@ const LoginForm: React.FC = () => {
     window.location.pathname = '/forgot-password';
   };
 
+  return {
+    formData,
+    errors,
+    showPassword,
+    isLoading,
+    handleSubmit,
+    handleInputChange,
+    togglePasswordVisibility,
+    handleRegisterClick,
+    handleForgotPasswordClick,
+  };
+};
+
+// eslint-disable-next-line max-lines-per-function
+const LoginForm: React.FC = () => {
+  const {
+    formData,
+    errors,
+    showPassword,
+    isLoading,
+    handleSubmit,
+    handleInputChange,
+    togglePasswordVisibility,
+    handleRegisterClick,
+    handleForgotPasswordClick,
+  } = useLoginForm();
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
@@ -90,7 +120,7 @@ const LoginForm: React.FC = () => {
             Sign in to your account
           </h2>
         </div>
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit} role="form">
+        <form className="mt-8 space-y-6" onSubmit={handleSubmit as any}>
           <div className="rounded-md shadow-sm -space-y-px">
             <div>
               <label htmlFor="email" className="sr-only">
@@ -192,7 +222,7 @@ const LoginForm: React.FC = () => {
 
           <div className="text-center">
             <p className="text-sm text-gray-600">
-              Don't have an account?{' '}
+              Don&apos;t have an account?{' '}
               <button
                 type="button"
                 onClick={handleRegisterClick}

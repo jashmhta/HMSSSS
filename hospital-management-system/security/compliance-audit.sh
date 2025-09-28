@@ -7,8 +7,8 @@ set -e
 
 # Configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-LOG_FILE="/var/log/hms/compliance-audit.log"
-REPORT_DIR="/tmp/compliance-reports"
+LOG_FILE="$SCRIPT_DIR/logs/compliance-audit.log"
+REPORT_DIR="$SCRIPT_DIR/reports"
 
 # Compliance standards to check
 CHECK_HIPAA="${CHECK_HIPAA:-true}"
@@ -546,22 +546,30 @@ generate_compliance_report() {
 
         if [ "$CHECK_HIPAA" = "true" ]; then
             echo "<h3 id='hipaa'>HIPAA Compliance Results</h3>"
-            echo "<pre>$(cat "$REPORT_DIR/hipaa/audit-results.txt" 2>/dev/null || echo 'No HIPAA results available')"</pre>
+            echo "<pre>"
+            cat "$REPORT_DIR/hipaa/audit-results.txt" 2>/dev/null || echo 'No HIPAA results available'
+            echo "</pre>"
         fi
 
         if [ "$CHECK_GDPR" = "true" ]; then
             echo "<h3 id='gdpr'>GDPR Compliance Results</h3>"
-            echo "<pre>$(cat "$REPORT_DIR/gdpr/audit-results.txt" 2>/dev/null || echo 'No GDPR results available')"</pre>
+            echo "<pre>"
+            cat "$REPORT_DIR/gdpr/audit-results.txt" 2>/dev/null || echo 'No GDPR results available'
+            echo "</pre>"
         fi
 
         if [ "$CHECK_SOC2" = "true" ]; then
             echo "<h3 id='soc2'>SOC 2 Compliance Results</h3>"
-            echo "<pre>$(cat "$REPORT_DIR/soc2/audit-results.txt" 2>/dev/null || echo 'No SOC 2 results available')"</pre>
+            echo "<pre>"
+            cat "$REPORT_DIR/soc2/audit-results.txt" 2>/dev/null || echo 'No SOC 2 results available'
+            echo "</pre>"
         fi
 
         if [ "$CHECK_PCI_DSS" = "true" ]; then
             echo "<h3 id='pci'>PCI DSS Compliance Results</h3>"
-            echo "<pre>$(cat "$REPORT_DIR/pci/audit-results.txt" 2>/dev/null || echo 'No PCI DSS results available')"</pre>
+            echo "<pre>"
+            cat "$REPORT_DIR/pci/audit-results.txt" 2>/dev/null || echo 'No PCI DSS results available'
+            echo "</pre>"
         fi
 
         echo ""

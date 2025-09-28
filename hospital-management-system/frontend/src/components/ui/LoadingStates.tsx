@@ -1,10 +1,12 @@
 'use client';
 
 import React from 'react';
+
 import { motion, AnimatePresence } from 'framer-motion';
+
 import { cn } from '@/lib/utils';
 
-interface SkeletonProps {
+interface ISkeletonProps {
   className?: string;
   variant?: 'text' | 'circular' | 'rectangular' | 'rounded';
   animation?: 'pulse' | 'wave' | 'shimmer';
@@ -13,14 +15,14 @@ interface SkeletonProps {
   height?: string | number;
 }
 
-interface LoadingSpinnerProps {
+interface ILoadingSpinnerProps {
   size?: 'sm' | 'md' | 'lg' | 'xl';
   variant?: 'spinner' | 'dots' | 'bars' | 'pulse';
   color?: string;
   className?: string;
 }
 
-interface LoadingCardProps {
+interface ILoadingCardProps {
   className?: string;
   children?: React.ReactNode;
   variant?: 'skeleton' | 'spinner' | 'shimmer';
@@ -30,7 +32,7 @@ interface LoadingCardProps {
   lines?: number;
 }
 
-interface LoadingOverlayProps {
+interface ILoadingOverlayProps {
   isLoading: boolean;
   children: React.ReactNode;
   message?: string;
@@ -38,7 +40,7 @@ interface LoadingOverlayProps {
   className?: string;
 }
 
-interface ProgressBarProps {
+interface IProgressBarProps {
   progress: number;
   className?: string;
   variant?: 'linear' | 'circular';
@@ -55,7 +57,7 @@ export function Skeleton({
   lines = 1,
   width,
   height,
-}: SkeletonProps) {
+}: ISkeletonProps) {
   const baseClasses = 'bg-gray-200 dark:bg-gray-700';
 
   const variantClasses = {
@@ -68,19 +70,9 @@ export function Skeleton({
   const animationVariants = {
     pulse: {
       opacity: [0.6, 1, 0.6],
-      transition: {
-        duration: 1.5,
-        repeat: Infinity,
-        ease: 'easeInOut',
-      },
     },
     wave: {
       x: [-100, 100],
-      transition: {
-        duration: 1,
-        repeat: Infinity,
-        ease: 'easeInOut',
-      },
     },
     shimmer: {
       background: [
@@ -88,17 +80,23 @@ export function Skeleton({
         'linear-gradient(90deg, transparent, rgba(255,255,255,0.6), transparent)',
         'linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent)',
       ],
-      transition: {
-        duration: 1.5,
-        repeat: Infinity,
-        ease: 'easeInOut',
-      },
     },
+  };
+
+  const transitionConfig = {
+    duration: 1.5,
+    repeat: Infinity,
+    ease: 'easeInOut' as const,
   };
 
   const style: React.CSSProperties = {};
   if (width) style.width = typeof width === 'number' ? `${width}px` : width;
   if (height) style.height = typeof height === 'number' ? `${height}px` : height;
+
+  // Create a clean style object without undefined values
+  const cleanStyle: React.CSSProperties = Object.fromEntries(
+    Object.entries(style).filter(([, value]) => value !== undefined),
+  );
 
   if (lines > 1) {
     return (
@@ -110,10 +108,11 @@ export function Skeleton({
               baseClasses,
               variantClasses[variant],
               i === lines - 1 && lines > 1 ? 'w-3/4' : 'w-full',
-              className
+              className,
             )}
-            style={i === 0 ? style : {}}
+            style={i === 0 ? (cleanStyle as any) : {}}
             animate={animationVariants[animation]}
+            transition={transitionConfig}
           />
         ))}
       </div>
@@ -123,7 +122,7 @@ export function Skeleton({
   return (
     <motion.div
       className={cn(baseClasses, variantClasses[variant], className)}
-      style={style}
+      style={cleanStyle as any}
       animate={animationVariants[animation]}
     />
   );
@@ -134,7 +133,7 @@ export function LoadingSpinner({
   variant = 'spinner',
   color = 'text-blue-600',
   className = '',
-}: LoadingSpinnerProps) {
+}: ILoadingSpinnerProps) {
   const sizeClasses = {
     sm: 'w-4 h-4',
     md: 'w-6 h-6',
@@ -223,7 +222,7 @@ export function LoadingCard({
   subtitle,
   avatar = false,
   lines = 3,
-}: LoadingCardProps) {
+}: ILoadingCardProps) {
   return (
     <div className={cn('p-4 bg-white dark:bg-gray-800 rounded-lg shadow-sm', className)}>
       {avatar && <Skeleton variant="circular" width={40} height={40} className="mb-3" />}
@@ -272,7 +271,7 @@ export function LoadingOverlay({
   message = 'Loading...',
   variant = 'overlay',
   className = '',
-}: LoadingOverlayProps) {
+}: ILoadingOverlayProps) {
   return (
     <div className={cn('relative', className)}>
       {children}
@@ -285,7 +284,7 @@ export function LoadingOverlay({
             className={cn(
               'absolute inset-0 flex items-center justify-center backdrop-blur-sm z-50',
               variant === 'overlay' && 'bg-white/70 dark:bg-gray-900/70',
-              variant === 'inline' && 'bg-transparent'
+              variant === 'inline' && 'bg-transparent',
             )}
           >
             <div className="text-center">
@@ -314,7 +313,7 @@ export function ProgressBar({
   color = 'bg-blue-600',
   showLabel = true,
   animated = true,
-}: ProgressBarProps) {
+}: IProgressBarProps) {
   const sizeClasses = {
     linear: {
       sm: 'h-1',

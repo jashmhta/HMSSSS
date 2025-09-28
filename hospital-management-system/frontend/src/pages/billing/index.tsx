@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from "react";
-import Link from "next/link";
+import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
+
 import {
   CurrencyDollarIcon,
   MagnifyingGlassIcon,
@@ -14,8 +15,8 @@ import {
   CalendarIcon,
   CreditCardIcon,
   BanknotesIcon,
-} from "@heroicons/react/24/outline";
-import { format } from "date-fns";
+} from '@heroicons/react/24/outline';
+import { format } from 'date-fns';
 
 interface Bill {
   id: string;
@@ -24,25 +25,25 @@ interface Bill {
   invoiceNumber: string;
   billDate: string;
   dueDate: string;
-  status: "draft" | "sent" | "paid" | "overdue" | "cancelled";
+  status: 'draft' | 'sent' | 'paid' | 'overdue' | 'cancelled';
   totalAmount: number;
   paidAmount: number;
   balance: number;
-  items: {
+  items: Array<{
     id: string;
     description: string;
     quantity: number;
     unitPrice: number;
     total: number;
     category:
-      | "consultation"
-      | "procedure"
-      | "medication"
-      | "lab"
-      | "radiology"
-      | "room"
-      | "other";
-  }[];
+      | 'consultation'
+      | 'procedure'
+      | 'medication'
+      | 'lab'
+      | 'radiology'
+      | 'room'
+      | 'other';
+  }>;
   insurance?: {
     provider: string;
     policyNumber: string;
@@ -50,22 +51,22 @@ interface Bill {
     approvedAmount: number;
     paidAmount: number;
   };
-  payments: {
+  payments: Array<{
     id: string;
     date: string;
     amount: number;
-    method: "cash" | "card" | "bank_transfer" | "insurance" | "check";
+    method: 'cash' | 'card' | 'bank_transfer' | 'insurance' | 'check';
     reference?: string;
-  }[];
+  }>;
 }
 
 const BillingManagement: React.FC = () => {
   const [bills, setBills] = useState<Bill[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState("");
+  const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<
-    "all" | "draft" | "sent" | "paid" | "overdue" | "cancelled"
-  >("all");
+    'all' | 'draft' | 'sent' | 'paid' | 'overdue' | 'cancelled'
+  >('all');
 
   useEffect(() => {
     // Simulate API call
@@ -74,106 +75,106 @@ const BillingManagement: React.FC = () => {
         setTimeout(() => {
           const mockBills: Bill[] = [
             {
-              id: "1",
-              patientId: "1",
-              patientName: "John Doe",
-              invoiceNumber: "INV-2025-001",
-              billDate: "2025-09-15",
-              dueDate: "2025-10-15",
-              status: "paid",
+              id: '1',
+              patientId: '1',
+              patientName: 'John Doe',
+              invoiceNumber: 'INV-2025-001',
+              billDate: '2025-09-15',
+              dueDate: '2025-10-15',
+              status: 'paid',
               totalAmount: 450.0,
               paidAmount: 450.0,
               balance: 0.0,
               items: [
                 {
-                  id: "1",
-                  description: "Cardiology Consultation",
+                  id: '1',
+                  description: 'Cardiology Consultation',
                   quantity: 1,
                   unitPrice: 200.0,
                   total: 200.0,
-                  category: "consultation",
+                  category: 'consultation',
                 },
                 {
-                  id: "2",
-                  description: "ECG",
+                  id: '2',
+                  description: 'ECG',
                   quantity: 1,
                   unitPrice: 150.0,
                   total: 150.0,
-                  category: "procedure",
+                  category: 'procedure',
                 },
                 {
-                  id: "3",
-                  description: "Blood Tests",
+                  id: '3',
+                  description: 'Blood Tests',
                   quantity: 1,
                   unitPrice: 100.0,
                   total: 100.0,
-                  category: "lab",
+                  category: 'lab',
                 },
               ],
               insurance: {
-                provider: "Blue Cross Blue Shield",
-                policyNumber: "BCBS123456",
+                provider: 'Blue Cross Blue Shield',
+                policyNumber: 'BCBS123456',
                 coverage: 80,
                 approvedAmount: 360.0,
                 paidAmount: 360.0,
               },
               payments: [
                 {
-                  id: "1",
-                  date: "2025-09-16",
+                  id: '1',
+                  date: '2025-09-16',
                   amount: 360.0,
-                  method: "insurance",
-                  reference: "CLAIM-001",
+                  method: 'insurance',
+                  reference: 'CLAIM-001',
                 },
                 {
-                  id: "2",
-                  date: "2025-09-16",
+                  id: '2',
+                  date: '2025-09-16',
                   amount: 90.0,
-                  method: "card",
-                  reference: "TXN-12345",
+                  method: 'card',
+                  reference: 'TXN-12345',
                 },
               ],
             },
             {
-              id: "2",
-              patientId: "2",
-              patientName: "Jane Smith",
-              invoiceNumber: "INV-2025-002",
-              billDate: "2025-09-18",
-              dueDate: "2025-10-18",
-              status: "sent",
+              id: '2',
+              patientId: '2',
+              patientName: 'Jane Smith',
+              invoiceNumber: 'INV-2025-002',
+              billDate: '2025-09-18',
+              dueDate: '2025-10-18',
+              status: 'sent',
               totalAmount: 320.0,
               paidAmount: 0.0,
               balance: 320.0,
               items: [
                 {
-                  id: "1",
-                  description: "General Consultation",
+                  id: '1',
+                  description: 'General Consultation',
                   quantity: 1,
                   unitPrice: 150.0,
                   total: 150.0,
-                  category: "consultation",
+                  category: 'consultation',
                 },
                 {
-                  id: "2",
-                  description: "Spirometry",
+                  id: '2',
+                  description: 'Spirometry',
                   quantity: 1,
                   unitPrice: 120.0,
                   total: 120.0,
-                  category: "procedure",
+                  category: 'procedure',
                 },
                 {
-                  id: "3",
-                  description: "Albuterol Inhaler",
+                  id: '3',
+                  description: 'Albuterol Inhaler',
                   quantity: 1,
                   unitPrice: 50.0,
                   total: 50.0,
-                  category: "medication",
+                  category: 'medication',
                 },
               ],
               insurance: {
-                provider: "Aetna",
-                policyNumber: "AET789012",
+                provider: 'Aetna',
+                policyNumber: 'AET789012',
                 coverage: 70,
                 approvedAmount: 224.0,
                 paidAmount: 0.0,
@@ -181,49 +182,49 @@ const BillingManagement: React.FC = () => {
               payments: [],
             },
             {
-              id: "3",
-              patientId: "3",
-              patientName: "Robert Johnson",
-              invoiceNumber: "INV-2025-003",
-              billDate: "2025-09-10",
-              dueDate: "2025-10-10",
-              status: "overdue",
+              id: '3',
+              patientId: '3',
+              patientName: 'Robert Johnson',
+              invoiceNumber: 'INV-2025-003',
+              billDate: '2025-09-10',
+              dueDate: '2025-10-10',
+              status: 'overdue',
               totalAmount: 1250.0,
               paidAmount: 500.0,
               balance: 750.0,
               items: [
                 {
-                  id: "1",
-                  description: "Orthopedic Consultation",
+                  id: '1',
+                  description: 'Orthopedic Consultation',
                   quantity: 1,
                   unitPrice: 300.0,
                   total: 300.0,
-                  category: "consultation",
+                  category: 'consultation',
                 },
                 {
-                  id: "2",
-                  description: "Knee MRI",
+                  id: '2',
+                  description: 'Knee MRI',
                   quantity: 1,
                   unitPrice: 800.0,
                   total: 800.0,
-                  category: "radiology",
+                  category: 'radiology',
                 },
                 {
-                  id: "3",
-                  description: "Pain Medication",
+                  id: '3',
+                  description: 'Pain Medication',
                   quantity: 1,
                   unitPrice: 150.0,
                   total: 150.0,
-                  category: "medication",
+                  category: 'medication',
                 },
               ],
               payments: [
                 {
-                  id: "1",
-                  date: "2025-09-12",
+                  id: '1',
+                  date: '2025-09-12',
                   amount: 500.0,
-                  method: "bank_transfer",
-                  reference: "BT-67890",
+                  method: 'bank_transfer',
+                  reference: 'BT-67890',
                 },
               ],
             },
@@ -232,7 +233,7 @@ const BillingManagement: React.FC = () => {
           setLoading(false);
         }, 1000);
       } catch (error) {
-        console.error("Failed to fetch bills:", error);
+        console.error('Failed to fetch bills:', error);
         setLoading(false);
       }
     };
@@ -242,56 +243,56 @@ const BillingManagement: React.FC = () => {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "draft":
-        return "bg-gray-100 text-gray-800";
-      case "sent":
-        return "bg-blue-100 text-blue-800";
-      case "paid":
-        return "bg-green-100 text-green-800";
-      case "overdue":
-        return "bg-red-100 text-red-800";
-      case "cancelled":
-        return "bg-red-100 text-red-800";
+      case 'draft':
+        return 'bg-gray-100 text-gray-800';
+      case 'sent':
+        return 'bg-blue-100 text-blue-800';
+      case 'paid':
+        return 'bg-green-100 text-green-800';
+      case 'overdue':
+        return 'bg-red-100 text-red-800';
+      case 'cancelled':
+        return 'bg-red-100 text-red-800';
       default:
-        return "bg-gray-100 text-gray-800";
+        return 'bg-gray-100 text-gray-800';
     }
   };
 
   const getCategoryColor = (category: string) => {
     switch (category) {
-      case "consultation":
-        return "bg-blue-100 text-blue-800";
-      case "procedure":
-        return "bg-green-100 text-green-800";
-      case "medication":
-        return "bg-purple-100 text-purple-800";
-      case "lab":
-        return "bg-yellow-100 text-yellow-800";
-      case "radiology":
-        return "bg-pink-100 text-pink-800";
-      case "room":
-        return "bg-indigo-100 text-indigo-800";
-      case "other":
-        return "bg-gray-100 text-gray-800";
+      case 'consultation':
+        return 'bg-blue-100 text-blue-800';
+      case 'procedure':
+        return 'bg-green-100 text-green-800';
+      case 'medication':
+        return 'bg-purple-100 text-purple-800';
+      case 'lab':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'radiology':
+        return 'bg-pink-100 text-pink-800';
+      case 'room':
+        return 'bg-indigo-100 text-indigo-800';
+      case 'other':
+        return 'bg-gray-100 text-gray-800';
       default:
-        return "bg-gray-100 text-gray-800";
+        return 'bg-gray-100 text-gray-800';
     }
   };
 
   const getPaymentMethodIcon = (method: string) => {
     switch (method) {
-      case "cash":
-        return "💵";
-      case "card":
-        return "💳";
-      case "bank_transfer":
-        return "🏦";
-      case "insurance":
-        return "🏥";
-      case "check":
-        return "📝";
+      case 'cash':
+        return '💵';
+      case 'card':
+        return '💳';
+      case 'bank_transfer':
+        return '🏦';
+      case 'insurance':
+        return '🏥';
+      case 'check':
+        return '📝';
       default:
-        return "💰";
+        return '💰';
     }
   };
 
@@ -300,28 +301,28 @@ const BillingManagement: React.FC = () => {
       bill.patientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       bill.invoiceNumber.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus =
-      filterStatus === "all" || bill.status === filterStatus;
+      filterStatus === 'all' || bill.status === filterStatus;
     return matchesSearch && matchesStatus;
   });
 
-  const overdueBills = bills.filter((bill) => bill.status === "overdue");
+  const overdueBills = bills.filter((bill) => bill.status === 'overdue');
   const pendingPayments = bills.filter(
-    (bill) => bill.balance > 0 && bill.status !== "cancelled",
+    (bill) => bill.balance > 0 && bill.status !== 'cancelled',
   );
 
   const totalRevenue = bills
-    .filter((bill) => bill.status === "paid")
+    .filter((bill) => bill.status === 'paid')
     .reduce((sum, bill) => sum + bill.paidAmount, 0);
 
   const outstandingAmount = bills
-    .filter((bill) => bill.status !== "paid" && bill.status !== "cancelled")
+    .filter((bill) => bill.status !== 'paid' && bill.status !== 'cancelled')
     .reduce((sum, bill) => sum + bill.balance, 0);
 
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto" />
           <p className="mt-4 text-gray-600">Loading billing data...</p>
         </div>
       </div>
@@ -481,7 +482,7 @@ const BillingManagement: React.FC = () => {
                       >
                         {bill.status}
                       </span>
-                      {bill.status === "overdue" && (
+                      {bill.status === 'overdue' && (
                         <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-red-100 text-red-800">
                           Overdue
                         </span>
@@ -495,12 +496,12 @@ const BillingManagement: React.FC = () => {
                       </div>
                       <div className="flex items-center">
                         <CalendarIcon className="h-4 w-4 mr-1" />
-                        Bill Date:{" "}
-                        {format(new Date(bill.billDate), "MMM d, yyyy")}
+                        Bill Date:{' '}
+                        {format(new Date(bill.billDate), 'MMM d, yyyy')}
                       </div>
                       <div className="flex items-center">
                         <ClockIcon className="h-4 w-4 mr-1" />
-                        Due: {format(new Date(bill.dueDate), "MMM d, yyyy")}
+                        Due: {format(new Date(bill.dueDate), 'MMM d, yyyy')}
                       </div>
                     </div>
 
@@ -551,7 +552,7 @@ const BillingManagement: React.FC = () => {
                       <div className="text-center">
                         <span className="text-gray-500">Balance</span>
                         <div
-                          className={`font-bold ${bill.balance > 0 ? "text-red-600" : "text-green-600"}`}
+                          className={`font-bold ${bill.balance > 0 ? 'text-red-600' : 'text-green-600'}`}
                         >
                           ${bill.balance.toFixed(2)}
                         </div>
@@ -565,8 +566,8 @@ const BillingManagement: React.FC = () => {
                           Insurance
                         </h4>
                         <div className="text-xs text-blue-800">
-                          {bill.insurance.provider} • Policy:{" "}
-                          {bill.insurance.policyNumber} • Coverage:{" "}
+                          {bill.insurance.provider} • Policy:{' '}
+                          {bill.insurance.policyNumber} • Coverage:{' '}
                           {bill.insurance.coverage}%
                         </div>
                       </div>
@@ -591,7 +592,7 @@ const BillingManagement: React.FC = () => {
                                 <span>
                                   {format(
                                     new Date(payment.date),
-                                    "MMM d, yyyy",
+                                    'MMM d, yyyy',
                                   )}
                                 </span>
                                 {payment.reference && (
@@ -626,13 +627,13 @@ const BillingManagement: React.FC = () => {
                     <PencilIcon className="h-4 w-4 mr-1" />
                     Edit
                   </Link>
-                  {bill.balance > 0 && bill.status !== "cancelled" && (
+                  {bill.balance > 0 && bill.status !== 'cancelled' && (
                     <button className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
                       <CreditCardIcon className="h-4 w-4 mr-1" />
                       Pay
                     </button>
                   )}
-                  {bill.status === "draft" && (
+                  {bill.status === 'draft' && (
                     <button className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
                       <CheckCircleIcon className="h-4 w-4 mr-1" />
                       Send
@@ -651,9 +652,9 @@ const BillingManagement: React.FC = () => {
               No bills found
             </h3>
             <p className="mt-1 text-sm text-gray-500">
-              {searchTerm || filterStatus !== "all"
-                ? "Try adjusting your search or filter criteria."
-                : "Get started by creating your first bill."}
+              {searchTerm || filterStatus !== 'all'
+                ? 'Try adjusting your search or filter criteria.'
+                : 'Get started by creating your first bill.'}
             </p>
             <div className="mt-6">
               <Link
@@ -680,13 +681,13 @@ const BillingManagement: React.FC = () => {
           </div>
           <div className="text-center">
             <div className="text-3xl font-bold text-green-600">
-              {bills.filter((b) => b.status === "paid").length}
+              {bills.filter((b) => b.status === 'paid').length}
             </div>
             <div className="text-sm text-gray-500">Paid</div>
           </div>
           <div className="text-center">
             <div className="text-3xl font-bold text-yellow-600">
-              {bills.filter((b) => b.status === "sent").length}
+              {bills.filter((b) => b.status === 'sent').length}
             </div>
             <div className="text-sm text-gray-500">Sent</div>
           </div>

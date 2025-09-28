@@ -438,7 +438,7 @@ export class PatientsService {
         },
         radiologyTests: {
           take: 10,
-          orderBy: { orderedDate: 'desc' },
+          orderBy: { createdAt: 'desc' },
           where: { status: 'COMPLETED' },
         },
         prescriptions: {

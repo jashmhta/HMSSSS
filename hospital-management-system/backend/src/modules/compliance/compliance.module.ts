@@ -8,6 +8,7 @@ import { ComplianceService } from './compliance.service';
 import { DataRetentionService } from './data-retention.service';
 import { AccessMonitoringService } from './access-monitoring.service';
 import { ComplianceDashboardService } from './compliance-dashboard.service';
+import { AutomatedComplianceService } from './automated-compliance.service';
 
 /**
  *
@@ -20,12 +21,14 @@ import { ComplianceDashboardService } from './compliance-dashboard.service';
     DataRetentionService,
     AccessMonitoringService,
     ComplianceDashboardService,
+    AutomatedComplianceService,
   ],
   exports: [
     ComplianceService,
     DataRetentionService,
     AccessMonitoringService,
     ComplianceDashboardService,
+    AutomatedComplianceService,
   ], // Export services for use in other modules
 })
 export class ComplianceModule {}

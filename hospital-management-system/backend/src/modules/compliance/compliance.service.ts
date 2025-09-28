@@ -1001,4 +1001,33 @@ export class ComplianceService {
     await this.storeComplianceCheckResults(checks);
     this.logger.log(`Completed ${checks.length} compliance checks`);
   }
+
+  /**
+   * Log a compliance event
+   */
+  async logComplianceEvent(event: {
+    userId: string;
+    action: string;
+    resource: string;
+    resourceId: string;
+    eventType?: string;
+    details?: Record<string, any>;
+    complianceFlags?: string[];
+  }): Promise<void> {
+    try {
+      await this.prisma.auditLog.create({
+        data: {
+          userId: event.userId,
+          action: event.action,
+          resource: event.resource,
+          resourceId: event.resourceId,
+          eventType: event.eventType,
+          details: event.details || {},
+          complianceFlags: event.complianceFlags || [],
+        },
+      });
+    } catch (error) {
+      this.logger.error('Failed to log compliance event', error);
+    }
+  }
 }

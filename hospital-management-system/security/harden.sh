@@ -7,7 +7,7 @@ set -e
 
 # Configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-LOG_FILE="/var/log/hms/security-hardening.log"
+LOG_FILE="$SCRIPT_DIR/logs/security-hardening.log"
 
 # Security configuration
 MIN_PASSWORD_LENGTH="${MIN_PASSWORD_LENGTH:-12}"
@@ -461,7 +461,7 @@ EOF
 generate_security_report() {
     log "Generating security hardening report..."
 
-    local report_file="/tmp/security-report-$(date +%Y%m%d_%H%M%S).txt"
+    local report_file="$SCRIPT_DIR/reports/security-report-$(date +%Y%m%d_%H%M%S).txt"
 
     {
         echo "HMS Security Hardening Report"

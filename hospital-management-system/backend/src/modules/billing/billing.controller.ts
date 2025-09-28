@@ -11,6 +11,7 @@ import {
   ForbiddenException,
   UseGuards,
 } from '@nestjs/common';
+import { ValidationPipe } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { UserRole } from '@prisma/client';
 
@@ -19,6 +20,11 @@ import { JwtAuthGuard } from '../../shared/guards/jwt-auth.guard';
 import { RolesGuard } from '../../modules/auth/roles.guard';
 
 import { BillingService } from './billing.service';
+import {
+  PreAuthorizationRequestDto,
+  ClaimSubmissionDto,
+  AppealRequestDto,
+} from './dto/insurance.dto';
 
 /**
  *
@@ -262,5 +268,120 @@ export class BillingController {
     @Query('endDate') endDate: string,
   ) {
     return this.billingService.getRevenueAnalytics(new Date(startDate), new Date(endDate));
+  }
+
+  // Insurance Pre-Authorization and Claims Management
+
+  /**
+   * Submit pre-authorization request
+   */
+  @Post('insurance/pre-authorizations')
+  @Roles(UserRole.ADMIN, UserRole.DOCTOR, UserRole.RECEPTIONIST)
+  @ApiOperation({ summary: 'Submit insurance pre-authorization request' })
+  @ApiResponse({ status: 201, description: 'Pre-authorization request submitted successfully' })
+  async submitPreAuthorization(
+    @Body(ValidationPipe) requestData: PreAuthorizationRequestDto,
+    @Request() req,
+  ) {
+    return this.billingService.submitPreAuthorization({
+      ...requestData,
+      submittedBy: req.user.id,
+    });
+  }
+
+  /**
+   * Get pre-authorization requests
+   */
+  @Get('insurance/pre-authorizations')
+  @Roles(UserRole.ADMIN, UserRole.DOCTOR, UserRole.RECEPTIONIST)
+  @ApiOperation({ summary: 'Get pre-authorization requests' })
+  @ApiResponse({ status: 200, description: 'List of pre-authorization requests' })
+  async getPreAuthorizations(@Query() query: any) {
+    return this.billingService.getPreAuthorizations(query);
+  }
+
+  /**
+   * Update pre-authorization status
+   */
+  @Put('insurance/pre-authorizations/:id')
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'Update pre-authorization status' })
+  @ApiResponse({ status: 200, description: 'Pre-authorization updated successfully' })
+  async updatePreAuthorization(@Param('id') id: string, @Body() updateData: any, @Request() req) {
+    return this.billingService.updatePreAuthorization(id, {
+      ...updateData,
+      updatedBy: req.user.id,
+    });
+  }
+
+  /**
+   * Submit insurance claim
+   */
+  @Post('insurance/claims')
+  @Roles(UserRole.ADMIN, UserRole.RECEPTIONIST)
+  @ApiOperation({ summary: 'Submit insurance claim' })
+  @ApiResponse({ status: 201, description: 'Insurance claim submitted successfully' })
+  async submitInsuranceClaim(@Body(ValidationPipe) claimData: ClaimSubmissionDto, @Request() req) {
+    return this.billingService.submitInsuranceClaim({
+      ...claimData,
+      submittedBy: req.user.id,
+    });
+  }
+
+  /**
+   * Get insurance claims
+   */
+  @Get('insurance/claims')
+  @Roles(UserRole.ADMIN, UserRole.RECEPTIONIST)
+  @ApiOperation({ summary: 'Get insurance claims' })
+  @ApiResponse({ status: 200, description: 'List of insurance claims' })
+  async getInsuranceClaims(@Query() query: any) {
+    return this.billingService.getInsuranceClaims(query);
+  }
+
+  /**
+   * Update insurance claim status
+   */
+  @Put('insurance/claims/:id')
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'Update insurance claim status' })
+  @ApiResponse({ status: 200, description: 'Insurance claim updated successfully' })
+  async updateInsuranceClaim(@Param('id') id: string, @Body() updateData: any, @Request() req) {
+    return this.billingService.updateInsuranceClaim(id, {
+      ...updateData,
+      updatedBy: req.user.id,
+    });
+  }
+
+  /**
+   * Submit claim appeal
+   */
+  @Post('insurance/claims/:id/appeals')
+  @Roles(UserRole.ADMIN, UserRole.RECEPTIONIST)
+  @ApiOperation({ summary: 'Submit appeal for denied insurance claim' })
+  @ApiResponse({ status: 201, description: 'Claim appeal submitted successfully' })
+  async submitClaimAppeal(
+    @Param('id') id: string,
+    @Body(ValidationPipe) appealData: AppealRequestDto,
+    @Request() req,
+  ) {
+    return this.billingService.submitClaimAppeal(id, {
+      ...appealData,
+      submittedBy: req.user.id,
+    });
+  }
+
+  /**
+   * Get insurance analytics
+   */
+  @Get('insurance/analytics')
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'Get insurance processing analytics' })
+  @ApiResponse({ status: 200, description: 'Insurance analytics data' })
+  async getInsuranceAnalytics(
+    @Query('startDate') startDate: string,
+    @Query('endDate') endDate: string,
+  ) {
+    return this.billingService.getInsuranceAnalytics(new Date(startDate), new Date(endDate));
   }
 }

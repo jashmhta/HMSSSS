@@ -270,6 +270,37 @@ export class DischargePatientDto {
   dischargeNotes?: string;
 }
 
+export class UpdateIPDAdmissionDto {
+  @IsOptional()
+  @IsString()
+  primaryDiagnosis?: string;
+
+  @IsOptional()
+  @IsEnum(AdmissionPriority)
+  priority?: AdmissionPriority;
+
+  @IsOptional()
+  @IsNumber()
+  expectedStayDays?: number;
+
+  @IsOptional()
+  @IsString()
+  admittingDepartment?: string;
+
+  @IsOptional()
+  @IsEnum(WardType)
+  wardType?: WardType;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => InsuranceInfoDto)
+  insuranceInfo?: InsuranceInfoDto;
+
+  @IsOptional()
+  @IsString()
+  admittingNotes?: string;
+}
+
 export class TransferPatientDto {
   @IsOptional()
   @IsString()

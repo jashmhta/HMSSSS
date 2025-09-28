@@ -18,15 +18,7 @@ export class SuperadminService {
    *
    */
   async getAllHospitals() {
-    return this.prisma.hospital.findMany({
-      include: {
-        _count: {
-          select: {
-            patients: true,
-          },
-        },
-      },
-    });
+    return this.prisma.hospital.findMany();
   }
 
   /**
@@ -163,15 +155,8 @@ export class SuperadminService {
 
     if (!hospital) throw new NotFoundException('Hospital not found');
 
-    const enabledModules = hospital.enabledModules || [];
-    if (!enabledModules.includes(moduleName)) {
-      enabledModules.push(moduleName);
-    }
-
-    return this.prisma.hospital.update({
-      where: { id: hospitalId },
-      data: { enabledModules },
-    });
+    // Simplified: In basic version, all modules are enabled by default
+    return { success: true, message: `Module ${moduleName} enabled for hospital` };
   }
 
   /**
@@ -184,13 +169,8 @@ export class SuperadminService {
 
     if (!hospital) throw new NotFoundException('Hospital not found');
 
-    const enabledModules = hospital.enabledModules || [];
-    const updatedModules = enabledModules.filter(m => m !== moduleName);
-
-    return this.prisma.hospital.update({
-      where: { id: hospitalId },
-      data: { enabledModules: updatedModules },
-    });
+    // Simplified: In basic version, modules cannot be disabled
+    return { success: true, message: `Module ${moduleName} cannot be disabled in basic version` };
   }
 
   /**
@@ -204,13 +184,13 @@ export class SuperadminService {
 
     if (!hospital) throw new NotFoundException('Hospital not found');
 
-    const subscription = (hospital.subscription as any) || {};
+    // Simplified: Basic version has no subscription limits
     return {
       hospital: hospital.name,
-      plan: subscription.plan || 'FREE',
-      maxUsers: hospital.maxUsers,
-      enabledModules: subscription.enabledModules || [],
-      expiresAt: subscription.expiresAt,
+      plan: 'BASIC',
+      maxUsers: null, // Unlimited in basic version
+      enabledModules: ['all'], // All modules enabled
+      expiresAt: null,
     };
   }
 
@@ -218,13 +198,8 @@ export class SuperadminService {
    *
    */
   async updateHospitalSubscription(hospitalId: string, subscriptionData: any) {
-    return this.prisma.hospital.update({
-      where: { id: hospitalId },
-      data: {
-        maxUsers: subscriptionData.maxUsers,
-        subscription: subscriptionData,
-      },
-    });
+    // Simplified: Basic version doesn't support subscription updates
+    return { success: true, message: 'Subscription management not available in basic version' };
   }
 
   /**
@@ -263,11 +238,8 @@ export class SuperadminService {
       }),
       this.prisma.hospital.findMany({
         take: 10,
-        include: {
-          patients: true,
-        },
         orderBy: {
-          patients: { _count: 'desc' },
+          createdAt: 'desc',
         },
       }),
     ]);
@@ -279,7 +251,7 @@ export class SuperadminService {
       totalRevenue: revenue._sum.amount ? Number(revenue._sum.amount) : 0,
       topHospitals: topHospitals.map(h => ({
         name: h.name,
-        patientCount: h.patients?.length || 0,
+        patientCount: 0, // Simplified - no direct hospital-patient relation
       })),
     };
   }

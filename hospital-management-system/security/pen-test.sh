@@ -7,8 +7,8 @@ set -e
 
 # Configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-LOG_FILE="/var/log/hms/pen-test.log"
-REPORT_DIR="/tmp/pen-test-reports"
+LOG_FILE="$SCRIPT_DIR/logs/pen-test.log"
+REPORT_DIR="$SCRIPT_DIR/reports"
 
 # Target configuration
 TARGET_HOST="${TARGET_HOST:-localhost}"
@@ -301,22 +301,34 @@ generate_comprehensive_report() {
         echo "<h2>Detailed Results</h2>"
         echo ""
         echo "<h3 id='port-scan'>Port Scan Results</h3>"
-        echo "<pre>$(cat "$REPORT_DIR/port-scan.txt" 2>/dev/null || echo 'No port scan results available')"</pre>
+        echo "<pre>"
+        cat "$REPORT_DIR/port-scan.txt" 2>/dev/null || echo 'No port scan results available'
+        echo "</pre>"
         echo ""
         echo "<h3 id='ssl-test'>SSL/TLS Test Results</h3>"
-        echo "<pre>$(cat "$REPORT_DIR/ssl-test.txt" 2>/dev/null || echo 'No SSL test results available')"</pre>
+        echo "<pre>"
+        cat "$REPORT_DIR/ssl-test.txt" 2>/dev/null || echo 'No SSL test results available'
+        echo "</pre>"
         echo ""
         echo "<h3 id='web-app'>Web Application Test Results</h3>"
-        echo "<pre>$(cat "$REPORT_DIR/web-app-test.txt" 2>/dev/null || echo 'No web app test results available')"</pre>
+        echo "<pre>"
+        cat "$REPORT_DIR/web-app-test.txt" 2>/dev/null || echo 'No web app test results available'
+        echo "</pre>"
         echo ""
         echo "<h3 id='api-test'>API Security Test Results</h3>"
-        echo "<pre>$(cat "$REPORT_DIR/api-test.txt" 2>/dev/null || echo 'No API test results available')"</pre>
+        echo "<pre>"
+        cat "$REPORT_DIR/api-test.txt" 2>/dev/null || echo 'No API test results available'
+        echo "</pre>"
         echo ""
         echo "<h3 id='database'>Database Security Test Results</h3>"
-        echo "<pre>$(cat "$REPORT_DIR/database-test.txt" 2>/dev/null || echo 'No database test results available')"</pre>
+        echo "<pre>"
+        cat "$REPORT_DIR/database-test.txt" 2>/dev/null || echo 'No database test results available'
+        echo "</pre>"
         echo ""
         echo "<h3 id='vulnerability'>Vulnerability Scan Results</h3>"
-        echo "<pre>$(cat "$REPORT_DIR/vulnerability-scan.txt" 2>/dev/null || echo 'No vulnerability scan results available')"</pre>
+        echo "<pre>"
+        cat "$REPORT_DIR/vulnerability-scan.txt" 2>/dev/null || echo 'No vulnerability scan results available'
+        echo "</pre>"
         echo ""
         echo "<h2>Recommendations</h2>"
         echo "<ul>"

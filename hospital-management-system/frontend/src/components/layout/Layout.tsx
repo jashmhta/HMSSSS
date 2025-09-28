@@ -1,20 +1,22 @@
- import React, { useState } from "react";
-import { useRouter } from "next/router";
-import Sidebar from "./Sidebar";
-import Header from "./Header";
-import { Toaster } from "react-hot-toast";
+ import React, { useState } from 'react';
+import { useRouter } from 'next/router';
 
-interface LayoutProps {
+import { Toaster } from 'react-hot-toast';
+
+import Header from './Header';
+import Sidebar from './Sidebar';
+
+interface ILayoutProps {
   children: React.ReactNode;
   userRole?: string;
 }
 
-const Layout: React.FC<LayoutProps> = ({ children, userRole }) => {
+const Layout: React.FC<ILayoutProps> = ({ children, userRole }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const router = useRouter();
 
   // Don't show layout for auth pages
-  if (router.pathname.startsWith("/auth")) {
+  if (router.pathname.startsWith('/auth')) {
     return (
       <>
         {children}
@@ -28,7 +30,7 @@ const Layout: React.FC<LayoutProps> = ({ children, userRole }) => {
       <Sidebar
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
-        userRole={userRole}
+        {...(userRole && { userRole })}
       />
       <div className="lg:pl-64">
         <Header onMenuClick={() => setSidebarOpen(true)} />

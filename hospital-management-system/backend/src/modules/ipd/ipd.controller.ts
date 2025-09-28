@@ -21,6 +21,7 @@ import { RolesGuard } from '../../modules/auth/roles.guard';
 import { IPDService } from './ipd.service';
 import {
   CreateIPDAdmissionDto,
+  UpdateIPDAdmissionDto,
   ProgressNoteDto,
   VitalSignsDto,
   NursingNoteDto,
@@ -29,6 +30,12 @@ import {
   IPDAdmissionResponse,
   BedInfoDto,
 } from './dto/ipd-admission.dto';
+import {
+  ICUTransferDto,
+  ICUProgressNoteDto,
+  ICUDischargeReadinessDto,
+  ICUAssessmentDto,
+} from './dto/icu-management.dto';
 
 /**
  *
@@ -86,7 +93,10 @@ export class IPDController {
   @Roles(UserRole.DOCTOR, UserRole.NURSE)
   @ApiOperation({ summary: 'Update IPD admission' })
   @ApiResponse({ type: IPDAdmissionResponse })
-  async updateAdmission(@Param('id') id: string, @Body() data: any) {
+  async updateAdmission(
+    @Param('id') id: string,
+    @Body(ValidationPipe) data: UpdateIPDAdmissionDto,
+  ) {
     return this.ipdService.updateAdmission(id, data);
   }
 
@@ -235,5 +245,99 @@ export class IPDController {
     const start = startDate ? new Date(startDate) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     const end = endDate ? new Date(endDate) : new Date();
     return this.ipdService.getIPDPerformanceMetrics(start, end);
+  }
+
+  // ICU/CCU Management Endpoints
+
+  /**
+   * Transfer patient to ICU/CCU
+   */
+  @Post('admissions/:id/icu-transfer')
+  @Roles(UserRole.DOCTOR, UserRole.ADMIN)
+  @ApiOperation({ summary: 'Transfer patient to ICU/CCU with critical care assessment' })
+  @ApiResponse({ status: 200, description: 'Patient transferred to ICU successfully' })
+  async transferToICU(
+    @Param('id') id: string,
+    @Body(ValidationPipe) data: ICUTransferDto,
+    @Request() req,
+  ) {
+    return this.ipdService.transferToICU(id, {
+      ...data,
+      transferredBy: req.user.id,
+    });
+  }
+
+  /**
+   * Record ICU progress note
+   */
+  @Post('admissions/:id/icu-progress')
+  @Roles(UserRole.DOCTOR, UserRole.NURSE)
+  @ApiOperation({ summary: 'Record ICU progress note with comprehensive assessment' })
+  @ApiResponse({ status: 201, description: 'ICU progress note recorded successfully' })
+  async recordICUProgress(
+    @Param('id') id: string,
+    @Body(ValidationPipe) data: ICUProgressNoteDto,
+    @Request() req,
+  ) {
+    return this.ipdService.recordICUProgress(id, {
+      ...data,
+      recordedBy: req.user.id,
+    });
+  }
+
+  /**
+   * Assess ICU discharge readiness
+   */
+  @Post('admissions/:id/icu-discharge-readiness')
+  @Roles(UserRole.DOCTOR)
+  @ApiOperation({ summary: 'Assess patient readiness for ICU discharge' })
+  @ApiResponse({ status: 200, description: 'ICU discharge readiness assessed' })
+  async assessICUDischargeReadiness(
+    @Param('id') id: string,
+    @Body(ValidationPipe) data: ICUDischargeReadinessDto,
+    @Request() req,
+  ) {
+    return this.ipdService.assessICUDischargeReadiness(id, {
+      ...data,
+      assessedBy: req.user.id,
+    });
+  }
+
+  /**
+   * Get ICU patients list
+   */
+  @Get('icu/patients')
+  @Roles(UserRole.DOCTOR, UserRole.NURSE, UserRole.ADMIN)
+  @ApiOperation({ summary: 'Get all patients currently in ICU/CCU' })
+  @ApiResponse({ status: 200, description: 'List of ICU patients' })
+  async getICUPatients() {
+    return this.ipdService.getICUPatients();
+  }
+
+  /**
+   * Get ICU bed occupancy
+   */
+  @Get('icu/beds/occupancy')
+  @Roles(UserRole.NURSE, UserRole.ADMIN, UserRole.DOCTOR)
+  @ApiOperation({ summary: 'Get ICU bed occupancy and availability' })
+  @ApiResponse({ status: 200, description: 'ICU bed occupancy status' })
+  async getICUBedOccupancy() {
+    return this.ipdService.getICUBedOccupancy();
+  }
+
+  /**
+   * Get ICU performance metrics
+   */
+  @Get('icu/performance')
+  @Roles(UserRole.ADMIN, UserRole.DOCTOR)
+  @ApiOperation({ summary: 'Get ICU performance metrics and outcomes' })
+  @ApiResponse({ status: 200, description: 'ICU performance metrics' })
+  async getICUPerformanceMetrics(
+    @Query('startDate') startDate: string,
+    @Query('endDate') endDate: string,
+  ) {
+    const start = startDate ? new Date(startDate) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const end = endDate ? new Date(endDate) : new Date();
+    return this.ipdService.getICUPerformanceMetrics(start, end);
   }
 }

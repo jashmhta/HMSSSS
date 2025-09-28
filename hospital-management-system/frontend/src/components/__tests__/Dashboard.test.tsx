@@ -1,17 +1,21 @@
 import React from 'react';
+
 import { render, screen, waitFor, act } from '@testing-library/react';
-import Dashboard from '../Dashboard';
+
+import Dashboard from '@/components/Dashboard';
+
+const EXPECTED_STAT_CARDS_COUNT = 8;
 
 // Mock Lucide icons
 jest.mock('lucide-react', () => ({
-  Users: () => <div data-testid="users-icon" />,
-  Calendar: () => <div data-testid="calendar-icon" />,
-  FileText: () => <div data-testid="file-text-icon" />,
-  Pill: () => <div data-testid="pill-icon" />,
-  TestTube: () => <div data-testid="test-tube-icon" />,
-  Activity: () => <div data-testid="activity-icon" />,
-  DollarSign: () => <div data-testid="dollar-sign-icon" />,
-  AlertTriangle: () => <div data-testid="alert-triangle-icon" />,
+  'Users': () => <div data-testid="users-icon" />,
+  'Calendar': () => <div data-testid="calendar-icon" />,
+  'FileText': () => <div data-testid="file-text-icon" />,
+  'Pill': () => <div data-testid="pill-icon" />,
+  'TestTube': () => <div data-testid="test-tube-icon" />,
+  'Activity': () => <div data-testid="activity-icon" />,
+  'DollarSign': () => <div data-testid="dollar-sign-icon" />,
+  'AlertTriangle': () => <div data-testid="alert-triangle-icon" />,
 }));
 
 // Mock setTimeout
@@ -126,7 +130,7 @@ describe('Dashboard', () => {
     expect(screen.getByText(/Billing/i)).toBeInTheDocument();
   });
 
-  it("displays today's appointments section", async () => {
+  it('displays today\'s appointments section', async () => {
     render(<Dashboard />);
 
     // Should show loading state initially
@@ -259,7 +263,7 @@ describe('Dashboard', () => {
 
     // Stat cards are in the grid with specific styling
     const statCards = container.querySelectorAll('.grid > .bg-white.rounded-lg.shadow-sm.p-6.border');
-    expect(statCards.length).toBe(8);
+    expect(statCards.length).toBe(EXPECTED_STAT_CARDS_COUNT);
   });
 
   it('displays all mocked Lucide icons', async () => {

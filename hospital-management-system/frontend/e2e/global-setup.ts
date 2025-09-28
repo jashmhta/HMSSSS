@@ -26,12 +26,12 @@ async function globalSetup(config: FullConfig) {
     console.log('Environment info:');
     console.log(`  - Base URL: ${config.projects?.[0]?.use?.baseURL}`);
     console.log(`  - Browser: Chromium`);
-    console.log(`  - Headless: ${process.env.HEADLESS !== 'false'}`);
+    console.log(`  - Headless: ${process.env['HEADLESS'] !== 'false'}`);
     console.log(`  - Test Workers: ${config.workers}`);
 
   } catch (error) {
     console.error('Global setup failed:', error);
-    await page.screenshot({ path: 'test-results/setup-error.png' });
+    // Note: page is not available in global setup, screenshot would need to be handled differently
     throw error;
   } finally {
     await context.close();

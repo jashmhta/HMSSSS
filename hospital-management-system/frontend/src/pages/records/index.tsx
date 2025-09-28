@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from "react";
-import Link from "next/link";
+import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
+
 import {
   DocumentTextIcon,
   MagnifyingGlassIcon,
@@ -13,14 +14,14 @@ import {
   ViewfinderCircleIcon,
   UserIcon,
   CalendarIcon,
-} from "@heroicons/react/24/outline";
-import { format } from "date-fns";
+} from '@heroicons/react/24/outline';
+import { format } from 'date-fns';
 
 interface MedicalRecord {
   id: string;
   patientId: string;
   patientName: string;
-  recordType: "visit" | "lab" | "radiology" | "prescription" | "procedure";
+  recordType: 'visit' | 'lab' | 'radiology' | 'prescription' | 'procedure';
   date: string;
   provider: string;
   specialty: string;
@@ -30,7 +31,7 @@ interface MedicalRecord {
   medications?: string[];
   notes?: string;
   attachments?: string[];
-  status: "draft" | "final" | "amended";
+  status: 'draft' | 'final' | 'amended';
 }
 
 interface PatientSummary {
@@ -49,11 +50,11 @@ const MedicalRecords: React.FC = () => {
   const [records, setRecords] = useState<MedicalRecord[]>([]);
   const [patients, setPatients] = useState<PatientSummary[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedPatient, setSelectedPatient] = useState<string>("");
-  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedPatient, setSelectedPatient] = useState<string>('');
+  const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<
-    "all" | "visit" | "lab" | "radiology" | "prescription" | "procedure"
-  >("all");
+    'all' | 'visit' | 'lab' | 'radiology' | 'prescription' | 'procedure'
+  >('all');
 
   useEffect(() => {
     // Simulate API call
@@ -62,80 +63,80 @@ const MedicalRecords: React.FC = () => {
         setTimeout(() => {
           const mockPatients: PatientSummary[] = [
             {
-              id: "1",
-              name: "John Doe",
+              id: '1',
+              name: 'John Doe',
               age: 40,
-              gender: "Male",
-              bloodType: "O+",
-              allergies: ["Penicillin", "Peanuts"],
-              chronicConditions: ["Hypertension", "Diabetes"],
-              lastVisit: "2025-09-15",
+              gender: 'Male',
+              bloodType: 'O+',
+              allergies: ['Penicillin', 'Peanuts'],
+              chronicConditions: ['Hypertension', 'Diabetes'],
+              lastVisit: '2025-09-15',
               totalRecords: 12,
             },
             {
-              id: "2",
-              name: "Jane Smith",
+              id: '2',
+              name: 'Jane Smith',
               age: 35,
-              gender: "Female",
-              bloodType: "A-",
-              allergies: ["Sulfa drugs"],
-              chronicConditions: ["Asthma"],
-              lastVisit: "2025-09-10",
+              gender: 'Female',
+              bloodType: 'A-',
+              allergies: ['Sulfa drugs'],
+              chronicConditions: ['Asthma'],
+              lastVisit: '2025-09-10',
               totalRecords: 8,
             },
           ];
 
           const mockRecords: MedicalRecord[] = [
             {
-              id: "1",
-              patientId: "1",
-              patientName: "John Doe",
-              recordType: "visit",
-              date: "2025-09-15",
-              provider: "Dr. Sarah Johnson",
-              specialty: "Cardiology",
-              diagnosis: "Hypertension - Stage 2",
-              symptoms: "Headache, dizziness, fatigue",
-              treatment: "Lifestyle modifications, medication adjustment",
+              id: '1',
+              patientId: '1',
+              patientName: 'John Doe',
+              recordType: 'visit',
+              date: '2025-09-15',
+              provider: 'Dr. Sarah Johnson',
+              specialty: 'Cardiology',
+              diagnosis: 'Hypertension - Stage 2',
+              symptoms: 'Headache, dizziness, fatigue',
+              treatment: 'Lifestyle modifications, medication adjustment',
               medications: [
-                "Lisinopril 10mg daily",
-                "Metformin 500mg twice daily",
+                'Lisinopril 10mg daily',
+                'Metformin 500mg twice daily',
               ],
               notes:
-                "Patient reports improved compliance with medication. Blood pressure controlled.",
-              status: "final",
+                'Patient reports improved compliance with medication. Blood pressure controlled.',
+              status: 'final',
             },
             {
-              id: "2",
-              patientId: "1",
-              patientName: "John Doe",
-              recordType: "lab",
-              date: "2025-09-15",
-              provider: "Dr. Sarah Johnson",
-              specialty: "Cardiology",
-              diagnosis: "Routine blood work",
-              notes: "CBC, Lipid panel, HbA1c - All within normal limits",
-              attachments: ["lab_results_2025-09-15.pdf"],
-              status: "final",
+              id: '2',
+              patientId: '1',
+              patientName: 'John Doe',
+              recordType: 'lab',
+              date: '2025-09-15',
+              provider: 'Dr. Sarah Johnson',
+              specialty: 'Cardiology',
+              diagnosis: 'Routine blood work',
+              notes: 'CBC, Lipid panel, HbA1c - All within normal limits',
+              attachments: ['lab_results_2025-09-15.pdf'],
+              status: 'final',
             },
             {
-              id: "3",
-              patientId: "2",
-              patientName: "Jane Smith",
-              recordType: "visit",
-              date: "2025-09-10",
-              provider: "Dr. Michael Chen",
-              specialty: "Pulmonology",
-              diagnosis: "Asthma exacerbation",
-              symptoms: "Shortness of breath, wheezing, chest tightness",
-              treatment: "Inhaled bronchodilators, oral steroids",
+              id: '3',
+              patientId: '2',
+              patientName: 'Jane Smith',
+              recordType: 'visit',
+              date: '2025-09-10',
+              provider: 'Dr. Michael Chen',
+              specialty: 'Pulmonology',
+              diagnosis: 'Asthma exacerbation',
+              symptoms: 'Shortness of breath, wheezing, chest tightness',
+              treatment: 'Inhaled bronchodilators, oral steroids',
               medications: [
-                "Albuterol inhaler PRN",
-                "Prednisone 40mg daily x5 days",
+                'Albuterol inhaler PRN',
+                'Prednisone 40mg daily x5 days',
               ],
               notes:
-                "Patient educated on proper inhaler technique. Follow-up in 2 weeks.",
-              status: "final",
+                'Patient educated on proper inhaler technique. Follow-up in 2 weeks.',
+              status: 'final',
             },
           ];
 
@@ -144,7 +145,7 @@ const MedicalRecords: React.FC = () => {
           setLoading(false);
         }, 1000);
       } catch (error) {
-        console.error("Failed to fetch medical records:", error);
+        console.error('Failed to fetch medical records:', error);
         setLoading(false);
       }
     };
@@ -154,15 +155,15 @@ const MedicalRecords: React.FC = () => {
 
   const getRecordTypeIcon = (type: string) => {
     switch (type) {
-      case "visit":
+      case 'visit':
         return DocumentTextIcon;
-      case "lab":
+      case 'lab':
         return BeakerIcon;
-      case "radiology":
+      case 'radiology':
         return ViewfinderCircleIcon;
-      case "prescription":
+      case 'prescription':
         return HeartIcon;
-      case "procedure":
+      case 'procedure':
         return ClipboardDocumentListIcon;
       default:
         return DocumentTextIcon;
@@ -171,31 +172,31 @@ const MedicalRecords: React.FC = () => {
 
   const getRecordTypeColor = (type: string) => {
     switch (type) {
-      case "visit":
-        return "bg-blue-100 text-blue-800";
-      case "lab":
-        return "bg-green-100 text-green-800";
-      case "radiology":
-        return "bg-purple-100 text-purple-800";
-      case "prescription":
-        return "bg-yellow-100 text-yellow-800";
-      case "procedure":
-        return "bg-red-100 text-red-800";
+      case 'visit':
+        return 'bg-blue-100 text-blue-800';
+      case 'lab':
+        return 'bg-green-100 text-green-800';
+      case 'radiology':
+        return 'bg-purple-100 text-purple-800';
+      case 'prescription':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'procedure':
+        return 'bg-red-100 text-red-800';
       default:
-        return "bg-gray-100 text-gray-800";
+        return 'bg-gray-100 text-gray-800';
     }
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "final":
-        return "bg-green-100 text-green-800";
-      case "draft":
-        return "bg-yellow-100 text-yellow-800";
-      case "amended":
-        return "bg-blue-100 text-blue-800";
+      case 'final':
+        return 'bg-green-100 text-green-800';
+      case 'draft':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'amended':
+        return 'bg-blue-100 text-blue-800';
       default:
-        return "bg-gray-100 text-gray-800";
+        return 'bg-gray-100 text-gray-800';
     }
   };
 
@@ -203,7 +204,7 @@ const MedicalRecords: React.FC = () => {
     const matchesPatient =
       !selectedPatient || record.patientId === selectedPatient;
     const matchesType =
-      filterType === "all" || record.recordType === filterType;
+      filterType === 'all' || record.recordType === filterType;
     const matchesSearch =
       !searchTerm ||
       record.patientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -217,7 +218,7 @@ const MedicalRecords: React.FC = () => {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto" />
           <p className="mt-4 text-gray-600">Loading medical records...</p>
         </div>
       </div>
@@ -254,12 +255,12 @@ const MedicalRecords: React.FC = () => {
             key={patient.id}
             className={`bg-white rounded-lg shadow-sm p-6 border-2 cursor-pointer transition-colors ${
               selectedPatient === patient.id
-                ? "border-blue-500 bg-blue-50"
-                : "border-gray-200 hover:border-gray-300"
+                ? 'border-blue-500 bg-blue-50'
+                : 'border-gray-200 hover:border-gray-300'
             }`}
             onClick={() =>
               setSelectedPatient(
-                selectedPatient === patient.id ? "" : patient.id,
+                selectedPatient === patient.id ? '' : patient.id,
               )
             }
           >
@@ -273,7 +274,7 @@ const MedicalRecords: React.FC = () => {
                     {patient.name}
                   </h3>
                   <p className="text-sm text-gray-500">
-                    {patient.age} years • {patient.gender} • Blood Type:{" "}
+                    {patient.age} years • {patient.gender} • Blood Type:{' '}
                     {patient.bloodType}
                   </p>
                 </div>
@@ -331,7 +332,7 @@ const MedicalRecords: React.FC = () => {
               <div className="flex items-center justify-between text-sm">
                 <span className="text-gray-500">Last Visit:</span>
                 <span className="font-medium">
-                  {format(new Date(patient.lastVisit), "MMM d, yyyy")}
+                  {format(new Date(patient.lastVisit), 'MMM d, yyyy')}
                 </span>
               </div>
             </div>
@@ -377,7 +378,7 @@ const MedicalRecords: React.FC = () => {
       <div className="bg-white rounded-lg shadow-sm">
         <div className="px-6 py-4 border-b border-gray-200">
           <h2 className="text-xl font-semibold text-gray-900">
-            Medical Records{" "}
+            Medical Records{' '}
             {selectedPatient &&
               `for ${patients.find((p) => p.id === selectedPatient)?.name}`}
           </h2>
@@ -391,7 +392,7 @@ const MedicalRecords: React.FC = () => {
                 <div className="flex items-start justify-between">
                   <div className="flex items-start space-x-4">
                     <div
-                      className={`p-2 rounded-lg ${getRecordTypeColor(record.recordType).split(" ")[0]}`}
+                      className={`p-2 rounded-lg ${getRecordTypeColor(record.recordType).split(' ')[0]}`}
                     >
                       <Icon className="h-5 w-5 text-current" />
                     </div>
@@ -419,7 +420,7 @@ const MedicalRecords: React.FC = () => {
                         </div>
                         <div className="flex items-center">
                           <CalendarIcon className="h-4 w-4 mr-1" />
-                          {format(new Date(record.date), "MMM d, yyyy")}
+                          {format(new Date(record.date), 'MMM d, yyyy')}
                         </div>
                         <span className="text-gray-500">
                           {record.specialty}
@@ -429,7 +430,7 @@ const MedicalRecords: React.FC = () => {
                       {record.diagnosis && (
                         <div className="mb-2">
                           <span className="text-sm font-medium text-gray-700">
-                            Diagnosis:{" "}
+                            Diagnosis:{' '}
                           </span>
                           <span className="text-sm text-gray-600">
                             {record.diagnosis}
@@ -440,7 +441,7 @@ const MedicalRecords: React.FC = () => {
                       {record.symptoms && (
                         <div className="mb-2">
                           <span className="text-sm font-medium text-gray-700">
-                            Symptoms:{" "}
+                            Symptoms:{' '}
                           </span>
                           <span className="text-sm text-gray-600">
                             {record.symptoms}
@@ -451,7 +452,7 @@ const MedicalRecords: React.FC = () => {
                       {record.treatment && (
                         <div className="mb-2">
                           <span className="text-sm font-medium text-gray-700">
-                            Treatment:{" "}
+                            Treatment:{' '}
                           </span>
                           <span className="text-sm text-gray-600">
                             {record.treatment}
@@ -462,7 +463,7 @@ const MedicalRecords: React.FC = () => {
                       {record.medications && record.medications.length > 0 && (
                         <div className="mb-2">
                           <span className="text-sm font-medium text-gray-700">
-                            Medications:{" "}
+                            Medications:{' '}
                           </span>
                           <div className="inline-flex flex-wrap gap-1 mt-1">
                             {record.medications.map((medication, index) => (
@@ -480,7 +481,7 @@ const MedicalRecords: React.FC = () => {
                       {record.notes && (
                         <div className="mb-2">
                           <span className="text-sm font-medium text-gray-700">
-                            Notes:{" "}
+                            Notes:{' '}
                           </span>
                           <span className="text-sm text-gray-600">
                             {record.notes}
@@ -536,9 +537,9 @@ const MedicalRecords: React.FC = () => {
               No medical records found
             </h3>
             <p className="mt-1 text-sm text-gray-500">
-              {searchTerm || filterType !== "all" || selectedPatient
-                ? "Try adjusting your search or filter criteria."
-                : "Get started by adding your first medical record."}
+              {searchTerm || filterType !== 'all' || selectedPatient
+                ? 'Try adjusting your search or filter criteria.'
+                : 'Get started by adding your first medical record.'}
             </p>
             <div className="mt-6">
               <Link
@@ -565,31 +566,31 @@ const MedicalRecords: React.FC = () => {
           </div>
           <div className="text-center">
             <div className="text-3xl font-bold text-green-600">
-              {records.filter((r) => r.recordType === "visit").length}
+              {records.filter((r) => r.recordType === 'visit').length}
             </div>
             <div className="text-sm text-gray-500">Visit Notes</div>
           </div>
           <div className="text-center">
             <div className="text-3xl font-bold text-purple-600">
-              {records.filter((r) => r.recordType === "lab").length}
+              {records.filter((r) => r.recordType === 'lab').length}
             </div>
             <div className="text-sm text-gray-500">Lab Results</div>
           </div>
           <div className="text-center">
             <div className="text-3xl font-bold text-yellow-600">
-              {records.filter((r) => r.recordType === "radiology").length}
+              {records.filter((r) => r.recordType === 'radiology').length}
             </div>
             <div className="text-sm text-gray-500">Radiology</div>
           </div>
           <div className="text-center">
             <div className="text-3xl font-bold text-red-600">
-              {records.filter((r) => r.recordType === "prescription").length}
+              {records.filter((r) => r.recordType === 'prescription').length}
             </div>
             <div className="text-sm text-gray-500">Prescriptions</div>
           </div>
           <div className="text-center">
             <div className="text-3xl font-bold text-indigo-600">
-              {records.filter((r) => r.status === "final").length}
+              {records.filter((r) => r.status === 'final').length}
             </div>
             <div className="text-sm text-gray-500">Final Records</div>
           </div>

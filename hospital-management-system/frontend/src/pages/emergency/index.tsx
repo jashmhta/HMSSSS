@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from "react";
-import Link from "next/link";
+import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
+
 import {
   ExclamationTriangleIcon,
   MagnifyingGlassIcon,
@@ -9,12 +10,9 @@ import {
   CheckCircleIcon,
   ClockIcon,
   HeartIcon,
-  UserIcon,
-  CalendarIcon,
-  PhoneIcon,
-  MapPinIcon,
-} from "@heroicons/react/24/outline";
-import { format } from "date-fns";
+   UserIcon,
+} from '@heroicons/react/24/outline';
+import { format } from 'date-fns';
 
 interface EmergencyCase {
   id: string;
@@ -34,12 +32,12 @@ interface EmergencyCase {
     painScale: number;
   };
   status:
-    | "waiting"
-    | "assessment"
-    | "treatment"
-    | "admitted"
-    | "discharged"
-    | "transferred";
+    | 'waiting'
+    | 'assessment'
+    | 'treatment'
+    | 'admitted'
+    | 'discharged'
+    | 'transferred';
   assignedDoctor?: string;
   assignedNurse?: string;
   room?: string;
@@ -53,18 +51,18 @@ interface EmergencyCase {
 const EmergencyDepartment: React.FC = () => {
   const [cases, setCases] = useState<EmergencyCase[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState("");
+  const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<
-    | "all"
-    | "waiting"
-    | "assessment"
-    | "treatment"
-    | "admitted"
-    | "discharged"
-    | "transferred"
-  >("all");
-  const [filterTriage, setFilterTriage] = useState<"all" | 1 | 2 | 3 | 4 | 5>(
-    "all",
+    | 'all'
+    | 'waiting'
+    | 'assessment'
+    | 'treatment'
+    | 'admitted'
+    | 'discharged'
+    | 'transferred'
+  >('all');
+  const [filterTriage, setFilterTriage] = useState<'all' | 1 | 2 | 3 | 4 | 5>(
+    'all',
   );
 
   useEffect(() => {
@@ -74,98 +72,98 @@ const EmergencyDepartment: React.FC = () => {
         setTimeout(() => {
           const mockCases: EmergencyCase[] = [
             {
-              id: "1",
-              patientName: "John Doe",
+              id: '1',
+              patientName: 'John Doe',
               age: 45,
-              gender: "Male",
-              arrivalTime: "2025-09-21T08:30:00Z",
+              gender: 'Male',
+              arrivalTime: '2025-09-21T08:30:00Z',
               triageLevel: 1,
-              chiefComplaint: "Chest pain, difficulty breathing",
+              chiefComplaint: 'Chest pain, difficulty breathing',
               vitalSigns: {
-                bloodPressure: "180/110",
+                bloodPressure: '180/110',
                 heartRate: 120,
                 temperature: 98.6,
                 respiratoryRate: 28,
                 oxygenSaturation: 92,
                 painScale: 8,
               },
-              status: "assessment",
-              assignedDoctor: "Dr. Sarah Johnson",
-              assignedNurse: "Nurse Emily Davis",
-              room: "ER-1",
+              status: 'assessment',
+              assignedDoctor: 'Dr. Sarah Johnson',
+              assignedNurse: 'Nurse Emily Davis',
+              room: 'ER-1',
               alerts: [
-                "Critical vital signs",
-                "Possible MI",
-                "Oxygen required",
+                'Critical vital signs',
+                'Possible MI',
+                'Oxygen required',
               ],
             },
             {
-              id: "2",
-              patientName: "Jane Smith",
+              id: '2',
+              patientName: 'Jane Smith',
               age: 32,
-              gender: "Female",
-              arrivalTime: "2025-09-21T09:15:00Z",
+              gender: 'Female',
+              arrivalTime: '2025-09-21T09:15:00Z',
               triageLevel: 2,
-              chiefComplaint: "Severe abdominal pain, vomiting",
+              chiefComplaint: 'Severe abdominal pain, vomiting',
               vitalSigns: {
-                bloodPressure: "110/70",
+                bloodPressure: '110/70',
                 heartRate: 95,
                 temperature: 101.2,
                 respiratoryRate: 20,
                 oxygenSaturation: 98,
                 painScale: 9,
               },
-              status: "treatment",
-              assignedDoctor: "Dr. Michael Chen",
-              assignedNurse: "Nurse Robert Wilson",
-              room: "ER-3",
-              alerts: ["High fever", "Dehydration risk"],
+              status: 'treatment',
+              assignedDoctor: 'Dr. Michael Chen',
+              assignedNurse: 'Nurse Robert Wilson',
+              room: 'ER-3',
+              alerts: ['High fever', 'Dehydration risk'],
             },
             {
-              id: "3",
-              patientName: "Robert Johnson",
+              id: '3',
+              patientName: 'Robert Johnson',
               age: 28,
-              gender: "Male",
-              arrivalTime: "2025-09-21T10:00:00Z",
+              gender: 'Male',
+              arrivalTime: '2025-09-21T10:00:00Z',
               triageLevel: 3,
-              chiefComplaint: "Sprained ankle from sports injury",
+              chiefComplaint: 'Sprained ankle from sports injury',
               vitalSigns: {
-                bloodPressure: "120/80",
+                bloodPressure: '120/80',
                 heartRate: 75,
                 temperature: 98.0,
                 respiratoryRate: 16,
                 oxygenSaturation: 99,
                 painScale: 6,
               },
-              status: "waiting",
+              status: 'waiting',
               alerts: [],
             },
             {
-              id: "4",
-              patientName: "Alice Brown",
+              id: '4',
+              patientName: 'Alice Brown',
               age: 67,
-              gender: "Female",
-              arrivalTime: "2025-09-21T07:45:00Z",
+              gender: 'Female',
+              arrivalTime: '2025-09-21T07:45:00Z',
               triageLevel: 2,
-              chiefComplaint: "Confusion, headache, vision changes",
+              chiefComplaint: 'Confusion, headache, vision changes',
               vitalSigns: {
-                bloodPressure: "160/95",
+                bloodPressure: '160/95',
                 heartRate: 88,
                 temperature: 97.8,
                 respiratoryRate: 18,
                 oxygenSaturation: 96,
                 painScale: 4,
               },
-              status: "admitted",
-              assignedDoctor: "Dr. Lisa Park",
-              assignedNurse: "Nurse Anna Lee",
-              room: "ICU-2",
-              diagnosis: "Acute ischemic stroke",
-              treatment: "tPA administration, blood pressure management",
-              disposition: "Admitted to Neurology ICU",
+              status: 'admitted',
+              assignedDoctor: 'Dr. Lisa Park',
+              assignedNurse: 'Nurse Anna Lee',
+              room: 'ICU-2',
+              diagnosis: 'Acute ischemic stroke',
+              treatment: 'tPA administration, blood pressure management',
+              disposition: 'Admitted to Neurology ICU',
               alerts: [
-                "Stroke protocol activated",
-                "Time-critical intervention",
+                'Stroke protocol activated',
+                'Time-critical intervention',
               ],
             },
           ];
@@ -173,7 +171,7 @@ const EmergencyDepartment: React.FC = () => {
           setLoading(false);
         }, 1000);
       } catch (error) {
-        console.error("Failed to fetch emergency cases:", error);
+        console.error('Failed to fetch emergency cases:', error);
         setLoading(false);
       }
     };
@@ -184,53 +182,53 @@ const EmergencyDepartment: React.FC = () => {
   const getTriageColor = (level: number) => {
     switch (level) {
       case 1:
-        return "bg-red-100 text-red-800 border-red-300";
+        return 'bg-red-100 text-red-800 border-red-300';
       case 2:
-        return "bg-orange-100 text-orange-800 border-orange-300";
+        return 'bg-orange-100 text-orange-800 border-orange-300';
       case 3:
-        return "bg-yellow-100 text-yellow-800 border-yellow-300";
+        return 'bg-yellow-100 text-yellow-800 border-yellow-300';
       case 4:
-        return "bg-green-100 text-green-800 border-green-300";
+        return 'bg-green-100 text-green-800 border-green-300';
       case 5:
-        return "bg-blue-100 text-blue-800 border-blue-300";
+        return 'bg-blue-100 text-blue-800 border-blue-300';
       default:
-        return "bg-gray-100 text-gray-800 border-gray-300";
+        return 'bg-gray-100 text-gray-800 border-gray-300';
     }
   };
 
   const getTriageLabel = (level: number) => {
     switch (level) {
       case 1:
-        return "Level 1 - Resuscitation";
+        return 'Level 1 - Resuscitation';
       case 2:
-        return "Level 2 - Emergent";
+        return 'Level 2 - Emergent';
       case 3:
-        return "Level 3 - Urgent";
+        return 'Level 3 - Urgent';
       case 4:
-        return "Level 4 - Less Urgent";
+        return 'Level 4 - Less Urgent';
       case 5:
-        return "Level 5 - Non-urgent";
+        return 'Level 5 - Non-urgent';
       default:
-        return "Unknown";
+        return 'Unknown';
     }
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "waiting":
-        return "bg-yellow-100 text-yellow-800";
-      case "assessment":
-        return "bg-blue-100 text-blue-800";
-      case "treatment":
-        return "bg-purple-100 text-purple-800";
-      case "admitted":
-        return "bg-green-100 text-green-800";
-      case "discharged":
-        return "bg-gray-100 text-gray-800";
-      case "transferred":
-        return "bg-indigo-100 text-indigo-800";
+      case 'waiting':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'assessment':
+        return 'bg-blue-100 text-blue-800';
+      case 'treatment':
+        return 'bg-purple-100 text-purple-800';
+      case 'admitted':
+        return 'bg-green-100 text-green-800';
+      case 'discharged':
+        return 'bg-gray-100 text-gray-800';
+      case 'transferred':
+        return 'bg-indigo-100 text-indigo-800';
       default:
-        return "bg-gray-100 text-gray-800";
+        return 'bg-gray-100 text-gray-800';
     }
   };
 
@@ -239,29 +237,28 @@ const EmergencyDepartment: React.FC = () => {
       case_.patientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       case_.chiefComplaint.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus =
-      filterStatus === "all" || case_.status === filterStatus;
+      filterStatus === 'all' || case_.status === filterStatus;
     const matchesTriage =
-      filterTriage === "all" || case_.triageLevel === filterTriage;
+      filterTriage === 'all' || case_.triageLevel === filterTriage;
     return matchesSearch && matchesStatus && matchesTriage;
   });
 
   const criticalCases = cases.filter((case_) => case_.triageLevel === 1);
-  const waitingCases = cases.filter((case_) => case_.status === "waiting");
+  const waitingCases = cases.filter((case_) => case_.status === 'waiting');
 
   const getWaitTime = (arrivalTime: string) => {
     const arrival = new Date(arrivalTime);
     const now = new Date();
-    const diffMinutes = Math.floor(
+    return Math.floor(
       (now.getTime() - arrival.getTime()) / (1000 * 60),
     );
-    return diffMinutes;
   };
 
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto" />
           <p className="mt-4 text-gray-600">Loading emergency cases...</p>
         </div>
       </div>
@@ -328,9 +325,9 @@ const EmergencyDepartment: React.FC = () => {
                 {
                   cases.filter(
                     (c) =>
-                      c.status === "assessment" || c.status === "treatment",
+                      c.status === 'assessment' || c.status === 'treatment',
                   ).length
-                }{" "}
+                }{' '}
                 patients in active care
               </p>
             </div>
@@ -429,8 +426,8 @@ const EmergencyDepartment: React.FC = () => {
                       </div>
                       <div className="flex items-center">
                         <ClockIcon className="h-4 w-4 mr-1" />
-                        Arrived:{" "}
-                        {format(new Date(case_.arrivalTime), "MMM d, HH:mm")}
+                        Arrived:{' '}
+                        {format(new Date(case_.arrivalTime), 'MMM d, HH:mm')}
                       </div>
                       <div className="flex items-center">
                         <ClockIcon className="h-4 w-4 mr-1" />
@@ -600,14 +597,14 @@ const EmergencyDepartment: React.FC = () => {
                     <PencilIcon className="h-4 w-4 mr-1" />
                     Edit
                   </Link>
-                  {case_.status === "waiting" && (
+                  {case_.status === 'waiting' && (
                     <button className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
                       <UserIcon className="h-4 w-4 mr-1" />
                       Assign
                     </button>
                   )}
-                  {(case_.status === "assessment" ||
-                    case_.status === "treatment") && (
+                  {(case_.status === 'assessment' ||
+                    case_.status === 'treatment') && (
                     <button className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
                       <CheckCircleIcon className="h-4 w-4 mr-1" />
                       Discharge
@@ -626,9 +623,9 @@ const EmergencyDepartment: React.FC = () => {
               No emergency cases found
             </h3>
             <p className="mt-1 text-sm text-gray-500">
-              {searchTerm || filterStatus !== "all" || filterTriage !== "all"
-                ? "Try adjusting your search or filter criteria."
-                : "No active emergency cases at this time."}
+              {searchTerm || filterStatus !== 'all' || filterTriage !== 'all'
+                ? 'Try adjusting your search or filter criteria.'
+                : 'No active emergency cases at this time.'}
             </p>
           </div>
         )}
@@ -660,19 +657,19 @@ const EmergencyDepartment: React.FC = () => {
           </div>
           <div className="text-center">
             <div className="text-3xl font-bold text-purple-600">
-              {cases.filter((c) => c.status === "treatment").length}
+              {cases.filter((c) => c.status === 'treatment').length}
             </div>
             <div className="text-sm text-gray-500">In Treatment</div>
           </div>
           <div className="text-center">
             <div className="text-3xl font-bold text-green-600">
-              {cases.filter((c) => c.status === "admitted").length}
+              {cases.filter((c) => c.status === 'admitted').length}
             </div>
             <div className="text-sm text-gray-500">Admitted</div>
           </div>
           <div className="text-center">
             <div className="text-3xl font-bold text-gray-600">
-              {cases.filter((c) => c.status === "discharged").length}
+              {cases.filter((c) => c.status === 'discharged').length}
             </div>
             <div className="text-sm text-gray-500">Discharged</div>
           </div>

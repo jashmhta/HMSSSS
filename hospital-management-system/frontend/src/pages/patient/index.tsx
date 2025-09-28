@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from "react";
-import Link from "next/link";
+import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
+
 import {
   MagnifyingGlassIcon,
   PlusIcon,
@@ -9,7 +10,7 @@ import {
   PhoneIcon,
   EnvelopeIcon,
   MapPinIcon,
-} from "@heroicons/react/24/outline";
+} from '@heroicons/react/24/outline';
 
 interface Patient {
   id: string;
@@ -24,7 +25,7 @@ interface Patient {
   bloodType: string;
   allergies: string[];
   medicalRecordNumber: string;
-  status: "active" | "inactive";
+  status: 'active' | 'inactive';
   lastVisit: string;
   nextAppointment?: string;
 }
@@ -32,10 +33,10 @@ interface Patient {
 const PatientManagement: React.FC = () => {
   const [patients, setPatients] = useState<Patient[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState("");
+  const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<
-    "all" | "active" | "inactive"
-  >("all");
+    'all' | 'active' | 'inactive'
+  >('all');
 
   useEffect(() => {
     // Simulate API call
@@ -44,60 +45,60 @@ const PatientManagement: React.FC = () => {
         setTimeout(() => {
           const mockPatients: Patient[] = [
             {
-              id: "1",
-              firstName: "John",
-              lastName: "Doe",
-              dateOfBirth: "1985-03-15",
-              gender: "Male",
-              phone: "+1-555-0123",
-              email: "john.doe@email.com",
-              address: "123 Main St, City, State 12345",
-              emergencyContact: "Jane Doe (+1-555-0124)",
-              bloodType: "O+",
-              allergies: ["Penicillin", "Peanuts"],
-              medicalRecordNumber: "MRN001234",
-              status: "active",
-              lastVisit: "2025-09-15",
-              nextAppointment: "2025-09-25",
+              id: '1',
+              firstName: 'John',
+              lastName: 'Doe',
+              dateOfBirth: '1985-03-15',
+              gender: 'Male',
+              phone: '+1-555-0123',
+              email: 'john.doe@email.com',
+              address: '123 Main St, City, State 12345',
+              emergencyContact: 'Jane Doe (+1-555-0124)',
+              bloodType: 'O+',
+              allergies: ['Penicillin', 'Peanuts'],
+              medicalRecordNumber: 'MRN001234',
+              status: 'active',
+              lastVisit: '2025-09-15',
+              nextAppointment: '2025-09-25',
             },
             {
-              id: "2",
-              firstName: "Jane",
-              lastName: "Smith",
-              dateOfBirth: "1990-07-22",
-              gender: "Female",
-              phone: "+1-555-0125",
-              email: "jane.smith@email.com",
-              address: "456 Oak Ave, City, State 12346",
-              emergencyContact: "Bob Smith (+1-555-0126)",
-              bloodType: "A-",
-              allergies: ["Sulfa drugs"],
-              medicalRecordNumber: "MRN001235",
-              status: "active",
-              lastVisit: "2025-09-10",
+              id: '2',
+              firstName: 'Jane',
+              lastName: 'Smith',
+              dateOfBirth: '1990-07-22',
+              gender: 'Female',
+              phone: '+1-555-0125',
+              email: 'jane.smith@email.com',
+              address: '456 Oak Ave, City, State 12346',
+              emergencyContact: 'Bob Smith (+1-555-0126)',
+              bloodType: 'A-',
+              allergies: ['Sulfa drugs'],
+              medicalRecordNumber: 'MRN001235',
+              status: 'active',
+              lastVisit: '2025-09-10',
             },
             {
-              id: "3",
-              firstName: "Robert",
-              lastName: "Johnson",
-              dateOfBirth: "1978-11-08",
-              gender: "Male",
-              phone: "+1-555-0127",
-              email: "robert.johnson@email.com",
-              address: "789 Pine Rd, City, State 12347",
-              emergencyContact: "Mary Johnson (+1-555-0128)",
-              bloodType: "B+",
+              id: '3',
+              firstName: 'Robert',
+              lastName: 'Johnson',
+              dateOfBirth: '1978-11-08',
+              gender: 'Male',
+              phone: '+1-555-0127',
+              email: 'robert.johnson@email.com',
+              address: '789 Pine Rd, City, State 12347',
+              emergencyContact: 'Mary Johnson (+1-555-0128)',
+              bloodType: 'B+',
               allergies: [],
-              medicalRecordNumber: "MRN001236",
-              status: "inactive",
-              lastVisit: "2025-06-20",
+              medicalRecordNumber: 'MRN001236',
+              status: 'inactive',
+              lastVisit: '2025-06-20',
             },
           ];
           setPatients(mockPatients);
           setLoading(false);
         }, 1000);
       } catch (error) {
-        console.error("Failed to fetch patients:", error);
+        console.error('Failed to fetch patients:', error);
         setLoading(false);
       }
     };
@@ -111,21 +112,21 @@ const PatientManagement: React.FC = () => {
         .toLowerCase()
         .includes(searchTerm.toLowerCase());
     const matchesStatus =
-      filterStatus === "all" || patient.status === filterStatus;
+      filterStatus === 'all' || patient.status === filterStatus;
     return matchesSearch && matchesStatus;
   });
 
   const getStatusBadge = (status: string) => {
-    return status === "active"
-      ? "bg-green-100 text-green-800"
-      : "bg-gray-100 text-gray-800";
+    return status === 'active'
+      ? 'bg-green-100 text-green-800'
+      : 'bg-gray-100 text-gray-800';
   };
 
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto" />
           <p className="mt-4 text-gray-600">Loading patients...</p>
         </div>
       </div>
@@ -176,7 +177,7 @@ const PatientManagement: React.FC = () => {
             <select
               value={filterStatus}
               onChange={(e) =>
-                setFilterStatus(e.target.value as "all" | "active" | "inactive")
+                setFilterStatus(e.target.value as 'all' | 'active' | 'inactive')
               }
               className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
             >
@@ -226,7 +227,7 @@ const PatientManagement: React.FC = () => {
                 <div className="flex items-center text-sm text-gray-600">
                   <UserPlusIcon className="h-4 w-4 mr-2" />
                   {new Date().getFullYear() -
-                    new Date(patient.dateOfBirth).getFullYear()}{" "}
+                    new Date(patient.dateOfBirth).getFullYear()}{' '}
                   years old • {patient.gender}
                 </div>
                 <div className="flex items-center text-sm text-gray-600">
@@ -239,7 +240,7 @@ const PatientManagement: React.FC = () => {
                 </div>
                 <div className="flex items-center text-sm text-gray-600">
                   <MapPinIcon className="h-4 w-4 mr-2" />
-                  {patient.address.split(",")[0]}
+                  {patient.address.split(',')[0]}
                 </div>
               </div>
 
@@ -255,7 +256,7 @@ const PatientManagement: React.FC = () => {
                   <div>
                     <span className="text-gray-500">Allergies:</span>
                     <span className="ml-1 font-medium">
-                      {patient.allergies.length || "None"}
+                      {patient.allergies.length || 'None'}
                     </span>
                   </div>
                 </div>
@@ -305,9 +306,9 @@ const PatientManagement: React.FC = () => {
             No patients found
           </h3>
           <p className="mt-1 text-sm text-gray-500">
-            {searchTerm || filterStatus !== "all"
-              ? "Try adjusting your search or filter criteria."
-              : "Get started by adding your first patient."}
+            {searchTerm || filterStatus !== 'all'
+              ? 'Try adjusting your search or filter criteria.'
+              : 'Get started by adding your first patient.'}
           </p>
           <div className="mt-6">
             <Link
@@ -333,7 +334,7 @@ const PatientManagement: React.FC = () => {
           </div>
           <div className="text-center">
             <div className="text-3xl font-bold text-green-600">
-              {patients.filter((p) => p.status === "active").length}
+              {patients.filter((p) => p.status === 'active').length}
             </div>
             <div className="text-sm text-gray-500">Active Patients</div>
           </div>

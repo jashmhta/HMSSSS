@@ -37,21 +37,20 @@ model User {
   passwordChangedAt   DateTime?
   lastPasswordReset   DateTime?
 
-  // Relations
-  patient            Patient?
-  doctor             Doctor?
-  nurse              Nurse?
-  receptionist       Receptionist?
-  labTechnician      LabTechnician?
-  pharmacist         Pharmacist?
-  admin              Admin?
-  invoices           Invoice[]
-  notifications      Notification[]
-  auditLogs          AuditLog[]
+   // Relations
+   patient            Patient?
+   doctor             Doctor?
+   nurse              Nurse?
+   receptionist       Receptionist?
+   labTechnician      LabTechnician?
+   pharmacist         Pharmacist?
+    admin              Admin?
+    notifications      Notification[]
+    auditLogs          AuditLog[]
 
-  // Audit
-  createdBy          String?
-  updatedBy          String?
+   // Audit
+   createdBy          String?
+   updatedBy          String?
 
   @@map("users")
 
@@ -85,7 +84,6 @@ enum UserRole {
 model Patient {
   id                String   @id @default(cuid())
   userId            String   @unique
-  hospitalId        String?
   mrn               String   @unique // Medical Record Number
   dateOfBirth       DateTime
   gender            Gender
@@ -100,19 +98,23 @@ model Patient {
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
-  // Relations
-  user              User     @relation(fields: [userId], references: [id])
-  hospital          Hospital? @relation(fields: [hospitalId], references: [id])
-  invoices           Invoice[]
-  appointments      Appointment[]
-  medicalRecords    MedicalRecord[]
-  prescriptions     Prescription[]
-  bills             Bill[]
-  labTests          LabTest[]
-  radiologyTests    RadiologyTest[]
-  emergencyVisits   EmergencyVisit[]
-  opdVisits         OPDVisit[]
-  surgeries         Surgery[]
+    // Relations
+    user              User     @relation(fields: [userId], references: [id])
+    appointments      Appointment[]
+    medicalRecords    MedicalRecord[]
+    prescriptions     Prescription[]
+    bills             Bill[]
+     labTests          LabTest[]
+     radiologyTests    RadiologyTest[]
+     emergencyVisits   EmergencyVisit[]
+     opdVisits         OPDVisit[]
+     surgeries         Surgery[]
+     invoices          Invoice[]
+     fhirResources     FHIRResource[]
+     hl7Messages       HL7Message[]
+     dicomStudies      DICOMStudy[]
+     interactionChecks InteractionCheck[]
+     ipdAdmissions     IPDAdmission[]
 
   @@map("patients")
 
@@ -162,6 +164,7 @@ model Doctor {
   medicalRecords    MedicalRecord[]
   prescriptions     Prescription[]
   surgeries         Surgery[]
+  radiologyTests    RadiologyTest[]
 
   @@map("doctors")
 }
@@ -258,9 +261,11 @@ model Medication {
   createdAt         DateTime       @default(now())
   updatedAt         DateTime       @updatedAt
 
-  // Relations
-  prescriptions     Prescription[]
-  inventoryLogs     InventoryLog[]
+   // Relations
+   prescriptions     Prescription[]
+   inventoryLogs     InventoryLog[]
+   drugInteractions1 DrugInteraction[] @relation(name: "drug1")
+   drugInteractions2 DrugInteraction[] @relation(name: "drug2")
 
   @@map("medications")
 }
@@ -294,10 +299,11 @@ model Prescription {
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
 
-  // Relations
-  patient           Patient            @relation(fields: [patientId], references: [id])
-  doctor            Doctor             @relation(fields: [doctorId], references: [id])
-  medication        Medication         @relation(fields: [medicationId], references: [id])
+   // Relations
+   patient           Patient            @relation(fields: [patientId], references: [id])
+   doctor            Doctor             @relation(fields: [doctorId], references: [id])
+   medication        Medication         @relation(fields: [medicationId], references: [id])
+   interactionChecks InteractionCheck[]
 
   @@map("prescriptions")
 }
@@ -725,6 +731,7 @@ model RadiologyTest {
   scheduledDate     DateTime?
   performedDate     DateTime?
   performedBy       String?
+  radiologistId     String?
   reportDate        DateTime?
   findings          String?
   impression        String?
@@ -736,6 +743,7 @@ model RadiologyTest {
 
   // Relations
   patient           Patient              @relation(fields: [patientId], references: [id])
+  radiologist       Doctor?              @relation(fields: [radiologistId], references: [id])
 
   @@map("radiology_tests")
 }
@@ -780,6 +788,7 @@ model Bill {
   // Relations
   patient           Patient        @relation(fields: [patientId], references: [id])
   items             BillItem[]
+  insuranceClaims   InsuranceClaim[]
 
   @@map("bills")
 }
@@ -825,6 +834,7 @@ enum BillItemType {
   RADIOLOGY_TEST
   MEDICATION
   ROOM_CHARGE
+  EMERGENCY
   OTHER
 }
 
@@ -869,86 +879,6 @@ enum EmergencyDisposition {
   TRANSFERRED
   LEFT_AGAINST_ADVICE
   EXPIRED
-}
-
-// Emergency Department - Supporting Models
-model EmergencyVital {
-  id          String   @id @default(cuid())
-  visitId     String
-  timestamp   DateTime @default(now())
-  bloodPressure String? // e.g., "120/80"
-  heartRate   Int?     // BPM
-  respiratoryRate Int? // breaths per minute
-  temperature  Decimal? @db.Decimal(3,1) // Celsius
-  oxygenSaturation Int? // SpO2 %
-  bloodSugar  Int?     // mg/dL
-  painScale   Int?     // 0-10
-  notes       String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  // Relations
-  visit       EmergencyVisit @relation(fields: [visitId], references: [id], onDelete: Cascade)
-
-  @@map("emergency_vitals")
-}
-
-model EmergencyMedication {
-  id          String   @id @default(cuid())
-  visitId     String
-  medication  String
-  dosage      String   // e.g., "500mg"
-  route       String   // e.g., "IV", "PO", "IM"
-  frequency   String? // e.g., "Q6H", "BID"
-  prescribedAt DateTime @default(now())
-  prescribedBy String   // User ID
-  notes       String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  // Relations
-  visit       EmergencyVisit @relation(fields: [visitId], references: [id], onDelete: Cascade)
-
-  @@map("emergency_medications")
-}
-
-model EmergencyProcedure {
-  id          String   @id @default(cuid())
-  visitId     String
-  procedure   String
-  performedAt DateTime @default(now())
-  performedBy String   // User ID
-  results     String?
-  complications String?
-  notes       String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  // Relations
-  visit       EmergencyVisit @relation(fields: [visitId], references: [id], onDelete: Cascade)
-
-  @@map("emergency_procedures")
-}
-
-model EmergencyAlert {
-  id          String   @id @default(cuid())
-  visitId     String
-  alertType   String   // e.g., "CRITICAL_PATIENT", "RAPID_RESPONSE"
-  message     String
-  severity    String   // e.g., "HIGH", "MEDIUM", "LOW"
-  triggeredAt DateTime @default(now())
-  acknowledgedAt DateTime?
-  acknowledgedBy String?
-  resolvedAt  DateTime?
-  resolvedBy  String?
-  notes       String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  // Relations
-  visit       EmergencyVisit @relation(fields: [visitId], references: [id], onDelete: Cascade)
-
-  @@map("emergency_alerts")
 }
 
 // OPD (Outpatient Department) Management
@@ -1227,38 +1157,6 @@ enum ShiftType {
   ROTATING
 }
 
-// Audit Logging
-model AuditLog {
-  id                String   @id @default(cuid())
-  userId            String
-  hospitalId        String?
-  action            String   // e.g., "PATIENT_RECORD_ACCESSED", "MEDICAL_RECORD_CREATED"
-  resource          String   // e.g., "patients", "medical_records", "prescriptions"
-  resourceId        String   // ID of the resource being accessed/modified
-  timestamp         DateTime @default(now())
-  ipAddress         String?
-  userAgent         String?
-  details           Json?    // Additional context about the action
-  complianceFlags   String[] // e.g., ["HIPAA", "PHI_ACCESS", "GDPR"]
-  sessionId         String?  // For tracking user sessions
-  success           Boolean  @default(true) // Whether the action succeeded
-
-  // Relations
-  user              User     @relation(fields: [userId], references: [id])
-  hospital          Hospital? @relation(fields: [hospitalId], references: [id])
-
-  @@map("audit_logs")
-
-  // Indexes for performance
-  @@index([userId])
-  @@index([hospitalId])
-  @@index([action])
-  @@index([resource])
-  @@index([timestamp])
-  @@index([complianceFlags])
-  @@index([sessionId])
-}
-
 // Compliance Monitoring
 model ComplianceCheck {
   id                String            @id @default(cuid())
@@ -1304,6 +1202,34 @@ enum ComplianceSeverity {
   CRITICAL
 }
 
+// Audit Logging
+model AuditLog {
+  id                String   @id @default(cuid())
+  userId            String
+  user              User     @relation(fields: [userId], references: [id])
+  action            String   // e.g., "PATIENT_RECORD_ACCESSED", "MEDICAL_RECORD_CREATED"
+  resource          String   // e.g., "patients", "medical_records", "prescriptions"
+  resourceId        String   // ID of the resource being accessed/modified
+  eventType         String?  // e.g., "PRE_AUTH_SUBMITTED", "CLAIM_APPEAL_SUBMITTED"
+  timestamp         DateTime @default(now())
+  ipAddress         String?
+  userAgent         String?
+  details           Json?    // Additional context about the action
+  complianceFlags   String[] // e.g., ["HIPAA", "PHI_ACCESS", "GDPR"]
+  sessionId         String?  // For tracking user sessions
+  success           Boolean  @default(true) // Whether the action succeeded
+
+  @@map("audit_logs")
+
+  // Indexes for performance
+  @@index([userId])
+  @@index([action])
+  @@index([resource])
+  @@index([timestamp])
+  @@index([complianceFlags])
+  @@index([sessionId])
+}
+
 // Data Retention Tracking
 model DataRetentionLog {
   id                String   @id @default(cuid())
@@ -1336,7 +1262,6 @@ model Invoice {
   id                String      @id @default(cuid())
   invoiceNumber     String      @unique
   patientId         String
-  userId            String
   amount            Decimal     @db.Decimal(15, 2)
   status            InvoiceStatus @default(PENDING)
   issuedAt          DateTime    @default(now())
@@ -1347,7 +1272,6 @@ model Invoice {
 
   // Relations
   patient           Patient     @relation(fields: [patientId], references: [id])
-  user              User        @relation(fields: [userId], references: [id])
 
   @@map("invoices")
   @@index([patientId])
@@ -1464,19 +1388,37 @@ model Hospital {
   email             String?
   status            HospitalStatus @default(ACTIVE)
   licenseNumber     String?
-  maxUsers          Int?        @default(100)
-  subscription      Json?       // Subscription details including expiresAt
-  enabledModules    String[]    @default([])
   createdAt         DateTime    @default(now())
   updatedAt         DateTime    @updatedAt
-
-  // Relations
-  patients          Patient[]
-  auditLogs         AuditLog[]
 
   @@map("hospitals")
   @@index([status])
   @@index([name])
+}
+
+// Insurance Claim Model
+model InsuranceClaim {
+  id                String              @id @default(cuid())
+  billId            String
+  invoiceId         String?
+  insuranceProvider String
+  claimNumber       String              @unique
+  claimAmount       Decimal             @db.Decimal(10,2)
+  approvedAmount    Decimal             @db.Decimal(10,2) @default(0)
+  claimStatus       InsuranceClaimStatus @default(PENDING)
+  claimDate         DateTime            @default(now())
+  processedBy       String
+  notes             String?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  // Relations
+  bill              Bill?               @relation(fields: [billId], references: [id])
+
+  @@map("insurance_claims")
+  @@index([billId])
+  @@index([claimStatus])
+  @@index([claimDate])
 }
 
 // Notification Model
@@ -1499,6 +1441,7 @@ model Notification {
   @@index([isRead])
   @@index([createdAt])
 }
+
 
 
 // Enums for Accounting
@@ -1562,6 +1505,13 @@ enum HospitalStatus {
   ACTIVE
   INACTIVE
   MAINTENANCE
+}
+
+enum InsuranceClaimStatus {
+  PENDING
+  APPROVED
+  DENIED
+  PARTIALLY_APPROVED
 }
 
 enum NotificationType {
@@ -1637,6 +1587,8 @@ model ServicePackage {
   @@map("service_packages")
 }
 
+
+
 enum ServiceType {
   CONSULTATION
   LAB_TEST
@@ -1647,3 +1599,492 @@ enum ServiceType {
   MEDICATION
   OTHER
 }
+
+// FHIR/HL7 Interoperability Models
+model FHIRResource {
+  id                String   @id @default(cuid())
+  resourceType      String   // Patient, Observation, Medication, etc.
+  resourceId        String   // FHIR resource ID
+  versionId         String?  // FHIR version ID for versioning
+  lastUpdated       DateTime @default(now())
+  data              Json     // Complete FHIR resource JSON
+  patientId         String?  // Link to internal patient if applicable
+  status            FHIRResourceStatus @default(ACTIVE)
+  source            String?  // Source system (OpenMRS, external EHR, etc.)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Relations
+  patient           Patient? @relation(fields: [patientId], references: [id])
+
+  @@map("fhir_resources")
+
+  // Indexes
+  @@index([resourceType])
+  @@index([resourceId])
+  @@index([patientId])
+  @@index([lastUpdated])
+  @@index([status])
+}
+
+model HL7Message {
+  id                String   @id @default(cuid())
+  messageType       String   // ADT, ORU, ORM, etc.
+  messageId         String   @unique // MSH-10 Message Control ID
+  version           String   @default("2.5") // HL7 version
+  rawMessage        String   // Complete HL7 message
+  parsedData        Json?    // Parsed message data
+  status            HL7MessageStatus @default(RECEIVED)
+  direction         HL7Direction // INBOUND or OUTBOUND
+  sourceSystem      String?  // Source/destination system
+  patientId         String?  // Linked patient ID
+  processingErrors  String[] // Any parsing/validation errors
+  processedAt       DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Relations
+  patient           Patient? @relation(fields: [patientId], references: [id])
+
+  @@map("hl7_messages")
+
+  // Indexes
+  @@index([messageType])
+  @@index([messageId])
+  @@index([status])
+  @@index([direction])
+  @@index([patientId])
+  @@index([createdAt])
+}
+
+model ExternalSystem {
+  id                String   @id @default(cuid())
+  name              String   @unique
+  type              ExternalSystemType // FHIR_SERVER, HL7_ENDPOINT, DICOM_PACS, etc.
+  baseUrl           String
+  apiKey            String?  // Encrypted
+  username          String?
+  password          String?  // Encrypted
+  authType          AuthType @default(BASIC)
+  isActive          Boolean  @default(true)
+  lastSync          DateTime?
+  syncStatus        SyncStatus @default(IDLE)
+  errorMessage      String?
+  configuration     Json?    // Additional system-specific config
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@map("external_systems")
+
+  // Indexes
+  @@index([type])
+  @@index([isActive])
+  @@index([lastSync])
+}
+
+model FHIRMapping {
+  id                String   @id @default(cuid())
+  internalResource  String   // Internal model name (Patient, MedicalRecord, etc.)
+  internalField     String   // Internal field path
+  fhirResource      String   // FHIR resource type
+  fhirPath          String   // FHIR field path
+  mappingType       MappingType // DIRECT, TRANSFORM, LOOKUP
+  transformFunction String?  // Function name for complex transformations
+  isRequired        Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@map("fhir_mappings")
+
+  // Indexes
+  @@index([internalResource])
+  @@index([fhirResource])
+}
+
+// DICOM/PACS Models
+model DICOMStudy {
+  id                String   @id @default(cuid())
+  studyInstanceUID  String   @unique
+  patientId         String
+  accessionNumber   String?  @unique
+  studyDescription  String?
+  studyDate         DateTime?
+  modality          RadiologyModality?
+  bodyPart          String?
+  referringPhysician String?
+  performingPhysician String?
+  institutionName   String?
+  status            DICOMStatus @default(RECEIVED)
+  storagePath       String?  // Path to stored DICOM files
+  metadata          Json?    // DICOM metadata
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Relations
+  patient           Patient  @relation(fields: [patientId], references: [id])
+  series            DICOMSeries[]
+
+  @@map("dicom_studies")
+
+  // Indexes
+  @@index([studyInstanceUID])
+  @@index([patientId])
+  @@index([accessionNumber])
+  @@index([studyDate])
+  @@index([modality])
+  @@index([status])
+}
+
+model DICOMSeries {
+  id                String   @id @default(cuid())
+  seriesInstanceUID String   @unique
+  studyId           String
+  seriesNumber      String?
+  seriesDescription String?
+  modality          RadiologyModality?
+  bodyPart          String?
+  seriesDate        DateTime?
+  status            DICOMStatus @default(RECEIVED)
+  storagePath       String?  // Path to stored DICOM files
+  metadata          Json?    // DICOM metadata
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Relations
+  study             DICOMStudy @relation(fields: [studyId], references: [id])
+  instances         DICOMInstance[]
+
+  @@map("dicom_series")
+
+  // Indexes
+  @@index([seriesInstanceUID])
+  @@index([studyId])
+  @@index([modality])
+  @@index([status])
+}
+
+model DICOMInstance {
+  id                String   @id @default(cuid())
+  sopInstanceUID    String   @unique
+  seriesId          String
+  instanceNumber    String?
+  sopClassUID       String?
+  storagePath       String   // Path to DICOM file
+  fileSize          Int?     // File size in bytes
+  metadata          Json?    // DICOM instance metadata
+  status            DICOMStatus @default(RECEIVED)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Relations
+  series            DICOMSeries @relation(fields: [seriesId], references: [id])
+
+  @@map("dicom_instances")
+
+  // Indexes
+  @@index([sopInstanceUID])
+  @@index([seriesId])
+  @@index([status])
+}
+
+model PACSIntegration {
+  id                String   @id @default(cuid())
+  systemName        String   @unique
+  baseUrl           String
+  aetitle           String   // DICOM AE Title
+  port              Int      @default(4242)
+  apiKey            String?  // Encrypted
+  isActive          Boolean  @default(true)
+  lastSync          DateTime?
+  syncStatus        SyncStatus @default(IDLE)
+  errorMessage      String?
+  configuration     Json?    // PACS-specific configuration
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@map("pacs_integrations")
+
+  // Indexes
+  @@index([systemName])
+  @@index([isActive])
+  @@index([lastSync])
+}
+
+// Drug Interaction Models
+model DrugInteraction {
+  id                String   @id @default(cuid())
+  drug1Id           String   // Reference to medication
+  drug2Id           String   // Reference to medication
+  interactionType   InteractionType
+  severity          InteractionSeverity
+  description       String
+  clinicalEffects   String?
+  management        String?
+  source            String   // Source of interaction data
+  lastUpdated       DateTime @default(now())
+  createdAt         DateTime @default(now())
+
+  // Relations
+  drug1             Medication @relation(name: "drug1", fields: [drug1Id], references: [id])
+  drug2             Medication @relation(name: "drug2", fields: [drug2Id], references: [id])
+
+  @@unique([drug1Id, drug2Id])
+  @@map("drug_interactions")
+
+  // Indexes
+  @@index([drug1Id])
+  @@index([drug2Id])
+  @@index([interactionType])
+  @@index([severity])
+}
+
+model DrugDatabase {
+  id                String   @id @default(cuid())
+  name              String   @unique
+  provider          String   // e.g., "Drugs.com", "RxNorm", "FDA"
+  baseUrl           String
+  apiKey            String?  // Encrypted
+  isActive          Boolean  @default(true)
+  lastSync          DateTime?
+  syncStatus        SyncStatus @default(IDLE)
+  configuration     Json?    // Database-specific configuration
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@map("drug_databases")
+
+  // Indexes
+  @@index([provider])
+  @@index([isActive])
+  @@index([lastSync])
+}
+
+model InteractionCheck {
+  id                String   @id @default(cuid())
+  prescriptionId    String
+  patientId         String
+  medications       String[] // List of medication IDs checked
+  interactions      Json     // Interaction results
+  checkedBy         String   // User who performed the check
+  checkedAt         DateTime @default(now())
+  status            CheckStatus @default(PASSED)
+  warnings          String[] // Warning messages
+  criticalAlerts    String[] // Critical interaction alerts
+
+  // Relations
+  prescription      Prescription? @relation(fields: [prescriptionId], references: [id])
+  patient           Patient       @relation(fields: [patientId], references: [id])
+
+  @@map("interaction_checks")
+
+  // Indexes
+  @@index([prescriptionId])
+  @@index([patientId])
+  @@index([checkedAt])
+  @@index([status])
+}
+
+// Enums for new models
+enum FHIRResourceStatus {
+  ACTIVE
+  DELETED
+  SUPERSEDED
+}
+
+enum HL7MessageStatus {
+  RECEIVED
+  PROCESSED
+  FAILED
+  RETRIED
+}
+
+enum HL7Direction {
+  INBOUND
+  OUTBOUND
+}
+
+enum ExternalSystemType {
+  FHIR_SERVER
+  HL7_ENDPOINT
+  DICOM_PACS
+  DRUG_DATABASE
+  EHR_SYSTEM
+}
+
+enum AuthType {
+  BASIC
+  BEARER
+  API_KEY
+  OAUTH2
+}
+
+enum MappingType {
+  DIRECT
+  TRANSFORM
+  LOOKUP
+}
+
+enum DICOMStatus {
+  RECEIVED
+  PROCESSING
+  STORED
+  FAILED
+  DELETED
+}
+
+enum InteractionType {
+  MAJOR
+  MODERATE
+  MINOR
+  UNKNOWN
+}
+
+enum InteractionSeverity {
+  CONTRAINDICATED
+  SEVERE
+  MODERATE
+  MILD
+  UNKNOWN
+}
+
+enum CheckStatus {
+  PASSED
+  WARNINGS
+  CRITICAL
+  FAILED
+}
+
+// Emergency Department Models
+model EmergencyVital {
+  id                String   @id @default(cuid())
+  emergencyVisitId  String
+  vitalType         String   // BP, HR, Temp, RR, O2_SAT, etc.
+  value             String
+  unit              String?  // mmHg, bpm, °C, etc.
+  recordedAt        DateTime @default(now())
+  recordedBy        String
+  createdAt         DateTime @default(now())
+
+  // Relations
+  emergencyVisit    EmergencyVisit @relation(fields: [emergencyVisitId], references: [id])
+
+  @@map("emergency_vitals")
+  @@index([emergencyVisitId])
+  @@index([vitalType])
+  @@index([recordedAt])
+}
+
+model EmergencyMedication {
+  id                String   @id @default(cuid())
+  emergencyVisitId  String
+  medicationId      String?
+  medicationName    String   // If not from inventory
+  dosage            String
+  route             String   // IV, IM, PO, etc.
+  administeredAt    DateTime @default(now())
+  administeredBy    String
+  notes             String?
+  createdAt         DateTime @default(now())
+
+  // Relations
+  emergencyVisit    EmergencyVisit @relation(fields: [emergencyVisitId], references: [id])
+
+  @@map("emergency_medications")
+  @@index([emergencyVisitId])
+  @@index([administeredAt])
+}
+
+model EmergencyProcedure {
+  id                String   @id @default(cuid())
+  emergencyVisitId  String
+  procedureName     String
+  procedureCode     String?
+  performedAt       DateTime @default(now())
+  performedBy       String
+  outcome           String?
+  complications     String?
+  notes             String?
+  createdAt         DateTime @default(now())
+
+  // Relations
+  emergencyVisit    EmergencyVisit @relation(fields: [emergencyVisitId], references: [id])
+
+  @@map("emergency_procedures")
+  @@index([emergencyVisitId])
+  @@index([performedAt])
+}
+
+model EmergencyAlert {
+  id                String   @id @default(cuid())
+  emergencyVisitId  String
+  alertType         String   // CRITICAL_VITALS, ALLERGY, etc.
+  severity          String   // HIGH, MEDIUM, LOW
+  message           String
+  triggeredAt       DateTime @default(now())
+  acknowledgedAt    DateTime?
+  acknowledgedBy    String?
+  resolvedAt        DateTime?
+  resolvedBy        String?
+  createdAt         DateTime @default(now())
+
+  // Relations
+  emergencyVisit    EmergencyVisit @relation(fields: [emergencyVisitId], references: [id])
+
+  @@map("emergency_alerts")
+  @@index([emergencyVisitId])
+  @@index([alertType])
+  @@index([severity])
+  @@index([triggeredAt])
+}
+
+// IPD (In-Patient Department) Models
+model TreatmentPlan {
+  id                String   @id @default(cuid())
+  admissionId       String   @unique
+  primaryDiagnosis  String
+  secondaryDiagnoses String[]
+  treatmentGoals    String[]
+  medications       Json?    // Prescribed medications with schedule
+  procedures        Json?    // Planned procedures
+  therapies         Json?    // Physical therapy, etc.
+  nursingCare       Json?    // Special nursing requirements
+  dietaryPlan       String?
+  dischargePlan     String?
+  estimatedStay     Int?     // Estimated length of stay in days
+  icuProgressNotes  Json?    // Daily ICU progress notes
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Relations
+  admission         IPDAdmission @relation(fields: [admissionId], references: [id])
+
+  @@map("treatment_plans")
+  @@index([admissionId])
+}
+
+// IPD Admission Model
+model IPDAdmission {
+  id                String   @id @default(cuid())
+  admissionNumber   String   @unique
+  patientId         String
+  doctorId          String
+  bedAssignment     String?
+  admissionDate     DateTime @default(now())
+  dischargeDate     DateTime?
+  admissionType     String   // EMERGENCY, ELECTIVE, TRANSFER
+  admissionReason   String
+  currentStatus     String   @default("ADMITTED") // ADMITTED, DISCHARGED, TRANSFERRED
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Relations
+  patient           Patient  @relation(fields: [patientId], references: [id])
+  treatmentPlan     TreatmentPlan?
+
+  @@map("ipd_admissions")
+  @@index([patientId])
+  @@index([doctorId])
+  @@index([admissionDate])
+  @@index([currentStatus])
+}
+

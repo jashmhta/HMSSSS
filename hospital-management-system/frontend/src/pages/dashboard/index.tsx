@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from 'react';
+
 import {
   UsersIcon,
   CalendarIcon,
@@ -8,12 +9,11 @@ import {
   CurrencyDollarIcon,
   ExclamationTriangleIcon,
   HeartIcon,
-  TruckIcon,
-  ChartBarIcon,
-  UserIcon,
+   TruckIcon,
+   UserIcon,
   ClipboardDocumentListIcon,
   CogIcon,
-} from "@heroicons/react/24/outline";
+} from '@heroicons/react/24/outline';
 import {
   BarChart,
   Bar,
@@ -21,13 +21,11 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  ResponsiveContainer,
-  LineChart,
-  Line,
-  PieChart,
+   ResponsiveContainer,
+   PieChart,
   Pie,
   Cell,
-} from "recharts";
+} from 'recharts';
 
 interface DashboardStats {
   totalPatients: number;
@@ -84,7 +82,7 @@ const Dashboard: React.FC = () => {
           setLoading(false);
         }, 1000);
       } catch (error) {
-        console.error("Failed to fetch dashboard stats:", error);
+        console.error('Failed to fetch dashboard stats:', error);
         setLoading(false);
       }
     };
@@ -94,168 +92,168 @@ const Dashboard: React.FC = () => {
 
   const statCards = [
     {
-      title: "Total Patients",
+      title: 'Total Patients',
       value: stats.totalPatients.toLocaleString(),
       icon: UsersIcon,
-      color: "bg-blue-500",
-      change: "+12%",
-      href: "/patient",
+      color: 'bg-blue-500',
+      change: '+12%',
+      href: '/patient',
     },
     {
       title: "Today's Appointments",
       value: stats.todayAppointments.toString(),
       icon: CalendarIcon,
-      color: "bg-green-500",
-      change: "+8%",
-      href: "/appointments",
+      color: 'bg-green-500',
+      change: '+8%',
+      href: '/appointments',
     },
     {
-      title: "Active Patients",
+      title: 'Active Patients',
       value: stats.activePatients.toLocaleString(),
       icon: UsersIcon,
-      color: "bg-purple-500",
-      change: "+5%",
-      href: "/patient",
+      color: 'bg-purple-500',
+      change: '+5%',
+      href: '/patient',
     },
     {
-      title: "Pending Bills",
+      title: 'Pending Bills',
       value: stats.pendingBills.toString(),
       icon: CurrencyDollarIcon,
-      color: "bg-yellow-500",
-      change: "-3%",
-      href: "/billing",
+      color: 'bg-yellow-500',
+      change: '-3%',
+      href: '/billing',
     },
     {
-      title: "Low Stock Medications",
+      title: 'Low Stock Medications',
       value: stats.lowStockMedications.toString(),
       icon: HeartIcon,
-      color: "bg-red-500",
-      change: "+2",
-      href: "/pharmacy",
+      color: 'bg-red-500',
+      change: '+2',
+      href: '/pharmacy',
     },
     {
-      title: "Pending Lab Tests",
+      title: 'Pending Lab Tests',
       value: stats.pendingLabTests.toString(),
       icon: BeakerIcon,
-      color: "bg-indigo-500",
-      change: "+4",
-      href: "/lab",
+      color: 'bg-indigo-500',
+      change: '+4',
+      href: '/lab',
     },
     {
-      title: "Pending Radiology",
+      title: 'Pending Radiology',
       value: stats.pendingRadiologyTests.toString(),
       icon: ViewfinderCircleIcon,
-      color: "bg-pink-500",
-      change: "+1",
-      href: "/radiology",
+      color: 'bg-pink-500',
+      change: '+1',
+      href: '/radiology',
     },
     {
-      title: "Emergency Alerts",
+      title: 'Emergency Alerts',
       value: stats.emergencyAlerts.toString(),
       icon: ExclamationTriangleIcon,
-      color: "bg-orange-500",
-      change: "0",
-      href: "/emergency",
+      color: 'bg-orange-500',
+      change: '0',
+      href: '/emergency',
     },
   ];
 
   const quickActions = [
     {
-      name: "New Patient",
+      name: 'New Patient',
       icon: UsersIcon,
-      href: "/patient/new",
-      color: "bg-blue-500",
+      href: '/patient/new',
+      color: 'bg-blue-500',
     },
     {
-      name: "Schedule Appointment",
+      name: 'Schedule Appointment',
       icon: CalendarIcon,
-      href: "/appointments/new",
-      color: "bg-green-500",
+      href: '/appointments/new',
+      color: 'bg-green-500',
     },
     {
-      name: "Medical Records",
+      name: 'Medical Records',
       icon: DocumentTextIcon,
-      href: "/records",
-      color: "bg-purple-500",
+      href: '/records',
+      color: 'bg-purple-500',
     },
     {
-      name: "Emergency",
+      name: 'Emergency',
       icon: ExclamationTriangleIcon,
-      href: "/emergency",
-      color: "bg-red-500",
+      href: '/emergency',
+      color: 'bg-red-500',
     },
     {
-      name: "Laboratory",
+      name: 'Laboratory',
       icon: BeakerIcon,
-      href: "/lab",
-      color: "bg-indigo-500",
+      href: '/lab',
+      color: 'bg-indigo-500',
     },
     {
-      name: "Radiology",
+      name: 'Radiology',
       icon: ViewfinderCircleIcon,
-      href: "/radiology",
-      color: "bg-pink-500",
+      href: '/radiology',
+      color: 'bg-pink-500',
     },
     {
-      name: "Pharmacy",
+      name: 'Pharmacy',
       icon: HeartIcon,
-      href: "/pharmacy",
-      color: "bg-yellow-500",
+      href: '/pharmacy',
+      color: 'bg-yellow-500',
     },
     {
-      name: "Billing",
+      name: 'Billing',
       icon: CurrencyDollarIcon,
-      href: "/billing",
-      color: "bg-orange-500",
+      href: '/billing',
+      color: 'bg-orange-500',
     },
   ];
 
   const moduleStats = [
     {
-      name: "Staff Management",
+      name: 'Staff Management',
       count: stats.totalStaff,
       icon: UserIcon,
-      href: "/hr",
+      href: '/hr',
     },
     {
-      name: "Inventory Items",
+      name: 'Inventory Items',
       count: 2450,
       icon: TruckIcon,
-      href: "/inventory",
+      href: '/inventory',
     },
     {
-      name: "Reports Generated",
+      name: 'Reports Generated',
       count: 89,
       icon: ClipboardDocumentListIcon,
-      href: "/reports",
+      href: '/reports',
     },
-    { name: "System Settings", count: null, icon: CogIcon, href: "/settings" },
+    { name: 'System Settings', count: null, icon: CogIcon, href: '/settings' },
   ];
 
   // Mock data for charts
   const appointmentData = [
-    { name: "Mon", appointments: 12 },
-    { name: "Tue", appointments: 19 },
-    { name: "Wed", appointments: 15 },
-    { name: "Thu", appointments: 22 },
-    { name: "Fri", appointments: 18 },
-    { name: "Sat", appointments: 8 },
-    { name: "Sun", appointments: 5 },
+    { name: 'Mon', appointments: 12 },
+    { name: 'Tue', appointments: 19 },
+    { name: 'Wed', appointments: 15 },
+    { name: 'Thu', appointments: 22 },
+    { name: 'Fri', appointments: 18 },
+    { name: 'Sat', appointments: 8 },
+    { name: 'Sun', appointments: 5 },
   ];
 
   const departmentData = [
-    { name: "Cardiology", patients: 120, color: "#3B82F6" },
-    { name: "Orthopedics", patients: 95, color: "#10B981" },
-    { name: "Neurology", patients: 78, color: "#F59E0B" },
-    { name: "Pediatrics", patients: 110, color: "#EF4444" },
-    { name: "Dermatology", patients: 65, color: "#8B5CF6" },
+    { name: 'Cardiology', patients: 120, color: '#3B82F6' },
+    { name: 'Orthopedics', patients: 95, color: '#10B981' },
+    { name: 'Neurology', patients: 78, color: '#F59E0B' },
+    { name: 'Pediatrics', patients: 110, color: '#EF4444' },
+    { name: 'Dermatology', patients: 65, color: '#8B5CF6' },
   ];
 
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto" />
           <p className="mt-4 text-gray-600">Loading dashboard...</p>
         </div>
       </div>
@@ -434,24 +432,24 @@ const Dashboard: React.FC = () => {
           <div className="space-y-3">
             {[
               {
-                patient: "John Doe",
-                time: "10:00 AM",
-                type: "Cardiology Consultation",
+                patient: 'John Doe',
+                time: '10:00 AM',
+                type: 'Cardiology Consultation',
               },
               {
-                patient: "Jane Smith",
-                time: "11:30 AM",
-                type: "General Checkup",
+                patient: 'Jane Smith',
+                time: '11:30 AM',
+                type: 'General Checkup',
               },
               {
-                patient: "Bob Johnson",
-                time: "2:00 PM",
-                type: "Dental Cleaning",
+                patient: 'Bob Johnson',
+                time: '2:00 PM',
+                type: 'Dental Cleaning',
               },
               {
-                patient: "Alice Brown",
-                time: "3:30 PM",
-                type: "Orthopedic Review",
+                patient: 'Alice Brown',
+                time: '3:30 PM',
+                type: 'Orthopedic Review',
               },
             ].map((appointment, index) => (
               <div
@@ -477,28 +475,28 @@ const Dashboard: React.FC = () => {
           <div className="space-y-3">
             {[
               {
-                type: "warning",
-                title: "Low Stock Alert",
-                message: "Paracetamol tablets running low",
-                color: "yellow",
+                type: 'warning',
+                title: 'Low Stock Alert',
+                message: 'Paracetamol tablets running low',
+                color: 'yellow',
               },
               {
-                type: "info",
-                title: "Pending Lab Results",
-                message: "12 test results awaiting review",
-                color: "blue",
+                type: 'info',
+                title: 'Pending Lab Results',
+                message: '12 test results awaiting review',
+                color: 'blue',
               },
               {
-                type: "error",
-                title: "Equipment Maintenance",
-                message: "MRI machine maintenance due",
-                color: "red",
+                type: 'error',
+                title: 'Equipment Maintenance',
+                message: 'MRI machine maintenance due',
+                color: 'red',
               },
               {
-                type: "success",
-                title: "Backup Completed",
-                message: "Daily backup completed successfully",
-                color: "green",
+                type: 'success',
+                title: 'Backup Completed',
+                message: 'Daily backup completed successfully',
+                color: 'green',
               },
             ].map((alert, index) => (
               <div

@@ -221,7 +221,7 @@ export class TestDataBuilder {
 
   static billing(overrides: Partial<any> = {}): any {
     return {
-      amount: 100.00,
+      amount: 100.0,
       description: 'Test billing item',
       status: 'PENDING',
       dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
@@ -340,26 +340,36 @@ export class TestAssertions {
 
 // Test performance helpers
 export class TestPerformance {
-  static async measureTime<T>(operation: () => Promise<T>, thresholdMs = 1000): Promise<{ result: T; duration: number }> {
+  static async measureTime<T>(
+    operation: () => Promise<T>,
+    thresholdMs = 1000,
+  ): Promise<{ result: T; duration: number }> {
     const start = Date.now();
     const result = await operation();
     const duration = Date.now() - start;
 
     if (duration > thresholdMs) {
-      console.warn(`Performance warning: Operation took ${duration}ms (threshold: ${thresholdMs}ms)`);
+      console.warn(
+        `Performance warning: Operation took ${duration}ms (threshold: ${thresholdMs}ms)`,
+      );
     }
 
     return { result, duration };
   }
 
-  static async measureMemory<T>(operation: () => Promise<T>, thresholdBytes = 1024 * 1024): Promise<{ result: T; memoryIncrease: number }> {
+  static async measureMemory<T>(
+    operation: () => Promise<T>,
+    thresholdBytes = 1024 * 1024,
+  ): Promise<{ result: T; memoryIncrease: number }> {
     const startMemory = process.memoryUsage().heapUsed;
     const result = await operation();
     const endMemory = process.memoryUsage().heapUsed;
     const memoryIncrease = endMemory - startMemory;
 
     if (memoryIncrease > thresholdBytes) {
-      console.warn(`Memory warning: Operation increased memory by ${memoryIncrease} bytes (threshold: ${thresholdBytes} bytes)`);
+      console.warn(
+        `Memory warning: Operation increased memory by ${memoryIncrease} bytes (threshold: ${thresholdBytes} bytes)`,
+      );
     }
 
     return { result, memoryIncrease };
@@ -368,7 +378,10 @@ export class TestPerformance {
 
 // Test security helpers
 export class TestSecurity {
-  static expectNoSensitiveData(response: any, fields: string[] = ['password', 'passwordHash', 'salt', 'token']): void {
+  static expectNoSensitiveData(
+    response: any,
+    fields: string[] = ['password', 'passwordHash', 'salt', 'token'],
+  ): void {
     const responseBody = JSON.stringify(response.body);
 
     for (const field of fields) {
@@ -441,10 +454,10 @@ export const createMockLogger = () => ({
 export const createMockConfigService = () => ({
   get: jest.fn((key: string) => {
     const defaults = {
-      'JWT_SECRET': 'test-secret',
-      'DATABASE_URL': 'postgresql://test:test@localhost:5432/test',
-      'REDIS_URL': 'redis://localhost:6379',
-      'BCRYPT_ROUNDS': 10,
+      JWT_SECRET: 'test-secret',
+      DATABASE_URL: 'postgresql://test:test@localhost:5432/test',
+      REDIS_URL: 'redis://localhost:6379',
+      BCRYPT_ROUNDS: 10,
     };
     return defaults[key];
   }),
@@ -456,7 +469,10 @@ export const generateTestData = {
   phone: () => `+1${Math.floor(Math.random() * 10000000000)}`,
   uuid: () => require('uuid').v4(),
   date: (daysFromNow = 0) => new Date(Date.now() + daysFromNow * 24 * 60 * 60 * 1000),
-  string: (length = 10) => Math.random().toString(36).substring(2, 2 + length),
+  string: (length = 10) =>
+    Math.random()
+      .toString(36)
+      .substring(2, 2 + length),
   number: (min = 0, max = 1000) => Math.floor(Math.random() * (max - min + 1)) + min,
 };
 
@@ -468,7 +484,7 @@ export const wait = (ms: number): Promise<void> => {
 export const waitFor = async (
   condition: () => boolean,
   timeout = 5000,
-  interval = 100
+  interval = 100,
 ): Promise<void> => {
   const start = Date.now();
 

@@ -62,7 +62,7 @@ data:
       mutate {
         remove_field => ["beat", "prospector", "input", "offset", "source", "type"]
       }
-    }
+     }
 
      output {
        elasticsearch {
@@ -71,10 +71,10 @@ data:
          document_type => "_doc"
        }
 
-      stdout {
-        codec => rubydebug
-      }
-    }
+       stdout {
+         codec => rubydebug
+       }
+     }
 
 ---
 # Logstash Deployment
@@ -87,30 +87,30 @@ metadata:
     app: hospital-management-system
     component: logging
     system: logstash
-spec:
-  replicas: 2
-  selector:
-    matchLabels:
-      app: hospital-management-system
-      component: logging
-      system: logstash
-  template:
-    metadata:
-      labels:
+ spec:
+    replicas: 2
+    selector:
+      matchLabels:
         app: hospital-management-system
         component: logging
         system: logstash
-    spec:
-      serviceAccountName: hms-admin
-      containers:
-      - name: logstash
-        image: docker.elastic.co/logstash/logstash:8.11.0
-        ports:
-        - containerPort: 5044
-          name: beats
-        - containerPort: 8080
-          name: http
-        env:
+    template:
+      metadata:
+        labels:
+          app: hospital-management-system
+          component: logging
+          system: logstash
+     spec:
+       serviceAccountName: hms-admin
+       containers:
+        - name: logstash
+          image: docker.elastic.co/logstash/logstash:8.11.0
+          ports:
+          - containerPort: 5044
+            name: beats
+          - containerPort: 8080
+            name: http
+          env:
         - name: LS_JAVA_OPTS
           value: "-Xmx1g -Xms1g"
         volumeMounts:
@@ -147,8 +147,8 @@ spec:
           initialDelaySeconds: 30
           periodSeconds: 10
           timeoutSeconds: 5
-          failureThreshold: 3
-      volumes:
+           failureThreshold: 3
+       volumes:
       - name: logstash-config
         configMap:
           name: logstash-config
@@ -221,26 +221,26 @@ spec:
         system: kibana
     spec:
       serviceAccountName: hms-admin
-      containers:
-      - name: kibana
-        image: docker.elastic.co/kibana/kibana:8.11.0
-        ports:
-        - containerPort: 5601
-          name: http
-        env:
+       containers:
+       - name: kibana
+         image: docker.elastic.co/kibana/kibana:8.11.0
+         ports:
+         - containerPort: 5601
+           name: http
+         env:
          - name: ELASTICSEARCH_HOSTS
            value: "http://elasticsearch-hms:9200"
          volumeMounts:
          - name: kibana-config
            mountPath: /usr/share/kibana/config/kibana.yml
            subPath: kibana.yml
-        resources:
-          requests:
-            cpu: 500m
-            memory: 1Gi
-          limits:
-            cpu: 1000m
-            memory: 2Gi
+         resources:
+           requests:
+             cpu: 500m
+             memory: 1Gi
+           limits:
+             cpu: 1000m
+             memory: 2Gi
          livenessProbe:
            httpGet:
              path: /login
@@ -250,15 +250,15 @@ spec:
            periodSeconds: 30
            timeoutSeconds: 10
            failureThreshold: 3
-          readinessProbe:
-            httpGet:
-              path: /
-              port: 5601
-              scheme: HTTP
-            initialDelaySeconds: 60
-            periodSeconds: 30
-            timeoutSeconds: 10
-            failureThreshold: 5
+         readinessProbe:
+           httpGet:
+             path: /
+             port: 5601
+             scheme: HTTP
+           initialDelaySeconds: 60
+           periodSeconds: 30
+           timeoutSeconds: 10
+           failureThreshold: 5
        volumes:
        - name: kibana-config
          configMap:
@@ -277,7 +277,7 @@ metadata:
   labels:
     app: hospital-management-system
     component: logging
-data:
+ data:
    kibana.yml: |
      server.name: kibana
      server.host: "0.0.0.0"

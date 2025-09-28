@@ -3,22 +3,16 @@ import { registerAs } from '@nestjs/config';
 
 export default registerAs('database', () => ({
   // Primary Database URL
-  url: process.env.DATABASE_URL || 'postgresql://hms_user:StrongPassword123!@localhost:5432/hms_db',
+  url: process.env.DATABASE_URL,
 
   // Test Database URL
-  testUrl:
-    process.env.DATABASE_TEST_URL ||
-    'postgresql://hms_test_user:TestPassword123!@localhost:5432/hms_test_db',
+  testUrl: process.env.DATABASE_TEST_URL,
 
   // Development Database URL
-  devUrl:
-    process.env.DATABASE_DEV_URL ||
-    'postgresql://hms_dev_user:DevPassword123!@localhost:5432/hms_dev_db',
+  devUrl: process.env.DATABASE_DEV_URL,
 
   // Shadow Database for Prisma Migrations
-  shadowUrl:
-    process.env.SHADOW_DATABASE_URL ||
-    'postgresql://hms_shadow_user:ShadowPassword123!@localhost:5432/hms_shadow_db',
+  shadowUrl: process.env.SHADOW_DATABASE_URL,
 
   // Connection Pooling Configuration
   pool: {
@@ -77,11 +71,11 @@ export default registerAs('database', () => ({
   replication: {
     enabled: process.env.DB_REPLICATION_ENABLED === 'true',
     primary: {
-      host: process.env.DB_PRIMARY_HOST || 'localhost',
+      host: process.env.DB_PRIMARY_HOST,
       port: parseInt(process.env.DB_PRIMARY_PORT) || 5432,
-      database: process.env.DB_PRIMARY_DATABASE || 'hms_db',
-      username: process.env.DB_PRIMARY_USERNAME || 'hms_user',
-      password: process.env.DB_PRIMARY_PASSWORD || 'StrongPassword123!',
+      database: process.env.DB_PRIMARY_DATABASE,
+      username: process.env.DB_PRIMARY_USERNAME,
+      password: process.env.DB_PRIMARY_PASSWORD,
     },
     replicas:
       process.env.DB_REPLICA_HOSTS?.split(',').map((host, index) => ({
@@ -89,7 +83,7 @@ export default registerAs('database', () => ({
         port: parseInt(process.env.DB_REPLICA_PORTS?.split(',')[index]) || 5432,
         database: process.env.DB_REPLICA_DATABASES?.split(',')[index] || 'hms_db',
         username: process.env.DB_REPLICA_USERNAMES?.split(',')[index] || 'hms_replica_user',
-        password: process.env.DB_REPLICA_PASSWORDS?.split(',')[index] || 'ReplicaPassword123!',
+        password: process.env.DB_REPLICA_PASSWORDS?.split(',')[index],
         readOnly: true,
       })) || [],
   },

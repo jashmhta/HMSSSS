@@ -1,13 +1,14 @@
-import React, { useState } from "react";
-import { useRouter } from "next/router";
-import Link from "next/link";
-import { EyeIcon, EyeSlashIcon } from "@heroicons/react/24/outline";
-import toast from "react-hot-toast";
+import React, { useState } from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/router';
+
+import { EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
+import toast from 'react-hot-toast';
 
 const Login: React.FC = () => {
   const [formData, setFormData] = useState({
-    email: "",
-    password: "",
+    email: '',
+    password: '',
     rememberMe: false,
   });
   const [showPassword, setShowPassword] = useState(false);
@@ -23,13 +24,13 @@ const Login: React.FC = () => {
       await new Promise((resolve) => setTimeout(resolve, 1000));
 
       // Mock successful login
-      localStorage.setItem("token", "mock-jwt-token");
-      localStorage.setItem("userRole", "admin");
+      localStorage.setItem('token', 'mock-jwt-token');
+      localStorage.setItem('userRole', 'admin');
 
-      toast.success("Login successful!");
-      router.push("/dashboard");
+      toast.success('Login successful!');
+      router.push('/dashboard');
     } catch (error) {
-      toast.error("Login failed. Please check your credentials.");
+      toast.error('Login failed. Please check your credentials.');
     } finally {
       setIsLoading(false);
     }
@@ -39,7 +40,7 @@ const Login: React.FC = () => {
     const { name, value, type, checked } = e.target;
     setFormData((prev) => ({
       ...prev,
-      [name]: type === "checkbox" ? checked : value,
+      [name]: type === 'checkbox' ? checked : value,
     }));
   };
 
@@ -54,7 +55,7 @@ const Login: React.FC = () => {
             Sign in to your account
           </h2>
           <p className="mt-2 text-center text-sm text-gray-600">
-            Or{" "}
+            Or{' '}
             <Link
               href="/auth/register"
               className="font-medium text-blue-600 hover:text-blue-500"
@@ -97,7 +98,7 @@ const Login: React.FC = () => {
                 <input
                   id="password"
                   name="password"
-                  type={showPassword ? "text" : "password"}
+                  type={showPassword ? 'text' : 'password'}
                   autoComplete="current-password"
                   required
                   value={formData.password}
@@ -154,7 +155,7 @@ const Login: React.FC = () => {
               disabled={isLoading}
               className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isLoading ? "Signing in..." : "Sign in"}
+              {isLoading ? 'Signing in...' : 'Sign in'}
             </button>
           </div>
 

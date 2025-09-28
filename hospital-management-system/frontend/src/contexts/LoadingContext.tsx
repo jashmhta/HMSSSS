@@ -1,21 +1,23 @@
 'use client';
 
 import React, { createContext, useContext, useState, useCallback } from 'react';
-import { LoadingState, LoadingTask } from '@/hooks/useLoading';
-import { LoadingOverlay, LoadingSpinner } from '@/components/ui/LoadingStates';
 
-interface LoadingContextType {
-  globalLoading: LoadingState;
-  globalTasks: LoadingTask[];
-  setGlobalLoading: (loading: LoadingState) => void;
-  addGlobalTask: (task: LoadingTask) => void;
+import { LoadingSpinner } from '@/components/ui/LoadingStates';
+
+import type { ILoadingState, ILoadingTask } from '@/hooks/useLoading';
+
+interface ILoadingContextType {
+  globalLoading: ILoadingState;
+  globalTasks: ILoadingTask[];
+  setGlobalLoading: (loading: ILoadingState) => void;
+  addGlobalTask: (task: ILoadingTask) => void;
   removeGlobalTask: (taskId: string) => void;
   clearGlobalTasks: () => void;
   showGlobalLoader: (message?: string) => void;
   hideGlobalLoader: () => void;
 }
 
-const LoadingContext = createContext<LoadingContextType | undefined>(undefined);
+const LoadingContext = createContext<ILoadingContextType | undefined>(undefined);
 
 export function useLoadingContext() {
   const context = useContext(LoadingContext);
@@ -25,24 +27,23 @@ export function useLoadingContext() {
   return context;
 }
 
-interface LoadingProviderProps {
+interface ILoadingProviderProps {
   children: React.ReactNode;
 }
 
-export function LoadingProvider({ children }: LoadingProviderProps) {
-  const [globalLoading, setGlobalLoadingState] = useState<LoadingState>({
+export function LoadingProvider({ children }: ILoadingProviderProps) {
+  const [globalLoading, setGlobalLoadingState] = useState<ILoadingState>({
     isLoading: false,
-    message: undefined,
     error: null,
   });
 
-  const [globalTasks, setGlobalTasks] = useState<LoadingTask[]>([]);
+  const [globalTasks, setGlobalTasks] = useState<ILoadingTask[]>([]);
 
-  const setGlobalLoading = useCallback((loading: LoadingState) => {
+  const setGlobalLoading = useCallback((loading: ILoadingState) => {
     setGlobalLoadingState(loading);
   }, []);
 
-  const addGlobalTask = useCallback((task: LoadingTask) => {
+  const addGlobalTask = useCallback((task: ILoadingTask) => {
     setGlobalTasks(prev => {
       const existingTaskIndex = prev.findIndex(t => t.id === task.id);
       if (existingTaskIndex >= 0) {
@@ -58,7 +59,7 @@ export function LoadingProvider({ children }: LoadingProviderProps) {
     if (activeTasks.length > 0) {
       setGlobalLoadingState({
         isLoading: true,
-        message: activeTasks[activeTasks.length - 1].message || 'Loading...',
+        message: activeTasks[activeTasks.length - 1]?.message || 'Loading...',
         error: null,
       });
     }
@@ -75,12 +76,11 @@ export function LoadingProvider({ children }: LoadingProviderProps) {
       setGlobalLoadingState(prev => ({
         ...prev,
         isLoading: false,
-        progress: undefined,
       }));
     } else {
       setGlobalLoadingState({
         isLoading: true,
-        message: activeTasks[activeTasks.length - 1].message || 'Loading...',
+        message: activeTasks[activeTasks.length - 1]?.message || 'Loading...',
         error: null,
       });
     }
@@ -91,14 +91,13 @@ export function LoadingProvider({ children }: LoadingProviderProps) {
     setGlobalLoadingState(prev => ({
       ...prev,
       isLoading: false,
-      progress: undefined,
     }));
   }, []);
 
   const showGlobalLoader = useCallback((message?: string) => {
     setGlobalLoadingState({
       isLoading: true,
-      message,
+      ...(message && { message }),
       error: null,
     });
   }, []);
@@ -107,7 +106,6 @@ export function LoadingProvider({ children }: LoadingProviderProps) {
     setGlobalLoadingState(prev => ({
       ...prev,
       isLoading: false,
-      progress: undefined,
     }));
   }, []);
 
@@ -157,7 +155,7 @@ function GlobalLoadingOverlay() {
 // Higher-order component for loading states
 export function withLoading<P extends object>(
   Component: React.ComponentType<P>,
-  loadingProp: keyof P = 'loading'
+  loadingProp: keyof P = 'loading' as keyof P,
 ) {
   return function WithLoading(props: P) {
     const { globalLoading } = useLoadingContext();
@@ -175,18 +173,13 @@ export function withLoading<P extends object>(
 export function useComponentLoading() {
   const { showGlobalLoader, hideGlobalLoader } = useLoadingContext();
 
-  const withLoading = useCallback(async <T>(
-    promise: Promise<T>,
-    message?: string
-  ): Promise<T> => {
-    showGlobalLoader(message);
-    try {
-      const result = await promise;
-      return result;
-    } finally {
-      hideGlobalLoader();
-    }
-  }, [showGlobalLoader, hideGlobalLoader]);
+  const withLoading = useCallback(
+    <T,>(promise: Promise<T>, message?: string): Promise<T> => {
+      showGlobalLoader(message);
+      return promise.finally(() => hideGlobalLoader());
+    },
+    [showGlobalLoader, hideGlobalLoader],
+  );
 
   return { withLoading };
 }

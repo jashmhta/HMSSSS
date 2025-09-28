@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from "react";
-import Link from "next/link";
+import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
+
 import {
   ViewfinderCircleIcon,
   MagnifyingGlassIcon,
@@ -13,8 +14,8 @@ import {
   UserIcon,
   CalendarIcon,
   PhotoIcon,
-} from "@heroicons/react/24/outline";
-import { format } from "date-fns";
+} from '@heroicons/react/24/outline';
+import { format } from 'date-fns';
 
 interface RadiologyExam {
   id: string;
@@ -22,16 +23,16 @@ interface RadiologyExam {
   patientName: string;
   doctorId: string;
   doctorName: string;
-  examType: "x-ray" | "ct" | "mri" | "ultrasound" | "mammogram" | "fluoroscopy";
+  examType: 'x-ray' | 'ct' | 'mri' | 'ultrasound' | 'mammogram' | 'fluoroscopy';
   bodyPart: string;
-  priority: "routine" | "urgent" | "stat";
+  priority: 'routine' | 'urgent' | 'stat';
   status:
-    | "ordered"
-    | "scheduled"
-    | "in-progress"
-    | "completed"
-    | "reported"
-    | "cancelled";
+    | 'ordered'
+    | 'scheduled'
+    | 'in-progress'
+    | 'completed'
+    | 'reported'
+    | 'cancelled';
   orderDate: string;
   scheduledDate?: string;
   completedDate?: string;
@@ -51,19 +52,19 @@ interface RadiologyExam {
 const RadiologyManagement: React.FC = () => {
   const [exams, setExams] = useState<RadiologyExam[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState("");
+  const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<
-    | "all"
-    | "ordered"
-    | "scheduled"
-    | "in-progress"
-    | "completed"
-    | "reported"
-    | "cancelled"
-  >("all");
+    | 'all'
+    | 'ordered'
+    | 'scheduled'
+    | 'in-progress'
+    | 'completed'
+    | 'reported'
+    | 'cancelled'
+  >('all');
   const [filterType, setFilterType] = useState<
-    "all" | "x-ray" | "ct" | "mri" | "ultrasound" | "mammogram" | "fluoroscopy"
-  >("all");
+    'all' | 'x-ray' | 'ct' | 'mri' | 'ultrasound' | 'mammogram' | 'fluoroscopy'
+  >('all');
 
   useEffect(() => {
     // Simulate API call
@@ -72,95 +73,95 @@ const RadiologyManagement: React.FC = () => {
         setTimeout(() => {
           const mockExams: RadiologyExam[] = [
             {
-              id: "1",
-              patientId: "1",
-              patientName: "John Doe",
-              doctorId: "1",
-              doctorName: "Dr. Sarah Johnson",
-              examType: "x-ray",
-              bodyPart: "Chest",
-              priority: "routine",
-              status: "reported",
-              orderDate: "2025-09-15",
-              scheduledDate: "2025-09-16",
-              completedDate: "2025-09-16",
-              reportDate: "2025-09-17",
-              dueDate: "2025-09-22",
-              modality: "Digital X-ray",
+              id: '1',
+              patientId: '1',
+              patientName: 'John Doe',
+              doctorId: '1',
+              doctorName: 'Dr. Sarah Johnson',
+              examType: 'x-ray',
+              bodyPart: 'Chest',
+              priority: 'routine',
+              status: 'reported',
+              orderDate: '2025-09-15',
+              scheduledDate: '2025-09-16',
+              completedDate: '2025-09-16',
+              reportDate: '2025-09-17',
+              dueDate: '2025-09-22',
+              modality: 'Digital X-ray',
               contrast: false,
-              clinicalIndication: "Cough and shortness of breath",
+              clinicalIndication: 'Cough and shortness of breath',
               findings:
-                "Normal cardiac silhouette. Clear lung fields bilaterally. No pleural effusion.",
-              impression: "No acute cardiopulmonary disease.",
-              radiologist: "Dr. Mark Thompson",
-              technician: "Sarah Wilson",
-              images: ["chest_xray_001.jpg", "chest_xray_002.jpg"],
+                'Normal cardiac silhouette. Clear lung fields bilaterally. No pleural effusion.',
+              impression: 'No acute cardiopulmonary disease.',
+              radiologist: 'Dr. Mark Thompson',
+              technician: 'Sarah Wilson',
+              images: ['chest_xray_001.jpg', 'chest_xray_002.jpg'],
             },
             {
-              id: "2",
-              patientId: "2",
-              patientName: "Jane Smith",
-              doctorId: "2",
-              doctorName: "Dr. Michael Chen",
-              examType: "ct",
-              bodyPart: "Abdomen and Pelvis",
-              priority: "urgent",
-              status: "completed",
-              orderDate: "2025-09-19",
-              scheduledDate: "2025-09-19",
-              completedDate: "2025-09-19",
-              dueDate: "2025-09-21",
-              modality: "CT Scanner",
+              id: '2',
+              patientId: '2',
+              patientName: 'Jane Smith',
+              doctorId: '2',
+              doctorName: 'Dr. Michael Chen',
+              examType: 'ct',
+              bodyPart: 'Abdomen and Pelvis',
+              priority: 'urgent',
+              status: 'completed',
+              orderDate: '2025-09-19',
+              scheduledDate: '2025-09-19',
+              completedDate: '2025-09-19',
+              dueDate: '2025-09-21',
+              modality: 'CT Scanner',
               contrast: true,
-              clinicalIndication: "Abdominal pain and elevated liver enzymes",
+              clinicalIndication: 'Abdominal pain and elevated liver enzymes',
               findings:
-                "Liver appears normal in size and attenuation. No focal lesions. Gallbladder is normal. Pancreas appears normal.",
-              impression: "No acute abdominal pathology identified.",
-              radiologist: "Dr. Lisa Park",
-              technician: "Mike Johnson",
+                'Liver appears normal in size and attenuation. No focal lesions. Gallbladder is normal. Pancreas appears normal.',
+              impression: 'No acute abdominal pathology identified.',
+              radiologist: 'Dr. Lisa Park',
+              technician: 'Mike Johnson',
             },
             {
-              id: "3",
-              patientId: "3",
-              patientName: "Robert Johnson",
-              doctorId: "3",
-              doctorName: "Dr. Emily Davis",
-              examType: "mri",
-              bodyPart: "Knee",
-              priority: "routine",
-              status: "scheduled",
-              orderDate: "2025-09-20",
-              scheduledDate: "2025-09-23",
-              dueDate: "2025-09-30",
-              modality: "MRI Scanner",
+              id: '3',
+              patientId: '3',
+              patientName: 'Robert Johnson',
+              doctorId: '3',
+              doctorName: 'Dr. Emily Davis',
+              examType: 'mri',
+              bodyPart: 'Knee',
+              priority: 'routine',
+              status: 'scheduled',
+              orderDate: '2025-09-20',
+              scheduledDate: '2025-09-23',
+              dueDate: '2025-09-30',
+              modality: 'MRI Scanner',
               contrast: false,
-              clinicalIndication: "Knee pain following injury",
-              technician: "Anna Lee",
+              clinicalIndication: 'Knee pain following injury',
+              technician: 'Anna Lee',
             },
             {
-              id: "4",
-              patientId: "4",
-              patientName: "Alice Brown",
-              doctorId: "4",
-              doctorName: "Dr. David Wilson",
-              examType: "mammogram",
-              bodyPart: "Both Breasts",
-              priority: "routine",
-              status: "in-progress",
-              orderDate: "2025-09-21",
-              scheduledDate: "2025-09-21",
-              dueDate: "2025-09-28",
-              modality: "Mammography Unit",
+              id: '4',
+              patientId: '4',
+              patientName: 'Alice Brown',
+              doctorId: '4',
+              doctorName: 'Dr. David Wilson',
+              examType: 'mammogram',
+              bodyPart: 'Both Breasts',
+              priority: 'routine',
+              status: 'in-progress',
+              orderDate: '2025-09-21',
+              scheduledDate: '2025-09-21',
+              dueDate: '2025-09-28',
+              modality: 'Mammography Unit',
               contrast: false,
-              clinicalIndication: "Screening mammography",
-              technician: "Rachel Green",
+              clinicalIndication: 'Screening mammography',
+              technician: 'Rachel Green',
             },
           ];
           setExams(mockExams);
           setLoading(false);
         }, 1000);
       } catch (error) {
-        console.error("Failed to fetch radiology exams:", error);
+        console.error('Failed to fetch radiology exams:', error);
         setLoading(false);
       }
     };
@@ -170,52 +171,52 @@ const RadiologyManagement: React.FC = () => {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "ordered":
-        return "bg-blue-100 text-blue-800";
-      case "scheduled":
-        return "bg-yellow-100 text-yellow-800";
-      case "in-progress":
-        return "bg-purple-100 text-purple-800";
-      case "completed":
-        return "bg-indigo-100 text-indigo-800";
-      case "reported":
-        return "bg-green-100 text-green-800";
-      case "cancelled":
-        return "bg-red-100 text-red-800";
+      case 'ordered':
+        return 'bg-blue-100 text-blue-800';
+      case 'scheduled':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'in-progress':
+        return 'bg-purple-100 text-purple-800';
+      case 'completed':
+        return 'bg-indigo-100 text-indigo-800';
+      case 'reported':
+        return 'bg-green-100 text-green-800';
+      case 'cancelled':
+        return 'bg-red-100 text-red-800';
       default:
-        return "bg-gray-100 text-gray-800";
+        return 'bg-gray-100 text-gray-800';
     }
   };
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
-      case "routine":
-        return "bg-gray-100 text-gray-800";
-      case "urgent":
-        return "bg-orange-100 text-orange-800";
-      case "stat":
-        return "bg-red-100 text-red-800";
+      case 'routine':
+        return 'bg-gray-100 text-gray-800';
+      case 'urgent':
+        return 'bg-orange-100 text-orange-800';
+      case 'stat':
+        return 'bg-red-100 text-red-800';
       default:
-        return "bg-gray-100 text-gray-800";
+        return 'bg-gray-100 text-gray-800';
     }
   };
 
   const getExamTypeColor = (type: string) => {
     switch (type) {
-      case "x-ray":
-        return "bg-blue-100 text-blue-800";
-      case "ct":
-        return "bg-green-100 text-green-800";
-      case "mri":
-        return "bg-purple-100 text-purple-800";
-      case "ultrasound":
-        return "bg-yellow-100 text-yellow-800";
-      case "mammogram":
-        return "bg-pink-100 text-pink-800";
-      case "fluoroscopy":
-        return "bg-indigo-100 text-indigo-800";
+      case 'x-ray':
+        return 'bg-blue-100 text-blue-800';
+      case 'ct':
+        return 'bg-green-100 text-green-800';
+      case 'mri':
+        return 'bg-purple-100 text-purple-800';
+      case 'ultrasound':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'mammogram':
+        return 'bg-pink-100 text-pink-800';
+      case 'fluoroscopy':
+        return 'bg-indigo-100 text-indigo-800';
       default:
-        return "bg-gray-100 text-gray-800";
+        return 'bg-gray-100 text-gray-800';
     }
   };
 
@@ -226,19 +227,19 @@ const RadiologyManagement: React.FC = () => {
       exam.bodyPart.toLowerCase().includes(searchTerm.toLowerCase()) ||
       exam.doctorName.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus =
-      filterStatus === "all" || exam.status === filterStatus;
-    const matchesType = filterType === "all" || exam.examType === filterType;
+      filterStatus === 'all' || exam.status === filterStatus;
+    const matchesType = filterType === 'all' || exam.examType === filterType;
     return matchesSearch && matchesStatus && matchesType;
   });
 
   const urgentExams = exams.filter(
-    (exam) => exam.priority === "urgent" || exam.priority === "stat",
+    (exam) => exam.priority === 'urgent' || exam.priority === 'stat',
   );
   const overdueExams = exams.filter(
     (exam) =>
-      exam.status !== "completed" &&
-      exam.status !== "reported" &&
-      exam.status !== "cancelled" &&
+      exam.status !== 'completed' &&
+      exam.status !== 'reported' &&
+      exam.status !== 'cancelled' &&
       new Date(exam.dueDate) < new Date(),
   );
 
@@ -246,7 +247,7 @@ const RadiologyManagement: React.FC = () => {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto" />
           <p className="mt-4 text-gray-600">Loading radiology exams...</p>
         </div>
       </div>
@@ -310,7 +311,7 @@ const RadiologyManagement: React.FC = () => {
             <div className="ml-3">
               <p className="text-sm font-medium text-blue-800">In Progress</p>
               <p className="text-sm text-blue-700">
-                {exams.filter((e) => e.status === "in-progress").length} exams
+                {exams.filter((e) => e.status === 'in-progress').length} exams
                 currently being performed
               </p>
             </div>
@@ -390,7 +391,7 @@ const RadiologyManagement: React.FC = () => {
                       <span
                         className={`inline-flex px-2 py-1 text-xs font-medium rounded-full capitalize ${getStatusColor(exam.status)}`}
                       >
-                        {exam.status.replace("-", " ")}
+                        {exam.status.replace('-', ' ')}
                       </span>
                       <span
                         className={`inline-flex px-2 py-1 text-xs font-medium rounded-full capitalize ${getPriorityColor(exam.priority)}`}
@@ -420,20 +421,20 @@ const RadiologyManagement: React.FC = () => {
                       </div>
                       <div className="flex items-center">
                         <CalendarIcon className="h-4 w-4 mr-1" />
-                        Ordered:{" "}
-                        {format(new Date(exam.orderDate), "MMM d, yyyy")}
+                        Ordered:{' '}
+                        {format(new Date(exam.orderDate), 'MMM d, yyyy')}
                       </div>
                       {exam.scheduledDate && (
                         <div className="flex items-center">
                           <CalendarIcon className="h-4 w-4 mr-1" />
-                          Scheduled:{" "}
-                          {format(new Date(exam.scheduledDate), "MMM d, yyyy")}
+                          Scheduled:{' '}
+                          {format(new Date(exam.scheduledDate), 'MMM d, yyyy')}
                         </div>
                       )}
                       {exam.dueDate && (
                         <div className="flex items-center">
                           <ClockIcon className="h-4 w-4 mr-1" />
-                          Due: {format(new Date(exam.dueDate), "MMM d, yyyy")}
+                          Due: {format(new Date(exam.dueDate), 'MMM d, yyyy')}
                         </div>
                       )}
                     </div>
@@ -500,25 +501,25 @@ const RadiologyManagement: React.FC = () => {
                     <PencilIcon className="h-4 w-4 mr-1" />
                     Edit
                   </Link>
-                  {exam.status === "ordered" && (
+                  {exam.status === 'ordered' && (
                     <button className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
                       <CalendarIcon className="h-4 w-4 mr-1" />
                       Schedule
                     </button>
                   )}
-                  {exam.status === "scheduled" && (
+                  {exam.status === 'scheduled' && (
                     <button className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
                       <ViewfinderCircleIcon className="h-4 w-4 mr-1" />
                       Start Exam
                     </button>
                   )}
-                  {exam.status === "completed" && (
+                  {exam.status === 'completed' && (
                     <button className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500">
                       <DocumentTextIcon className="h-4 w-4 mr-1" />
                       Create Report
                     </button>
                   )}
-                  {exam.status === "completed" && !exam.report && (
+                  {exam.status === 'completed' && !exam.report && (
                     <button className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
                       <CheckCircleIcon className="h-4 w-4 mr-1" />
                       Finalize Report
@@ -537,9 +538,9 @@ const RadiologyManagement: React.FC = () => {
               No radiology exams found
             </h3>
             <p className="mt-1 text-sm text-gray-500">
-              {searchTerm || filterStatus !== "all" || filterType !== "all"
-                ? "Try adjusting your search or filter criteria."
-                : "Get started by ordering your first radiology exam."}
+              {searchTerm || filterStatus !== 'all' || filterType !== 'all'
+                ? 'Try adjusting your search or filter criteria.'
+                : 'Get started by ordering your first radiology exam.'}
             </p>
             <div className="mt-6">
               <Link
@@ -566,19 +567,19 @@ const RadiologyManagement: React.FC = () => {
           </div>
           <div className="text-center">
             <div className="text-3xl font-bold text-green-600">
-              {exams.filter((e) => e.status === "reported").length}
+              {exams.filter((e) => e.status === 'reported').length}
             </div>
             <div className="text-sm text-gray-500">Reported</div>
           </div>
           <div className="text-center">
             <div className="text-3xl font-bold text-purple-600">
-              {exams.filter((e) => e.status === "in-progress").length}
+              {exams.filter((e) => e.status === 'in-progress').length}
             </div>
             <div className="text-sm text-gray-500">In Progress</div>
           </div>
           <div className="text-center">
             <div className="text-3xl font-bold text-yellow-600">
-              {exams.filter((e) => e.status === "scheduled").length}
+              {exams.filter((e) => e.status === 'scheduled').length}
             </div>
             <div className="text-sm text-gray-500">Scheduled</div>
           </div>

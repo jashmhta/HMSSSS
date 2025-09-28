@@ -628,6 +628,161 @@ afterEach(() => {
   document.body.innerHTML = '';
 });
 
+// Global test utilities
+global.testUtils = {
+  // Mock API responses
+  mockApiResponse: (data, status = 200) => ({
+    ok: status >= 200 && status < 300,
+    status,
+    statusText: status === 200 ? 'OK' : 'Error',
+    json: () => Promise.resolve(data),
+    text: () => Promise.resolve(JSON.stringify(data)),
+    headers: new Headers(),
+    redirected: false,
+    type: 'basic',
+    url: 'http://localhost:3000/api/test',
+    clone: () => ({ ...this }),
+  }),
+
+  // Mock API error
+  mockApiError: (message, status = 400) => ({
+    ok: false,
+    status,
+    statusText: 'Error',
+    json: () => Promise.resolve({ error: message }),
+    text: () => Promise.resolve(JSON.stringify({ error: message })),
+    headers: new Headers(),
+    redirected: false,
+    type: 'error',
+    url: 'http://localhost:3000/api/test',
+    clone: () => ({ ...this }),
+  }),
+
+  // Wait for component updates
+  waitFor: (condition, timeout = 5000) => {
+    return new Promise((resolve, reject) => {
+      const start = Date.now();
+      const check = () => {
+        if (condition()) {
+          resolve();
+        } else if (Date.now() - start > timeout) {
+          reject(new Error('Timeout waiting for condition'));
+        } else {
+          setTimeout(check, 100);
+        }
+      };
+      check();
+    });
+  },
+
+  // Create mock component props
+  createMockProps: (overrides = {}) => ({
+    id: 'test-id',
+    className: 'test-class',
+    children: null,
+    ...overrides,
+  }),
+
+  // Mock form data
+  createMockFormData: (data) => {
+    const formData = new FormData();
+    Object.entries(data).forEach(([key, value]) => {
+      formData.append(key, value);
+    });
+    return formData;
+  },
+
+  // Mock file upload
+  createMockFile: (name, content, type = 'text/plain') => {
+    const blob = new Blob([content], { type });
+    return new File([blob], name, { type });
+  },
+
+  // Mock user interactions
+  userEvent: {
+    click: async (element) => {
+      element.click();
+      await new Promise(resolve => setTimeout(resolve, 0));
+    },
+    type: async (element, text) => {
+      element.value = text;
+      element.dispatchEvent(new Event('input', { bubbles: true }));
+      element.dispatchEvent(new Event('change', { bubbles: true }));
+      await new Promise(resolve => setTimeout(resolve, 0));
+    },
+    clear: async (element) => {
+      element.value = '';
+      element.dispatchEvent(new Event('input', { bubbles: true }));
+      element.dispatchEvent(new Event('change', { bubbles: true }));
+      await new Promise(resolve => setTimeout(resolve, 0));
+    },
+    select: async (element, value) => {
+      element.value = value;
+      element.dispatchEvent(new Event('change', { bubbles: true }));
+      await new Promise(resolve => setTimeout(resolve, 0));
+    },
+  },
+
+  // Performance monitoring
+  measureTime: async (fn, name = 'Operation') => {
+    const start = performance.now();
+    const result = await fn();
+    const duration = performance.now() - start;
+
+    if (duration > 1000) {
+      console.warn(`Performance warning: ${name} took ${duration.toFixed(2)}ms`);
+    }
+
+    return { result, duration };
+  },
+
+  // Memory monitoring
+  measureMemory: (fn, name = 'Operation') => {
+    const startMemory = process.memoryUsage().heapUsed;
+    const result = fn();
+    const endMemory = process.memoryUsage().heapUsed;
+    const memoryIncrease = endMemory - startMemory;
+
+    if (memoryIncrease > 1024 * 1024) { // 1MB
+      console.warn(`Memory warning: ${name} increased memory by ${(memoryIncrease / 1024 / 1024).toFixed(2)}MB`);
+    }
+
+    return { result, memoryIncrease };
+  },
+
+  // Mock navigation
+  navigation: {
+    push: jest.fn(),
+    replace: jest.fn(),
+    back: jest.fn(),
+    forward: jest.fn(),
+    reload: jest.fn(),
+  },
+
+  // Mock authentication
+  auth: {
+    getToken: () => 'mock-jwt-token',
+    getUser: () => ({
+      id: 'test-user-id',
+      email: 'test@example.com',
+      firstName: 'Test',
+      lastName: 'User',
+      role: 'PATIENT',
+    }),
+    isAuthenticated: () => true,
+  },
+
+  // Mock form validation
+  validation: {
+    required: (value) => !!value,
+    email: (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value),
+    phone: (value) => /^\+?[1-9]\d{1,14}$/.test(value),
+    minLength: (value, min) => value.length >= min,
+    maxLength: (value, max) => value.length <= max,
+    pattern: (value, regex) => regex.test(value),
+  },
+};
+
 // Custom Jest matchers
 expect.extend({
   toBeValidEmail(received) {
@@ -635,6 +790,49 @@ expect.extend({
     const pass = typeof received === 'string' && emailRegex.test(received);
     return {
       message: () => `expected ${received} to be a valid email`,
+      pass,
+    };
+  },
+
+  toBeValidPhoneNumber(received) {
+    const phoneRegex = /^\+?[1-9]\d{1,14}$/;
+    const pass = typeof received === 'string' && phoneRegex.test(received);
+    return {
+      message: () => `expected ${received} to be a valid phone number`,
+      pass,
+    };
+  },
+
+  toBeValidDate(received) {
+    const pass = received instanceof Date && !isNaN(received.getTime());
+    return {
+      message: () => `expected ${received} to be a valid date`,
+      pass,
+    };
+  },
+
+  toBeValidUUID(received) {
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    const pass = typeof received === 'string' && uuidRegex.test(received);
+    return {
+      message: () => `expected ${received} to be a valid UUID`,
+      pass,
+    };
+  },
+
+  toHaveRequiredFields(received, fields) {
+    const missingFields = fields.filter(field => !(field in received));
+    const pass = missingFields.length === 0;
+    return {
+      message: () => `expected object to have required fields: ${missingFields.join(', ')}`,
+      pass,
+    };
+  },
+
+  toBeWithinRange(received, floor, ceiling) {
+    const pass = received >= floor && received <= ceiling;
+    return {
+      message: () => `expected ${received} to be within range ${floor} - ${ceiling}`,
       pass,
     };
   },

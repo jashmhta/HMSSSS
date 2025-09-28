@@ -19,6 +19,11 @@ import { RolesGuard } from '../../modules/auth/roles.guard';
 import { Roles } from '../../shared/decorators/roles.decorator';
 
 import { PatientsService } from './patients.service';
+import { CreatePatientDto } from './dto/create-patient.dto';
+import { UpdatePatientDto } from './dto/update-patient.dto';
+import { RegisterPatientDto } from './dto/register-patient.dto';
+import { SearchPatientDto } from './dto/search-patient.dto';
+import { CheckInPatientDto } from './dto/check-in-patient.dto';
 
 /**
  *
@@ -40,10 +45,20 @@ export class PatientsController {
   @Roles(UserRole.ADMIN, UserRole.RECEPTIONIST)
   @ApiOperation({ summary: 'Register a new patient with comprehensive validation' })
   @ApiResponse({ status: 201, description: 'Patient registered successfully' })
-  async registerNewPatient(@Body() registrationData: any, @Request() req) {
+  async registerNewPatient(@Body() registrationData: RegisterPatientDto, @Request() req) {
     return this.patientsService.registerNewPatient({
-      ...registrationData,
+      email: registrationData.email,
+      firstName: registrationData.firstName,
+      lastName: registrationData.lastName,
+      phone: registrationData.phoneNumber,
+      dateOfBirth: new Date(registrationData.dateOfBirth),
+      gender: registrationData.gender,
+      bloodType: registrationData.bloodType,
+      emergencyContact: registrationData.emergencyContactName,
+      emergencyPhone: registrationData.emergencyContactPhone,
+      allergies: registrationData.allergies,
       registeredBy: req.user.id,
+      registrationType: registrationData.registrationType,
     });
   }
 
@@ -56,7 +71,7 @@ export class PatientsController {
   @ApiResponse({ status: 200, description: 'Patient checked in successfully' })
   async checkInReturningPatient(
     @Param('mrn') mrn: string,
-    @Body() checkInData: any,
+    @Body() checkInData: CheckInPatientDto,
     @Request() req,
   ) {
     return this.patientsService.checkInReturningPatient(mrn, {
@@ -72,10 +87,16 @@ export class PatientsController {
   @Roles(UserRole.ADMIN, UserRole.RECEPTIONIST, UserRole.DOCTOR)
   @ApiOperation({ summary: 'Create a new patient (legacy)' })
   @ApiResponse({ status: 201, description: 'Patient created successfully' })
-  create(@Body() createPatientDto: any, @Request() req) {
+  create(@Body() createPatientDto: CreatePatientDto, @Request() req) {
     return this.patientsService.create({
-      ...createPatientDto,
       userId: req.user.id,
+      mrn: createPatientDto.mrn,
+      dateOfBirth: new Date(createPatientDto.dateOfBirth),
+      gender: createPatientDto.gender,
+      bloodType: createPatientDto.bloodType,
+      emergencyContact: createPatientDto.emergencyContactName,
+      emergencyPhone: createPatientDto.emergencyContactPhone,
+      allergies: createPatientDto.allergies,
     });
   }
 
@@ -93,7 +114,7 @@ export class PatientsController {
   )
   @ApiOperation({ summary: 'Search patients with advanced filtering' })
   @ApiResponse({ status: 200, description: 'Patient search results' })
-  async searchPatients(@Query() searchCriteria: any) {
+  async searchPatients(@Query() searchCriteria: SearchPatientDto) {
     return this.patientsService.searchPatients(searchCriteria);
   }
 
@@ -166,19 +187,12 @@ export class PatientsController {
   @Roles(UserRole.ADMIN, UserRole.DOCTOR, UserRole.NURSE, UserRole.RECEPTIONIST)
   @ApiOperation({ summary: 'Update patient information' })
   @ApiResponse({ status: 200, description: 'Patient updated successfully' })
-  async updatePatientInfo(@Param('id') id: string, @Body() updateData: any, @Request() req) {
+  async updatePatientInfo(
+    @Param('id') id: string,
+    @Body() updateData: UpdatePatientDto,
+    @Request() req,
+  ) {
     return this.patientsService.updatePatientInfo(id, updateData, req.user.id);
-  }
-
-  /**
-   *
-   */
-  @Patch(':id')
-  @Roles(UserRole.ADMIN, UserRole.DOCTOR, UserRole.NURSE, UserRole.RECEPTIONIST)
-  @ApiOperation({ summary: 'Update patient (legacy)' })
-  @ApiResponse({ status: 200, description: 'Patient updated successfully' })
-  update(@Param('id') id: string, @Body() updatePatientDto: any) {
-    return this.patientsService.update(id, updatePatientDto);
   }
 
   /**

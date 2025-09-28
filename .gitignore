@@ -194,3 +194,33 @@ istio-*/tools/_istioctl
 # OS specific
 .DS_Store
 Thumbs.db
+
+# Claude-specific files
+.claude/
+
+# Temporary scripts
+*.sh
+!deploy.sh
+!setup-databases.sh
+!test-database-automation.sh
+!verify-prisma-setup.sh
+!blue-green-deploy.sh
+!canary-deploy.sh
+!health-check.sh
+!backup-strategy.sh
+!ha-setup.sh
+!migrate.sh
+!init.sql
+
+# Documentation files (keep essential ones)
+docs/
+research/
+*.md
+!README.md
+!docs/api/rest-api.md
+!infrastructure/PHASE3_API_DOCUMENTATION.md
+!infrastructure/PHASE3_DEPLOYMENT_GUIDE.md
+
+# Reports
+security/reports/
+infrastructure/monitoring/elk-stack-fixed.yaml

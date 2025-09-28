@@ -15,7 +15,8 @@ let moduleFixture: TestingModule;
 beforeAll(async () => {
   // Set test environment variables
   process.env.NODE_ENV = 'test';
-  process.env.DATABASE_URL = process.env.TEST_DATABASE_URL || 'postgresql://test:test@localhost:5433/hms_test';
+  process.env.DATABASE_URL =
+    process.env.TEST_DATABASE_URL || 'postgresql://test:test@localhost:5433/hms_test';
   process.env.REDIS_URL = 'redis://localhost:6379/1';
   process.env.JWT_SECRET = 'test-jwt-secret-for-integration';
   process.env.JWT_EXPIRES_IN = '3600';
@@ -26,9 +27,9 @@ beforeAll(async () => {
   prisma = new PrismaClient({
     datasources: {
       db: {
-        url: process.env.DATABASE_URL
-      }
-    }
+        url: process.env.DATABASE_URL,
+      },
+    },
   });
 
   try {
@@ -57,21 +58,19 @@ beforeAll(async () => {
         forbidNonWhitelisted: true,
         transform: true,
         disableErrorMessages: false,
-        enableDebugMessages: true
-      })
+        enableDebugMessages: true,
+      }),
     );
 
     // Apply global filters
-    app.useGlobalFilters(
-      new (require('@nestjs/common').AllExceptionsFilter)()
-    );
+    app.useGlobalFilters(new (require('@nestjs/common').AllExceptionsFilter)());
 
     // Enable CORS
     app.enableCors({
       origin: true,
       credentials: true,
       methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-      allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'X-Requested-With']
+      allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'X-Requested-With'],
     });
 
     // Initialize the application
@@ -83,7 +82,6 @@ beforeAll(async () => {
     global.testRequest = request(app.getHttpServer());
 
     console.log('✅ Integration test environment setup completed');
-
   } catch (error) {
     console.error('❌ Integration test setup failed:', error);
     throw error;
@@ -147,7 +145,6 @@ async function cleanupTestData(): Promise<void> {
       SELECT setval(pg_get_serial_sequence('"Medication"', 'id'), 1, false);
       SELECT setval(pg_get_serial_sequence('"Prescription"', 'id'), 1, false);
     `;
-
   } catch (error) {
     console.warn('Test data cleanup warning:', error.message);
   }
@@ -164,7 +161,7 @@ async function runMigrations(): Promise<void> {
       stdio: 'pipe',
       env: {
         ...process.env,
-        DATABASE_URL: process.env.DATABASE_URL
+        DATABASE_URL: process.env.DATABASE_URL,
       },
     });
 
@@ -185,7 +182,7 @@ export async function createTestUser(userData: any = {}): Promise<any> {
     phone: '+1234567890',
     role: 'DOCTOR',
     isActive: true,
-    ...userData
+    ...userData,
   };
 
   return await prisma.user.create({ data: defaultUser });
@@ -203,13 +200,17 @@ export async function createTestPatient(userId: string, patientData: any = {}): 
     address: { street: '123 Test St', city: 'Test City', state: 'Test State', zipCode: '12345' },
     allergies: [],
     currentMedications: [],
-    ...patientData
+    ...patientData,
   };
 
   return await prisma.patient.create({ data: defaultPatient });
 }
 
-export async function createTestLabTest(patientId: string, orderedBy: string, labTestData: any = {}): Promise<any> {
+export async function createTestLabTest(
+  patientId: string,
+  orderedBy: string,
+  labTestData: any = {},
+): Promise<any> {
   const defaultLabTest = {
     patientId,
     testName: 'Complete Blood Count',
@@ -219,13 +220,17 @@ export async function createTestLabTest(patientId: string, orderedBy: string, la
     orderedBy,
     specimenType: 'Blood',
     urgent: false,
-    ...labTestData
+    ...labTestData,
   };
 
   return await prisma.labTest.create({ data: defaultLabTest });
 }
 
-export async function createTestRadiologyTest(patientId: string, orderedBy: string, radiologyTestData: any = {}): Promise<any> {
+export async function createTestRadiologyTest(
+  patientId: string,
+  orderedBy: string,
+  radiologyTestData: any = {},
+): Promise<any> {
   const defaultRadiologyTest = {
     patientId,
     testName: 'Chest X-Ray',
@@ -234,7 +239,7 @@ export async function createTestRadiologyTest(patientId: string, orderedBy: stri
     status: 'ORDERED',
     orderedBy,
     urgent: false,
-    ...radiologyTestData
+    ...radiologyTestData,
   };
 
   return await prisma.radiologyTest.create({ data: defaultRadiologyTest });
@@ -246,7 +251,7 @@ export async function getAuthToken(user: any): Promise<string> {
     .post('/auth/login')
     .send({
       email: user.email,
-      password: 'hmsadmin' // Default test password
+      password: 'hmsadmin', // Default test password
     })
     .expect(200);
 
@@ -261,7 +266,10 @@ export function createAuthenticatedRequest(token: string) {
 }
 
 // Performance monitoring for integration tests
-export function measureApiCall<T>(fn: () => Promise<T>, threshold: number = 1000): Promise<{ result: T; duration: number }> {
+export function measureApiCall<T>(
+  fn: () => Promise<T>,
+  threshold: number = 1000,
+): Promise<{ result: T; duration: number }> {
   return new Promise(async (resolve, reject) => {
     const start = Date.now();
     try {
@@ -269,7 +277,9 @@ export function measureApiCall<T>(fn: () => Promise<T>, threshold: number = 1000
       const duration = Date.now() - start;
 
       if (duration > threshold) {
-        console.warn(`Performance warning: API call took ${duration}ms (threshold: ${threshold}ms)`);
+        console.warn(
+          `Performance warning: API call took ${duration}ms (threshold: ${threshold}ms)`,
+        );
       }
 
       resolve({ result, duration });
@@ -284,7 +294,18 @@ export function validateUserResponse(data: any): void {
   expect(data).toHaveRequiredFields(['id', 'email', 'firstName', 'lastName', 'role', 'isActive']);
   expect(data.id).toBeValidUUID();
   expect(data.email).toBeValidEmail();
-  expect(['SUPERADMIN', 'ADMIN', 'DOCTOR', 'NURSE', 'LAB_TECHNICIAN', 'PHARMACIST', 'RECEPTIONIST', 'BILLING_STAFF', 'RADIOLOGIST', 'PATIENT']).toContain(data.role);
+  expect([
+    'SUPERADMIN',
+    'ADMIN',
+    'DOCTOR',
+    'NURSE',
+    'LAB_TECHNICIAN',
+    'PHARMACIST',
+    'RECEPTIONIST',
+    'BILLING_STAFF',
+    'RADIOLOGIST',
+    'PATIENT',
+  ]).toContain(data.role);
   expect(typeof data.isActive).toBe('boolean');
 }
 
@@ -294,19 +315,46 @@ export function validatePatientResponse(data: any): void {
   expect(data.userId).toBeValidUUID();
   expect(data.dateOfBirth).toBeValidDate();
   expect(['MALE', 'FEMALE', 'OTHER']).toContain(data.gender);
-  expect(['A_POSITIVE', 'A_NEGATIVE', 'B_POSITIVE', 'B_NEGATIVE', 'AB_POSITIVE', 'AB_NEGATIVE', 'O_POSITIVE', 'O_NEGATIVE']).toContain(data.bloodType);
+  expect([
+    'A_POSITIVE',
+    'A_NEGATIVE',
+    'B_POSITIVE',
+    'B_NEGATIVE',
+    'AB_POSITIVE',
+    'AB_NEGATIVE',
+    'O_POSITIVE',
+    'O_NEGATIVE',
+  ]).toContain(data.bloodType);
 }
 
 export function validateLabTestResponse(data: any): void {
-  expect(data).toHaveRequiredFields(['id', 'patientId', 'testName', 'testCode', 'category', 'status', 'orderedDate']);
+  expect(data).toHaveRequiredFields([
+    'id',
+    'patientId',
+    'testName',
+    'testCode',
+    'category',
+    'status',
+    'orderedDate',
+  ]);
   expect(data.id).toBeValidUUID();
   expect(data.patientId).toBeValidUUID();
   expect(data.orderedDate).toBeValidDate();
-  expect(['ORDERED', 'SPECIMEN_COLLECTED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED']).toContain(data.status);
+  expect(['ORDERED', 'SPECIMEN_COLLECTED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED']).toContain(
+    data.status,
+  );
 }
 
 export function validateRadiologyTestResponse(data: any): void {
-  expect(data).toHaveRequiredFields(['id', 'patientId', 'testName', 'testCode', 'modality', 'status', 'orderedDate']);
+  expect(data).toHaveRequiredFields([
+    'id',
+    'patientId',
+    'testName',
+    'testCode',
+    'modality',
+    'status',
+    'orderedDate',
+  ]);
   expect(data.id).toBeValidUUID();
   expect(data.patientId).toBeValidUUID();
   expect(data.orderedDate).toBeValidDate();
@@ -344,9 +392,7 @@ export async function checkDatabaseHealth(): Promise<boolean> {
 // Application health check
 export async function checkApplicationHealth(): Promise<boolean> {
   try {
-    const response = await request(app.getHttpServer())
-      .get('/health')
-      .expect(200);
+    const response = await request(app.getHttpServer()).get('/health').expect(200);
 
     return response.body.status === 'ok';
   } catch (error) {
@@ -370,5 +416,5 @@ export async function checkApplicationHealth(): Promise<boolean> {
   validateErrorResponse,
   validatePaginatedResponse,
   checkDatabaseHealth,
-  checkApplicationHealth
+  checkApplicationHealth,
 };

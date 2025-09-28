@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from "react";
-import Link from "next/link";
+import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
+
 import {
   BeakerIcon,
   MagnifyingGlassIcon,
@@ -12,8 +13,8 @@ import {
   DocumentTextIcon,
   UserIcon,
   CalendarIcon,
-} from "@heroicons/react/24/outline";
-import { format } from "date-fns";
+} from '@heroicons/react/24/outline';
+import { format } from 'date-fns';
 
 interface LabTest {
   id: string;
@@ -23,25 +24,25 @@ interface LabTest {
   doctorName: string;
   testName: string;
   testCategory:
-    | "hematology"
-    | "biochemistry"
-    | "microbiology"
-    | "immunology"
-    | "pathology";
-  priority: "routine" | "urgent" | "stat";
-  status: "ordered" | "collected" | "processing" | "completed" | "cancelled";
+    | 'hematology'
+    | 'biochemistry'
+    | 'microbiology'
+    | 'immunology'
+    | 'pathology';
+  priority: 'routine' | 'urgent' | 'stat';
+  status: 'ordered' | 'collected' | 'processing' | 'completed' | 'cancelled';
   orderDate: string;
   collectionDate?: string;
   resultDate?: string;
   dueDate: string;
   specimenType: string;
-  results?: {
+  results?: Array<{
     parameter: string;
     value: string;
     unit: string;
     referenceRange: string;
-    flag: "normal" | "high" | "low" | "critical";
-  }[];
+    flag: 'normal' | 'high' | 'low' | 'critical';
+  }>;
   notes?: string;
   technician?: string;
 }
@@ -49,13 +50,13 @@ interface LabTest {
 const LaboratoryManagement: React.FC = () => {
   const [tests, setTests] = useState<LabTest[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState("");
+  const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<
-    "all" | "ordered" | "collected" | "processing" | "completed" | "cancelled"
-  >("all");
+    'all' | 'ordered' | 'collected' | 'processing' | 'completed' | 'cancelled'
+  >('all');
   const [filterPriority, setFilterPriority] = useState<
-    "all" | "routine" | "urgent" | "stat"
-  >("all");
+    'all' | 'routine' | 'urgent' | 'stat'
+  >('all');
 
   useEffect(() => {
     // Simulate API call
@@ -64,98 +65,98 @@ const LaboratoryManagement: React.FC = () => {
         setTimeout(() => {
           const mockTests: LabTest[] = [
             {
-              id: "1",
-              patientId: "1",
-              patientName: "John Doe",
-              doctorId: "1",
-              doctorName: "Dr. Sarah Johnson",
-              testName: "Complete Blood Count (CBC)",
-              testCategory: "hematology",
-              priority: "routine",
-              status: "completed",
-              orderDate: "2025-09-18",
-              collectionDate: "2025-09-18",
-              resultDate: "2025-09-19",
-              dueDate: "2025-09-25",
-              specimenType: "Whole Blood",
+              id: '1',
+              patientId: '1',
+              patientName: 'John Doe',
+              doctorId: '1',
+              doctorName: 'Dr. Sarah Johnson',
+              testName: 'Complete Blood Count (CBC)',
+              testCategory: 'hematology',
+              priority: 'routine',
+              status: 'completed',
+              orderDate: '2025-09-18',
+              collectionDate: '2025-09-18',
+              resultDate: '2025-09-19',
+              dueDate: '2025-09-25',
+              specimenType: 'Whole Blood',
               results: [
                 {
-                  parameter: "Hemoglobin",
-                  value: "14.2",
-                  unit: "g/dL",
-                  referenceRange: "13.5-17.5",
-                  flag: "normal",
+                  parameter: 'Hemoglobin',
+                  value: '14.2',
+                  unit: 'g/dL',
+                  referenceRange: '13.5-17.5',
+                  flag: 'normal',
                 },
                 {
-                  parameter: "WBC Count",
-                  value: "8.5",
-                  unit: "×10³/μL",
-                  referenceRange: "4.5-11.0",
-                  flag: "normal",
+                  parameter: 'WBC Count',
+                  value: '8.5',
+                  unit: '×10³/μL',
+                  referenceRange: '4.5-11.0',
+                  flag: 'normal',
                 },
                 {
-                  parameter: "Platelets",
-                  value: "250",
-                  unit: "×10³/μL",
-                  referenceRange: "150-450",
-                  flag: "normal",
+                  parameter: 'Platelets',
+                  value: '250',
+                  unit: '×10³/μL',
+                  referenceRange: '150-450',
+                  flag: 'normal',
                 },
               ],
-              technician: "Dr. Lisa Wong",
+              technician: 'Dr. Lisa Wong',
             },
             {
-              id: "2",
-              patientId: "2",
-              patientName: "Jane Smith",
-              doctorId: "2",
-              doctorName: "Dr. Michael Chen",
-              testName: "Lipid Profile",
-              testCategory: "biochemistry",
-              priority: "urgent",
-              status: "processing",
-              orderDate: "2025-09-20",
-              collectionDate: "2025-09-20",
-              dueDate: "2025-09-22",
-              specimenType: "Serum",
-              notes: "Patient has family history of heart disease",
-              technician: "Dr. Robert Kim",
+              id: '2',
+              patientId: '2',
+              patientName: 'Jane Smith',
+              doctorId: '2',
+              doctorName: 'Dr. Michael Chen',
+              testName: 'Lipid Profile',
+              testCategory: 'biochemistry',
+              priority: 'urgent',
+              status: 'processing',
+              orderDate: '2025-09-20',
+              collectionDate: '2025-09-20',
+              dueDate: '2025-09-22',
+              specimenType: 'Serum',
+              notes: 'Patient has family history of heart disease',
+              technician: 'Dr. Robert Kim',
             },
             {
-              id: "3",
-              patientId: "3",
-              patientName: "Robert Johnson",
-              doctorId: "3",
-              doctorName: "Dr. Emily Davis",
-              testName: "Urine Culture",
-              testCategory: "microbiology",
-              priority: "stat",
-              status: "collected",
-              orderDate: "2025-09-21",
-              collectionDate: "2025-09-21",
-              dueDate: "2025-09-21",
-              specimenType: "Urine",
-              notes: "Suspected UTI - start empiric antibiotics",
+              id: '3',
+              patientId: '3',
+              patientName: 'Robert Johnson',
+              doctorId: '3',
+              doctorName: 'Dr. Emily Davis',
+              testName: 'Urine Culture',
+              testCategory: 'microbiology',
+              priority: 'stat',
+              status: 'collected',
+              orderDate: '2025-09-21',
+              collectionDate: '2025-09-21',
+              dueDate: '2025-09-21',
+              specimenType: 'Urine',
+              notes: 'Suspected UTI - start empiric antibiotics',
             },
             {
-              id: "4",
-              patientId: "1",
-              patientName: "John Doe",
-              doctorId: "1",
-              doctorName: "Dr. Sarah Johnson",
-              testName: "HbA1c",
-              testCategory: "biochemistry",
-              priority: "routine",
-              status: "ordered",
-              orderDate: "2025-09-21",
-              dueDate: "2025-09-28",
-              specimenType: "Whole Blood",
+              id: '4',
+              patientId: '1',
+              patientName: 'John Doe',
+              doctorId: '1',
+              doctorName: 'Dr. Sarah Johnson',
+              testName: 'HbA1c',
+              testCategory: 'biochemistry',
+              priority: 'routine',
+              status: 'ordered',
+              orderDate: '2025-09-21',
+              dueDate: '2025-09-28',
+              specimenType: 'Whole Blood',
             },
           ];
           setTests(mockTests);
           setLoading(false);
         }, 1000);
       } catch (error) {
-        console.error("Failed to fetch lab tests:", error);
+        console.error('Failed to fetch lab tests:', error);
         setLoading(false);
       }
     };
@@ -165,48 +166,48 @@ const LaboratoryManagement: React.FC = () => {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "ordered":
-        return "bg-blue-100 text-blue-800";
-      case "collected":
-        return "bg-yellow-100 text-yellow-800";
-      case "processing":
-        return "bg-purple-100 text-purple-800";
-      case "completed":
-        return "bg-green-100 text-green-800";
-      case "cancelled":
-        return "bg-red-100 text-red-800";
+      case 'ordered':
+        return 'bg-blue-100 text-blue-800';
+      case 'collected':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'processing':
+        return 'bg-purple-100 text-purple-800';
+      case 'completed':
+        return 'bg-green-100 text-green-800';
+      case 'cancelled':
+        return 'bg-red-100 text-red-800';
       default:
-        return "bg-gray-100 text-gray-800";
+        return 'bg-gray-100 text-gray-800';
     }
   };
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
-      case "routine":
-        return "bg-gray-100 text-gray-800";
-      case "urgent":
-        return "bg-orange-100 text-orange-800";
-      case "stat":
-        return "bg-red-100 text-red-800";
+      case 'routine':
+        return 'bg-gray-100 text-gray-800';
+      case 'urgent':
+        return 'bg-orange-100 text-orange-800';
+      case 'stat':
+        return 'bg-red-100 text-red-800';
       default:
-        return "bg-gray-100 text-gray-800";
+        return 'bg-gray-100 text-gray-800';
     }
   };
 
   const getCategoryColor = (category: string) => {
     switch (category) {
-      case "hematology":
-        return "bg-red-100 text-red-800";
-      case "biochemistry":
-        return "bg-blue-100 text-blue-800";
-      case "microbiology":
-        return "bg-green-100 text-green-800";
-      case "immunology":
-        return "bg-purple-100 text-purple-800";
-      case "pathology":
-        return "bg-yellow-100 text-yellow-800";
+      case 'hematology':
+        return 'bg-red-100 text-red-800';
+      case 'biochemistry':
+        return 'bg-blue-100 text-blue-800';
+      case 'microbiology':
+        return 'bg-green-100 text-green-800';
+      case 'immunology':
+        return 'bg-purple-100 text-purple-800';
+      case 'pathology':
+        return 'bg-yellow-100 text-yellow-800';
       default:
-        return "bg-gray-100 text-gray-800";
+        return 'bg-gray-100 text-gray-800';
     }
   };
 
@@ -216,19 +217,19 @@ const LaboratoryManagement: React.FC = () => {
       test.testName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       test.doctorName.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus =
-      filterStatus === "all" || test.status === filterStatus;
+      filterStatus === 'all' || test.status === filterStatus;
     const matchesPriority =
-      filterPriority === "all" || test.priority === filterPriority;
+      filterPriority === 'all' || test.priority === filterPriority;
     return matchesSearch && matchesStatus && matchesPriority;
   });
 
   const urgentTests = tests.filter(
-    (test) => test.priority === "urgent" || test.priority === "stat",
+    (test) => test.priority === 'urgent' || test.priority === 'stat',
   );
   const overdueTests = tests.filter(
     (test) =>
-      test.status !== "completed" &&
-      test.status !== "cancelled" &&
+      test.status !== 'completed' &&
+      test.status !== 'cancelled' &&
       new Date(test.dueDate) < new Date(),
   );
 
@@ -236,7 +237,7 @@ const LaboratoryManagement: React.FC = () => {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto" />
           <p className="mt-4 text-gray-600">Loading laboratory tests...</p>
         </div>
       </div>
@@ -300,7 +301,7 @@ const LaboratoryManagement: React.FC = () => {
             <div className="ml-3">
               <p className="text-sm font-medium text-blue-800">Processing</p>
               <p className="text-sm text-blue-700">
-                {tests.filter((t) => t.status === "processing").length} tests
+                {tests.filter((t) => t.status === 'processing').length} tests
                 currently being processed
               </p>
             </div>
@@ -401,13 +402,13 @@ const LaboratoryManagement: React.FC = () => {
                       </div>
                       <div className="flex items-center">
                         <CalendarIcon className="h-4 w-4 mr-1" />
-                        Ordered:{" "}
-                        {format(new Date(test.orderDate), "MMM d, yyyy")}
+                        Ordered:{' '}
+                        {format(new Date(test.orderDate), 'MMM d, yyyy')}
                       </div>
                       {test.dueDate && (
                         <div className="flex items-center">
                           <ClockIcon className="h-4 w-4 mr-1" />
-                          Due: {format(new Date(test.dueDate), "MMM d, yyyy")}
+                          Due: {format(new Date(test.dueDate), 'MMM d, yyyy')}
                         </div>
                       )}
                     </div>
@@ -436,11 +437,11 @@ const LaboratoryManagement: React.FC = () => {
                               </div>
                               <div
                                 className={`text-xs font-medium ${
-                                  result.flag === "normal"
-                                    ? "text-green-600"
-                                    : result.flag === "critical"
-                                      ? "text-red-600"
-                                      : "text-yellow-600"
+                                  result.flag === 'normal'
+                                    ? 'text-green-600'
+                                    : result.flag === 'critical'
+                                      ? 'text-red-600'
+                                      : 'text-yellow-600'
                                 }`}
                               >
                                 {result.flag.toUpperCase()}
@@ -474,19 +475,19 @@ const LaboratoryManagement: React.FC = () => {
                     <PencilIcon className="h-4 w-4 mr-1" />
                     Edit
                   </Link>
-                  {test.status === "ordered" && (
+                  {test.status === 'ordered' && (
                     <button className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
                       <CheckCircleIcon className="h-4 w-4 mr-1" />
                       Collect Sample
                     </button>
                   )}
-                  {test.status === "collected" && (
+                  {test.status === 'collected' && (
                     <button className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
                       <BeakerIcon className="h-4 w-4 mr-1" />
                       Start Processing
                     </button>
                   )}
-                  {test.status === "processing" && (
+                  {test.status === 'processing' && (
                     <button className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500">
                       <DocumentTextIcon className="h-4 w-4 mr-1" />
                       Enter Results
@@ -505,9 +506,9 @@ const LaboratoryManagement: React.FC = () => {
               No lab tests found
             </h3>
             <p className="mt-1 text-sm text-gray-500">
-              {searchTerm || filterStatus !== "all" || filterPriority !== "all"
-                ? "Try adjusting your search or filter criteria."
-                : "Get started by ordering your first lab test."}
+              {searchTerm || filterStatus !== 'all' || filterPriority !== 'all'
+                ? 'Try adjusting your search or filter criteria.'
+                : 'Get started by ordering your first lab test.'}
             </p>
             <div className="mt-6">
               <Link
@@ -534,19 +535,19 @@ const LaboratoryManagement: React.FC = () => {
           </div>
           <div className="text-center">
             <div className="text-3xl font-bold text-green-600">
-              {tests.filter((t) => t.status === "completed").length}
+              {tests.filter((t) => t.status === 'completed').length}
             </div>
             <div className="text-sm text-gray-500">Completed</div>
           </div>
           <div className="text-center">
             <div className="text-3xl font-bold text-purple-600">
-              {tests.filter((t) => t.status === "processing").length}
+              {tests.filter((t) => t.status === 'processing').length}
             </div>
             <div className="text-sm text-gray-500">Processing</div>
           </div>
           <div className="text-center">
             <div className="text-3xl font-bold text-yellow-600">
-              {tests.filter((t) => t.status === "ordered").length}
+              {tests.filter((t) => t.status === 'ordered').length}
             </div>
             <div className="text-sm text-gray-500">Ordered</div>
           </div>

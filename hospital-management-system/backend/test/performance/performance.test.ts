@@ -2,7 +2,12 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
 import * as request from 'supertest';
 import { AppModule } from '../../src/app.module';
-import { TestApp, setupTestEnvironment, teardownTestEnvironment, createAuthHelper } from '../test-helpers';
+import {
+  TestApp,
+  setupTestEnvironment,
+  teardownTestEnvironment,
+  createAuthHelper,
+} from '../test-helpers';
 import { TestPerformance } from '../test-helpers';
 
 describe('Performance Tests', () => {
@@ -26,9 +31,7 @@ describe('Performance Tests', () => {
       const authHeaders = authHelper.getAuthHeaders('ADMIN');
 
       for (let i = 0; i < concurrentRequests; i++) {
-        requests.push(
-          app.get('/api/patients', authHeaders)
-        );
+        requests.push(app.get('/api/patients', authHeaders));
       }
 
       const { duration } = await TestPerformance.measureTime(async () => {
@@ -113,18 +116,22 @@ describe('Performance Tests', () => {
 
       // Create
       const { duration: createDuration } = await TestPerformance.measureTime(async () => {
-        const response = await app.post('/api/patients', {
-          firstName: 'Performance',
-          lastName: 'Test',
-          email: `perf.test.${Date.now()}@example.com`,
-          phone: '+1234567890',
-          dateOfBirth: new Date('1990-01-01'),
-          gender: 'MALE',
-          bloodType: 'A+',
-          address: '123 Test St',
-          emergencyContact: 'Emergency Contact',
-          emergencyPhone: '+1234567891',
-        }, authHeaders);
+        const response = await app.post(
+          '/api/patients',
+          {
+            firstName: 'Performance',
+            lastName: 'Test',
+            email: `perf.test.${Date.now()}@example.com`,
+            phone: '+1234567890',
+            dateOfBirth: new Date('1990-01-01'),
+            gender: 'MALE',
+            bloodType: 'A+',
+            address: '123 Test St',
+            emergencyContact: 'Emergency Contact',
+            emergencyPhone: '+1234567891',
+          },
+          authHeaders,
+        );
         expect(response.status).toBe(201);
       }, 500);
 
@@ -145,18 +152,22 @@ describe('Performance Tests', () => {
         const patients = await app.get('/api/patients', authHeaders);
         const patientId = patients.body.data[0].id;
 
-        const response = await app.put(`/api/patients/${patientId}`, {
-          firstName: 'Updated',
-          lastName: 'Test',
-          email: `updated.test.${Date.now()}@example.com`,
-          phone: '+1234567890',
-          dateOfBirth: new Date('1990-01-01'),
-          gender: 'MALE',
-          bloodType: 'A+',
-          address: '123 Test St',
-          emergencyContact: 'Emergency Contact',
-          emergencyPhone: '+1234567891',
-        }, authHeaders);
+        const response = await app.put(
+          `/api/patients/${patientId}`,
+          {
+            firstName: 'Updated',
+            lastName: 'Test',
+            email: `updated.test.${Date.now()}@example.com`,
+            phone: '+1234567890',
+            dateOfBirth: new Date('1990-01-01'),
+            gender: 'MALE',
+            bloodType: 'A+',
+            address: '123 Test St',
+            emergencyContact: 'Emergency Contact',
+            emergencyPhone: '+1234567891',
+          },
+          authHeaders,
+        );
         expect(response.status).toBe(200);
       }, 500);
 
@@ -195,11 +206,14 @@ describe('Performance Tests', () => {
       const authHeaders = authHelper.getAuthHeaders('ADMIN');
       const iterations = 100;
 
-      const { memoryIncrease } = await TestPerformance.measureMemory(async () => {
-        for (let i = 0; i < iterations; i++) {
-          await app.get('/api/patients', authHeaders);
-        }
-      }, 10 * 1024 * 1024); // 10MB threshold
+      const { memoryIncrease } = await TestPerformance.measureMemory(
+        async () => {
+          for (let i = 0; i < iterations; i++) {
+            await app.get('/api/patients', authHeaders);
+          }
+        },
+        10 * 1024 * 1024,
+      ); // 10MB threshold
 
       console.log(`Memory increase after ${iterations} operations: ${memoryIncrease} bytes`);
       expect(memoryIncrease).toBeLessThan(10 * 1024 * 1024); // 10MB
@@ -210,20 +224,25 @@ describe('Performance Tests', () => {
 
       // Create a large payload
       const largePayload = {
-        data: Array(1000).fill(0).map((_, i) => ({
-          id: i,
-          name: `Item ${i}`,
-          description: `Description for item ${i}`,
-          value: Math.random() * 1000,
-          timestamp: new Date().toISOString(),
-        })),
+        data: Array(1000)
+          .fill(0)
+          .map((_, i) => ({
+            id: i,
+            name: `Item ${i}`,
+            description: `Description for item ${i}`,
+            value: Math.random() * 1000,
+            timestamp: new Date().toISOString(),
+          })),
       };
 
-      const { duration, memoryIncrease } = await TestPerformance.measureMemory(async () => {
-        const response = await app.post('/api/test/large-payload', largePayload, authHeaders);
-        // Expect 404 or appropriate error since endpoint doesn't exist
-        expect([404, 400]).toContain(response.status);
-      }, 5 * 1024 * 1024); // 5MB threshold
+      const { duration, memoryIncrease } = await TestPerformance.measureMemory(
+        async () => {
+          const response = await app.post('/api/test/large-payload', largePayload, authHeaders);
+          // Expect 404 or appropriate error since endpoint doesn't exist
+          expect([404, 400]).toContain(response.status);
+        },
+        5 * 1024 * 1024,
+      ); // 5MB threshold
 
       console.log(`Large payload processing completed in ${duration}ms`);
       console.log(`Memory increase: ${memoryIncrease} bytes`);
@@ -248,9 +267,10 @@ describe('Performance Tests', () => {
       const interval = setInterval(() => {
         if (Date.now() - startTime < duration) {
           requests.push(
-            app.get('/api/patients', authHeaders)
+            app
+              .get('/api/patients', authHeaders)
               .then(() => completedRequests++)
-              .catch(() => failedRequests++)
+              .catch(() => failedRequests++),
           );
         } else {
           clearInterval(interval);
@@ -330,18 +350,22 @@ describe('Performance Tests', () => {
       expect(initialResponse.status).toBe(200);
 
       // Create new patient (invalidates cache)
-      await app.post('/api/patients', {
-        firstName: 'Cache',
-        lastName: 'Test',
-        email: `cache.test.${Date.now()}@example.com`,
-        phone: '+1234567890',
-        dateOfBirth: new Date('1990-01-01'),
-        gender: 'MALE',
-        bloodType: 'A+',
-        address: '123 Test St',
-        emergencyContact: 'Emergency Contact',
-        emergencyPhone: '+1234567891',
-      }, authHeaders);
+      await app.post(
+        '/api/patients',
+        {
+          firstName: 'Cache',
+          lastName: 'Test',
+          email: `cache.test.${Date.now()}@example.com`,
+          phone: '+1234567890',
+          dateOfBirth: new Date('1990-01-01'),
+          gender: 'MALE',
+          bloodType: 'A+',
+          address: '123 Test St',
+          emergencyContact: 'Emergency Contact',
+          emergencyPhone: '+1234567891',
+        },
+        authHeaders,
+      );
 
       // Request again (should get fresh data)
       const { duration: freshDuration } = await TestPerformance.measureTime(async () => {
@@ -360,7 +384,8 @@ describe('Performance Tests', () => {
 
       // Make requests that should trigger rate limiting
       const requests = [];
-      for (let i = 0; i < 150; i++) { // Assuming rate limit is 100 per minute
+      for (let i = 0; i < 150; i++) {
+        // Assuming rate limit is 100 per minute
         requests.push(app.get('/api/patients', authHeaders));
       }
 

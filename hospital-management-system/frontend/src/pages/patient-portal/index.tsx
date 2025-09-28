@@ -1,18 +1,16 @@
-import React, { useState, useEffect } from "react";
-import Link from "next/link";
+import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
+
 import {
   UserIcon,
   CalendarIcon,
-  DocumentTextIcon,
-  HeartIcon,
-  CreditCardIcon,
-  BellIcon,
-  ChatBubbleLeftRightIcon,
-  ClockIcon,
-  CheckCircleIcon,
+   DocumentTextIcon,
+   CreditCardIcon,
+   BellIcon,
+   ChatBubbleLeftRightIcon,
   ExclamationTriangleIcon,
-} from "@heroicons/react/24/outline";
-import { format } from "date-fns";
+} from '@heroicons/react/24/outline';
+import { format } from 'date-fns';
 
 interface PatientPortalProps {
   patientId?: string;
@@ -41,7 +39,7 @@ interface Appointment {
   doctor: string;
   specialty: string;
   type: string;
-  status: "scheduled" | "confirmed" | "completed" | "cancelled";
+  status: 'scheduled' | 'confirmed' | 'completed' | 'cancelled';
   location: string;
   notes?: string;
 }
@@ -60,19 +58,19 @@ interface Bill {
   id: string;
   date: string;
   amount: number;
-  status: "paid" | "pending" | "overdue";
+  status: 'paid' | 'pending' | 'overdue';
   description: string;
 }
 
-const PatientPortal: React.FC<PatientPortalProps> = ({ patientId = "1" }) => {
+const PatientPortal: React.FC<PatientPortalProps> = ({ patientId = '1' }) => {
   const [patient, setPatient] = useState<PatientInfo | null>(null);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [records, setRecords] = useState<MedicalRecord[]>([]);
   const [bills, setBills] = useState<Bill[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<
-    "overview" | "appointments" | "records" | "billing" | "messages"
-  >("overview");
+    'overview' | 'appointments' | 'records' | 'billing' | 'messages'
+  >('overview');
 
   useEffect(() => {
     // Simulate API calls
@@ -80,80 +78,80 @@ const PatientPortal: React.FC<PatientPortalProps> = ({ patientId = "1" }) => {
       try {
         setTimeout(() => {
           const mockPatient: PatientInfo = {
-            id: "1",
-            name: "John Doe",
-            dateOfBirth: "1985-03-15",
-            gender: "Male",
-            phone: "+1-555-0123",
-            email: "john.doe@email.com",
-            address: "123 Main St, City, State 12345",
-            emergencyContact: "Jane Doe (+1-555-0124)",
-            bloodType: "O+",
-            allergies: ["Penicillin", "Peanuts"],
-            primaryPhysician: "Dr. Sarah Johnson",
-            insuranceProvider: "Blue Cross Blue Shield",
-            insuranceNumber: "BCBS123456789",
+            id: '1',
+            name: 'John Doe',
+            dateOfBirth: '1985-03-15',
+            gender: 'Male',
+            phone: '+1-555-0123',
+            email: 'john.doe@email.com',
+            address: '123 Main St, City, State 12345',
+            emergencyContact: 'Jane Doe (+1-555-0124)',
+            bloodType: 'O+',
+            allergies: ['Penicillin', 'Peanuts'],
+            primaryPhysician: 'Dr. Sarah Johnson',
+            insuranceProvider: 'Blue Cross Blue Shield',
+            insuranceNumber: 'BCBS123456789',
           };
 
           const mockAppointments: Appointment[] = [
             {
-              id: "1",
-              date: "2025-09-25",
-              time: "10:00 AM",
-              doctor: "Dr. Sarah Johnson",
-              specialty: "Cardiology",
-              type: "Follow-up Consultation",
-              status: "confirmed",
-              location: "Cardiology Clinic, Room 101",
-              notes: "Please bring your blood pressure log",
+              id: '1',
+              date: '2025-09-25',
+              time: '10:00 AM',
+              doctor: 'Dr. Sarah Johnson',
+              specialty: 'Cardiology',
+              type: 'Follow-up Consultation',
+              status: 'confirmed',
+              location: 'Cardiology Clinic, Room 101',
+              notes: 'Please bring your blood pressure log',
             },
             {
-              id: "2",
-              date: "2025-10-15",
-              time: "2:00 PM",
-              doctor: "Dr. Michael Chen",
-              specialty: "General Medicine",
-              type: "Annual Physical",
-              status: "scheduled",
-              location: "General Medicine Clinic, Room 205",
+              id: '2',
+              date: '2025-10-15',
+              time: '2:00 PM',
+              doctor: 'Dr. Michael Chen',
+              specialty: 'General Medicine',
+              type: 'Annual Physical',
+              status: 'scheduled',
+              location: 'General Medicine Clinic, Room 205',
             },
           ];
 
           const mockRecords: MedicalRecord[] = [
             {
-              id: "1",
-              date: "2025-09-15",
-              type: "Consultation",
-              provider: "Dr. Sarah Johnson",
-              diagnosis: "Hypertension - Well Controlled",
+              id: '1',
+              date: '2025-09-15',
+              type: 'Consultation',
+              provider: 'Dr. Sarah Johnson',
+              diagnosis: 'Hypertension - Well Controlled',
               notes:
-                "Blood pressure stable. Continue current medication regimen.",
-              documents: ["consultation_notes.pdf"],
+                'Blood pressure stable. Continue current medication regimen.',
+              documents: ['consultation_notes.pdf'],
             },
             {
-              id: "2",
-              date: "2025-09-15",
-              type: "Laboratory",
-              provider: "Lab Services",
-              notes: "Complete Blood Count - All values within normal range",
-              documents: ["cbc_results.pdf"],
+              id: '2',
+              date: '2025-09-15',
+              type: 'Laboratory',
+              provider: 'Lab Services',
+              notes: 'Complete Blood Count - All values within normal range',
+              documents: ['cbc_results.pdf'],
             },
           ];
 
           const mockBills: Bill[] = [
             {
-              id: "1",
-              date: "2025-09-15",
+              id: '1',
+              date: '2025-09-15',
               amount: 150.0,
-              status: "paid",
-              description: "Cardiology Consultation & ECG",
+              status: 'paid',
+              description: 'Cardiology Consultation & ECG',
             },
             {
-              id: "2",
-              date: "2025-09-20",
+              id: '2',
+              date: '2025-09-20',
               amount: 75.0,
-              status: "pending",
-              description: "Laboratory Tests",
+              status: 'pending',
+              description: 'Laboratory Tests',
             },
           ];
 
@@ -164,7 +162,7 @@ const PatientPortal: React.FC<PatientPortalProps> = ({ patientId = "1" }) => {
           setLoading(false);
         }, 1000);
       } catch (error) {
-        console.error("Failed to fetch patient data:", error);
+        console.error('Failed to fetch patient data:', error);
         setLoading(false);
       }
     };
@@ -173,17 +171,17 @@ const PatientPortal: React.FC<PatientPortalProps> = ({ patientId = "1" }) => {
   }, [patientId]);
 
   const upcomingAppointments = appointments.filter(
-    (apt) => apt.status !== "cancelled" && new Date(apt.date) >= new Date(),
+    (apt) => apt.status !== 'cancelled' && new Date(apt.date) >= new Date(),
   );
 
-  const pendingBills = bills.filter((bill) => bill.status === "pending");
-  const overdueBills = bills.filter((bill) => bill.status === "overdue");
+  const pendingBills = bills.filter((bill) => bill.status === 'pending');
+  const overdueBills = bills.filter((bill) => bill.status === 'overdue');
 
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto" />
           <p className="mt-4 text-gray-600">
             Loading your health information...
           </p>
@@ -218,9 +216,9 @@ const PatientPortal: React.FC<PatientPortalProps> = ({ patientId = "1" }) => {
               <div className="h-10 w-10 rounded-full bg-blue-500 flex items-center justify-center">
                 <span className="text-white font-medium text-lg">
                   {patient.name
-                    .split(" ")
+                    .split(' ')
                     .map((n) => n[0])
-                    .join("")}
+                    .join('')}
                 </span>
               </div>
               <div className="ml-4">
@@ -234,7 +232,7 @@ const PatientPortal: React.FC<PatientPortalProps> = ({ patientId = "1" }) => {
               <button className="p-2 text-gray-400 hover:text-gray-500 relative">
                 <BellIcon className="h-6 w-6" />
                 {pendingBills.length + overdueBills.length > 0 && (
-                  <span className="absolute top-0 right-0 block h-2 w-2 rounded-full bg-red-400"></span>
+                  <span className="absolute top-0 right-0 block h-2 w-2 rounded-full bg-red-400" />
                 )}
               </button>
               <button className="p-2 text-gray-400 hover:text-gray-500">
@@ -251,55 +249,55 @@ const PatientPortal: React.FC<PatientPortalProps> = ({ patientId = "1" }) => {
           <div className="lg:col-span-1">
             <nav className="space-y-2">
               <button
-                onClick={() => setActiveTab("overview")}
+                onClick={() => setActiveTab('overview')}
                 className={`w-full text-left px-4 py-3 rounded-lg font-medium transition-colors ${
-                  activeTab === "overview"
-                    ? "bg-blue-100 text-blue-700"
-                    : "text-gray-700 hover:bg-gray-100"
+                  activeTab === 'overview'
+                    ? 'bg-blue-100 text-blue-700'
+                    : 'text-gray-700 hover:bg-gray-100'
                 }`}
               >
                 <UserIcon className="h-5 w-5 mr-3 inline" />
                 Overview
               </button>
               <button
-                onClick={() => setActiveTab("appointments")}
+                onClick={() => setActiveTab('appointments')}
                 className={`w-full text-left px-4 py-3 rounded-lg font-medium transition-colors ${
-                  activeTab === "appointments"
-                    ? "bg-blue-100 text-blue-700"
-                    : "text-gray-700 hover:bg-gray-100"
+                  activeTab === 'appointments'
+                    ? 'bg-blue-100 text-blue-700'
+                    : 'text-gray-700 hover:bg-gray-100'
                 }`}
               >
                 <CalendarIcon className="h-5 w-5 mr-3 inline" />
                 Appointments
               </button>
               <button
-                onClick={() => setActiveTab("records")}
+                onClick={() => setActiveTab('records')}
                 className={`w-full text-left px-4 py-3 rounded-lg font-medium transition-colors ${
-                  activeTab === "records"
-                    ? "bg-blue-100 text-blue-700"
-                    : "text-gray-700 hover:bg-gray-100"
+                  activeTab === 'records'
+                    ? 'bg-blue-100 text-blue-700'
+                    : 'text-gray-700 hover:bg-gray-100'
                 }`}
               >
                 <DocumentTextIcon className="h-5 w-5 mr-3 inline" />
                 Medical Records
               </button>
               <button
-                onClick={() => setActiveTab("billing")}
+                onClick={() => setActiveTab('billing')}
                 className={`w-full text-left px-4 py-3 rounded-lg font-medium transition-colors ${
-                  activeTab === "billing"
-                    ? "bg-blue-100 text-blue-700"
-                    : "text-gray-700 hover:bg-gray-100"
+                  activeTab === 'billing'
+                    ? 'bg-blue-100 text-blue-700'
+                    : 'text-gray-700 hover:bg-gray-100'
                 }`}
               >
                 <CreditCardIcon className="h-5 w-5 mr-3 inline" />
                 Billing
               </button>
               <button
-                onClick={() => setActiveTab("messages")}
+                onClick={() => setActiveTab('messages')}
                 className={`w-full text-left px-4 py-3 rounded-lg font-medium transition-colors ${
-                  activeTab === "messages"
-                    ? "bg-blue-100 text-blue-700"
-                    : "text-gray-700 hover:bg-gray-100"
+                  activeTab === 'messages'
+                    ? 'bg-blue-100 text-blue-700'
+                    : 'text-gray-700 hover:bg-gray-100'
                 }`}
               >
                 <ChatBubbleLeftRightIcon className="h-5 w-5 mr-3 inline" />
@@ -337,7 +335,7 @@ const PatientPortal: React.FC<PatientPortalProps> = ({ patientId = "1" }) => {
 
           {/* Main Content */}
           <div className="lg:col-span-3">
-            {activeTab === "overview" && (
+            {activeTab === 'overview' && (
               <div className="space-y-6">
                 {/* Welcome Card */}
                 <div className="bg-white rounded-lg shadow-sm p-6">
@@ -390,8 +388,8 @@ const PatientPortal: React.FC<PatientPortalProps> = ({ patientId = "1" }) => {
                               <div className="font-medium text-gray-900">
                                 {format(
                                   new Date(appointment.date),
-                                  "MMM d, yyyy",
-                                )}{" "}
+                                  'MMM d, yyyy',
+                                )}{' '}
                                 at {appointment.time}
                               </div>
                               <div className="text-sm text-gray-600">
@@ -405,9 +403,9 @@ const PatientPortal: React.FC<PatientPortalProps> = ({ patientId = "1" }) => {
                           <div className="flex items-center space-x-2">
                             <span
                               className={`inline-flex px-2 py-1 text-xs font-medium rounded-full capitalize ${
-                                appointment.status === "confirmed"
-                                  ? "bg-green-100 text-green-800"
-                                  : "bg-yellow-100 text-yellow-800"
+                                appointment.status === 'confirmed'
+                                  ? 'bg-green-100 text-green-800'
+                                  : 'bg-yellow-100 text-yellow-800'
                               }`}
                             >
                               {appointment.status}
@@ -440,7 +438,7 @@ const PatientPortal: React.FC<PatientPortalProps> = ({ patientId = "1" }) => {
                             {record.type}
                           </div>
                           <div className="text-sm text-gray-600">
-                            {format(new Date(record.date), "MMM d, yyyy")} •{" "}
+                            {format(new Date(record.date), 'MMM d, yyyy')} •{' '}
                             {record.provider}
                           </div>
                         </div>
@@ -459,11 +457,11 @@ const PatientPortal: React.FC<PatientPortalProps> = ({ patientId = "1" }) => {
                           Payment Required
                         </p>
                         <p className="text-sm text-yellow-700">
-                          You have {pendingBills.length + overdueBills.length}{" "}
+                          You have {pendingBills.length + overdueBills.length}{' '}
                           outstanding bill
                           {pendingBills.length + overdueBills.length !== 1
-                            ? "s"
-                            : ""}
+                            ? 's'
+                            : ''}
                           .
                           <Link
                             href="/patient-portal/billing"
@@ -479,7 +477,7 @@ const PatientPortal: React.FC<PatientPortalProps> = ({ patientId = "1" }) => {
               </div>
             )}
 
-            {activeTab === "appointments" && (
+            {activeTab === 'appointments' && (
               <div className="space-y-6">
                 <div className="flex items-center justify-between">
                   <h2 className="text-2xl font-bold text-gray-900">
@@ -512,8 +510,8 @@ const PatientPortal: React.FC<PatientPortalProps> = ({ patientId = "1" }) => {
                             <p className="text-gray-600">
                               {format(
                                 new Date(appointment.date),
-                                "EEEE, MMMM d, yyyy",
-                              )}{" "}
+                                'EEEE, MMMM d, yyyy',
+                              )}{' '}
                               at {appointment.time}
                             </p>
                             <p className="text-sm text-gray-500">
@@ -527,18 +525,18 @@ const PatientPortal: React.FC<PatientPortalProps> = ({ patientId = "1" }) => {
                         <div className="flex items-center space-x-2">
                           <span
                             className={`inline-flex px-3 py-1 text-sm font-medium rounded-full capitalize ${
-                              appointment.status === "confirmed"
-                                ? "bg-green-100 text-green-800"
-                                : appointment.status === "scheduled"
-                                  ? "bg-yellow-100 text-yellow-800"
-                                  : appointment.status === "completed"
-                                    ? "bg-blue-100 text-blue-800"
-                                    : "bg-red-100 text-red-800"
+                              appointment.status === 'confirmed'
+                                ? 'bg-green-100 text-green-800'
+                                : appointment.status === 'scheduled'
+                                  ? 'bg-yellow-100 text-yellow-800'
+                                  : appointment.status === 'completed'
+                                    ? 'bg-blue-100 text-blue-800'
+                                    : 'bg-red-100 text-red-800'
                             }`}
                           >
                             {appointment.status}
                           </span>
-                          {appointment.status === "scheduled" && (
+                          {appointment.status === 'scheduled' && (
                             <button className="text-red-600 hover:text-red-800 text-sm font-medium">
                               Cancel
                             </button>
@@ -558,7 +556,7 @@ const PatientPortal: React.FC<PatientPortalProps> = ({ patientId = "1" }) => {
               </div>
             )}
 
-            {activeTab === "records" && (
+            {activeTab === 'records' && (
               <div className="space-y-6">
                 <div className="flex items-center justify-between">
                   <h2 className="text-2xl font-bold text-gray-900">
@@ -589,7 +587,7 @@ const PatientPortal: React.FC<PatientPortalProps> = ({ patientId = "1" }) => {
                               {record.type}
                             </h3>
                             <p className="text-gray-600">
-                              {format(new Date(record.date), "MMMM d, yyyy")} •{" "}
+                              {format(new Date(record.date), 'MMMM d, yyyy')} •{' '}
                               {record.provider}
                             </p>
                             {record.diagnosis && (
@@ -618,7 +616,7 @@ const PatientPortal: React.FC<PatientPortalProps> = ({ patientId = "1" }) => {
               </div>
             )}
 
-            {activeTab === "billing" && (
+            {activeTab === 'billing' && (
               <div className="space-y-6">
                 <h2 className="text-2xl font-bold text-gray-900">
                   Billing & Payments
@@ -629,7 +627,7 @@ const PatientPortal: React.FC<PatientPortalProps> = ({ patientId = "1" }) => {
                     <div className="text-3xl font-bold text-green-600">
                       $
                       {bills
-                        .filter((b) => b.status === "paid")
+                        .filter((b) => b.status === 'paid')
                         .reduce((sum, bill) => sum + bill.amount, 0)
                         .toFixed(2)}
                     </div>
@@ -667,7 +665,7 @@ const PatientPortal: React.FC<PatientPortalProps> = ({ patientId = "1" }) => {
                             {bill.description}
                           </h3>
                           <p className="text-gray-600">
-                            {format(new Date(bill.date), "MMMM d, yyyy")}
+                            {format(new Date(bill.date), 'MMMM d, yyyy')}
                           </p>
                         </div>
                         <div className="text-right">
@@ -676,18 +674,18 @@ const PatientPortal: React.FC<PatientPortalProps> = ({ patientId = "1" }) => {
                           </div>
                           <span
                             className={`inline-flex px-2 py-1 text-xs font-medium rounded-full capitalize ${
-                              bill.status === "paid"
-                                ? "bg-green-100 text-green-800"
-                                : bill.status === "pending"
-                                  ? "bg-yellow-100 text-yellow-800"
-                                  : "bg-red-100 text-red-800"
+                              bill.status === 'paid'
+                                ? 'bg-green-100 text-green-800'
+                                : bill.status === 'pending'
+                                  ? 'bg-yellow-100 text-yellow-800'
+                                  : 'bg-red-100 text-red-800'
                             }`}
                           >
                             {bill.status}
                           </span>
                         </div>
                       </div>
-                      {bill.status !== "paid" && (
+                      {bill.status !== 'paid' && (
                         <div className="mt-4">
                           <button className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">
                             <CreditCardIcon className="h-4 w-4 mr-2" />
@@ -701,7 +699,7 @@ const PatientPortal: React.FC<PatientPortalProps> = ({ patientId = "1" }) => {
               </div>
             )}
 
-            {activeTab === "messages" && (
+            {activeTab === 'messages' && (
               <div className="space-y-6">
                 <div className="flex items-center justify-between">
                   <h2 className="text-2xl font-bold text-gray-900">Messages</h2>

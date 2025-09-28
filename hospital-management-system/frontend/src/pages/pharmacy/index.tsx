@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from "react";
-import Link from "next/link";
+import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
+
 import {
   HeartIcon,
   MagnifyingGlassIcon,
@@ -8,12 +9,10 @@ import {
   PencilIcon,
   ExclamationTriangleIcon,
   CheckCircleIcon,
-  ClockIcon,
-  TruckIcon,
-  ArchiveBoxIcon,
-  CurrencyDollarIcon,
-} from "@heroicons/react/24/outline";
-import { format } from "date-fns";
+   ClockIcon,
+   ArchiveBoxIcon,
+} from '@heroicons/react/24/outline';
+import { format } from 'date-fns';
 
 interface Medication {
   id: string;
@@ -21,7 +20,7 @@ interface Medication {
   genericName: string;
   category: string;
   dosage: string;
-  form: "tablet" | "capsule" | "liquid" | "injection" | "cream" | "inhaler";
+  form: 'tablet' | 'capsule' | 'liquid' | 'injection' | 'cream' | 'inhaler';
   strength: string;
   manufacturer: string;
   batchNumber: string;
@@ -29,7 +28,7 @@ interface Medication {
   stockQuantity: number;
   reorderLevel: number;
   unitPrice: number;
-  status: "active" | "discontinued" | "expired" | "low_stock";
+  status: 'active' | 'discontinued' | 'expired' | 'low_stock';
 }
 
 interface Prescription {
@@ -39,7 +38,7 @@ interface Prescription {
   doctorId: string;
   doctorName: string;
   date: string;
-  medications: {
+  medications: Array<{
     medicationId: string;
     medicationName: string;
     dosage: string;
@@ -47,8 +46,8 @@ interface Prescription {
     duration: string;
     quantity: number;
     instructions: string;
-  }[];
-  status: "pending" | "filled" | "partially_filled" | "cancelled";
+  }>;
+  status: 'pending' | 'filled' | 'partially_filled' | 'cancelled';
   notes?: string;
 }
 
@@ -56,13 +55,13 @@ const PharmacyManagement: React.FC = () => {
   const [medications, setMedications] = useState<Medication[]>([]);
   const [prescriptions, setPrescriptions] = useState<Prescription[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<"inventory" | "prescriptions">(
-    "inventory",
+  const [activeTab, setActiveTab] = useState<'inventory' | 'prescriptions'>(
+    'inventory',
   );
-  const [searchTerm, setSearchTerm] = useState("");
+  const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<
-    "all" | "active" | "low_stock" | "expired" | "discontinued"
-  >("all");
+    'all' | 'active' | 'low_stock' | 'expired' | 'discontinued'
+  >('all');
 
   useEffect(() => {
     // Simulate API call
@@ -71,105 +70,105 @@ const PharmacyManagement: React.FC = () => {
         setTimeout(() => {
           const mockMedications: Medication[] = [
             {
-              id: "1",
-              name: "Lisinopril",
-              genericName: "Lisinopril",
-              category: "ACE Inhibitor",
-              dosage: "10mg",
-              form: "tablet",
-              strength: "10mg",
-              manufacturer: "Generic Pharma",
-              batchNumber: "LP2025001",
-              expiryDate: "2026-12-31",
+              id: '1',
+              name: 'Lisinopril',
+              genericName: 'Lisinopril',
+              category: 'ACE Inhibitor',
+              dosage: '10mg',
+              form: 'tablet',
+              strength: '10mg',
+              manufacturer: 'Generic Pharma',
+              batchNumber: 'LP2025001',
+              expiryDate: '2026-12-31',
               stockQuantity: 150,
               reorderLevel: 50,
               unitPrice: 0.25,
-              status: "active",
+              status: 'active',
             },
             {
-              id: "2",
-              name: "Metformin",
-              genericName: "Metformin HCl",
-              category: "Antidiabetic",
-              dosage: "500mg",
-              form: "tablet",
-              strength: "500mg",
-              manufacturer: "MediCorp",
-              batchNumber: "MT2025002",
-              expiryDate: "2026-08-15",
+              id: '2',
+              name: 'Metformin',
+              genericName: 'Metformin HCl',
+              category: 'Antidiabetic',
+              dosage: '500mg',
+              form: 'tablet',
+              strength: '500mg',
+              manufacturer: 'MediCorp',
+              batchNumber: 'MT2025002',
+              expiryDate: '2026-08-15',
               stockQuantity: 25,
               reorderLevel: 50,
               unitPrice: 0.15,
-              status: "low_stock",
+              status: 'low_stock',
             },
             {
-              id: "3",
-              name: "Amoxicillin",
-              genericName: "Amoxicillin",
-              category: "Antibiotic",
-              dosage: "500mg",
-              form: "capsule",
-              strength: "500mg",
-              manufacturer: "PharmaPlus",
-              batchNumber: "AM2024001",
-              expiryDate: "2025-06-30",
+              id: '3',
+              name: 'Amoxicillin',
+              genericName: 'Amoxicillin',
+              category: 'Antibiotic',
+              dosage: '500mg',
+              form: 'capsule',
+              strength: '500mg',
+              manufacturer: 'PharmaPlus',
+              batchNumber: 'AM2024001',
+              expiryDate: '2025-06-30',
               stockQuantity: 0,
               reorderLevel: 100,
               unitPrice: 0.35,
-              status: "expired",
+              status: 'expired',
             },
           ];
 
           const mockPrescriptions: Prescription[] = [
             {
-              id: "1",
-              patientId: "1",
-              patientName: "John Doe",
-              doctorId: "1",
-              doctorName: "Dr. Sarah Johnson",
-              date: "2025-09-20",
+              id: '1',
+              patientId: '1',
+              patientName: 'John Doe',
+              doctorId: '1',
+              doctorName: 'Dr. Sarah Johnson',
+              date: '2025-09-20',
               medications: [
                 {
-                  medicationId: "1",
-                  medicationName: "Lisinopril 10mg",
-                  dosage: "10mg",
-                  frequency: "Once daily",
-                  duration: "30 days",
+                  medicationId: '1',
+                  medicationName: 'Lisinopril 10mg',
+                  dosage: '10mg',
+                  frequency: 'Once daily',
+                  duration: '30 days',
                   quantity: 30,
-                  instructions: "Take with food",
+                  instructions: 'Take with food',
                 },
                 {
-                  medicationId: "2",
-                  medicationName: "Metformin 500mg",
-                  dosage: "500mg",
-                  frequency: "Twice daily",
-                  duration: "30 days",
+                  medicationId: '2',
+                  medicationName: 'Metformin 500mg',
+                  dosage: '500mg',
+                  frequency: 'Twice daily',
+                  duration: '30 days',
                   quantity: 60,
-                  instructions: "Take with meals",
+                  instructions: 'Take with meals',
                 },
               ],
-              status: "pending",
-              notes: "Patient has hypertension and diabetes",
+              status: 'pending',
+              notes: 'Patient has hypertension and diabetes',
             },
             {
-              id: "2",
-              patientId: "2",
-              patientName: "Jane Smith",
-              doctorId: "2",
-              doctorName: "Dr. Michael Chen",
-              date: "2025-09-18",
+              id: '2',
+              patientId: '2',
+              patientName: 'Jane Smith',
+              doctorId: '2',
+              doctorName: 'Dr. Michael Chen',
+              date: '2025-09-18',
               medications: [
                 {
-                  medicationId: "4",
-                  medicationName: "Albuterol Inhaler",
-                  dosage: "90mcg",
-                  frequency: "As needed",
-                  duration: "PRN",
+                  medicationId: '4',
+                  medicationName: 'Albuterol Inhaler',
+                  dosage: '90mcg',
+                  frequency: 'As needed',
+                  duration: 'PRN',
                   quantity: 1,
-                  instructions: "Use during asthma attacks",
+                  instructions: 'Use during asthma attacks',
                 },
               ],
-              status: "filled",
+              status: 'filled',
             },
           ];
 
@@ -178,7 +177,7 @@ const PharmacyManagement: React.FC = () => {
           setLoading(false);
         }, 1000);
       } catch (error) {
-        console.error("Failed to fetch pharmacy data:", error);
+        console.error('Failed to fetch pharmacy data:', error);
         setLoading(false);
       }
     };
@@ -188,31 +187,31 @@ const PharmacyManagement: React.FC = () => {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "active":
-        return "bg-green-100 text-green-800";
-      case "low_stock":
-        return "bg-yellow-100 text-yellow-800";
-      case "expired":
-        return "bg-red-100 text-red-800";
-      case "discontinued":
-        return "bg-gray-100 text-gray-800";
+      case 'active':
+        return 'bg-green-100 text-green-800';
+      case 'low_stock':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'expired':
+        return 'bg-red-100 text-red-800';
+      case 'discontinued':
+        return 'bg-gray-100 text-gray-800';
       default:
-        return "bg-gray-100 text-gray-800";
+        return 'bg-gray-100 text-gray-800';
     }
   };
 
   const getPrescriptionStatusColor = (status: string) => {
     switch (status) {
-      case "pending":
-        return "bg-yellow-100 text-yellow-800";
-      case "filled":
-        return "bg-green-100 text-green-800";
-      case "partially_filled":
-        return "bg-blue-100 text-blue-800";
-      case "cancelled":
-        return "bg-red-100 text-red-800";
+      case 'pending':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'filled':
+        return 'bg-green-100 text-green-800';
+      case 'partially_filled':
+        return 'bg-blue-100 text-blue-800';
+      case 'cancelled':
+        return 'bg-red-100 text-red-800';
       default:
-        return "bg-gray-100 text-gray-800";
+        return 'bg-gray-100 text-gray-800';
     }
   };
 
@@ -222,7 +221,7 @@ const PharmacyManagement: React.FC = () => {
       medication.genericName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       medication.category.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus =
-      filterStatus === "all" || medication.status === filterStatus;
+      filterStatus === 'all' || medication.status === filterStatus;
     return matchesSearch && matchesStatus;
   });
 
@@ -237,7 +236,7 @@ const PharmacyManagement: React.FC = () => {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto" />
           <p className="mt-4 text-gray-600">Loading pharmacy data...</p>
         </div>
       </div>
@@ -314,7 +313,7 @@ const PharmacyManagement: React.FC = () => {
                 Pending Prescriptions
               </p>
               <p className="text-sm text-blue-700">
-                {prescriptions.filter((p) => p.status === "pending").length}{" "}
+                {prescriptions.filter((p) => p.status === 'pending').length}{' '}
                 prescriptions awaiting fulfillment
               </p>
             </div>
@@ -327,22 +326,22 @@ const PharmacyManagement: React.FC = () => {
         <div className="border-b border-gray-200">
           <nav className="-mb-px flex space-x-8 px-6">
             <button
-              onClick={() => setActiveTab("inventory")}
+              onClick={() => setActiveTab('inventory')}
               className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                activeTab === "inventory"
-                  ? "border-blue-500 text-blue-600"
-                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                activeTab === 'inventory'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
             >
               <ArchiveBoxIcon className="h-5 w-5 mr-2 inline" />
               Inventory ({medications.length})
             </button>
             <button
-              onClick={() => setActiveTab("prescriptions")}
+              onClick={() => setActiveTab('prescriptions')}
               className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                activeTab === "prescriptions"
-                  ? "border-blue-500 text-blue-600"
-                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                activeTab === 'prescriptions'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
             >
               <HeartIcon className="h-5 w-5 mr-2 inline" />
@@ -352,7 +351,7 @@ const PharmacyManagement: React.FC = () => {
         </div>
 
         <div className="p-6">
-          {activeTab === "inventory" && (
+          {activeTab === 'inventory' && (
             <div className="space-y-6">
               {/* Filters */}
               <div className="flex flex-col lg:flex-row gap-4">
@@ -435,7 +434,7 @@ const PharmacyManagement: React.FC = () => {
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {format(new Date(medication.expiryDate), "MMM yyyy")}
+                          {format(new Date(medication.expiryDate), 'MMM yyyy')}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                           ${medication.unitPrice.toFixed(2)}
@@ -444,7 +443,7 @@ const PharmacyManagement: React.FC = () => {
                           <span
                             className={`inline-flex px-2 py-1 text-xs font-medium rounded-full capitalize ${getStatusColor(medication.status)}`}
                           >
-                            {medication.status.replace("_", " ")}
+                            {medication.status.replace('_', ' ')}
                           </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
@@ -471,7 +470,7 @@ const PharmacyManagement: React.FC = () => {
             </div>
           )}
 
-          {activeTab === "prescriptions" && (
+          {activeTab === 'prescriptions' && (
             <div className="space-y-6">
               {/* Prescriptions List */}
               <div className="space-y-4">
@@ -489,12 +488,12 @@ const PharmacyManagement: React.FC = () => {
                           <span
                             className={`inline-flex px-2 py-1 text-xs font-medium rounded-full capitalize ${getPrescriptionStatusColor(prescription.status)}`}
                           >
-                            {prescription.status.replace("_", " ")}
+                            {prescription.status.replace('_', ' ')}
                           </span>
                         </div>
                         <div className="text-sm text-gray-600">
-                          Prescribed by {prescription.doctorName} on{" "}
-                          {format(new Date(prescription.date), "MMM d, yyyy")}
+                          Prescribed by {prescription.doctorName} on{' '}
+                          {format(new Date(prescription.date), 'MMM d, yyyy')}
                         </div>
                       </div>
                       <div className="flex space-x-2">
@@ -505,7 +504,7 @@ const PharmacyManagement: React.FC = () => {
                           <EyeIcon className="h-4 w-4 mr-1" />
                           View
                         </Link>
-                        {prescription.status === "pending" && (
+                        {prescription.status === 'pending' && (
                           <button className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
                             <CheckCircleIcon className="h-4 w-4 mr-1" />
                             Fill Prescription
@@ -526,7 +525,7 @@ const PharmacyManagement: React.FC = () => {
                                 {med.medicationName}
                               </h4>
                               <div className="text-sm text-gray-600 mt-1">
-                                {med.dosage} • {med.frequency} • {med.duration}{" "}
+                                {med.dosage} • {med.frequency} • {med.duration}{' '}
                                 • Quantity: {med.quantity}
                               </div>
                               {med.instructions && (
@@ -567,7 +566,7 @@ const PharmacyManagement: React.FC = () => {
           </div>
           <div className="text-center">
             <div className="text-3xl font-bold text-green-600">
-              {medications.filter((m) => m.status === "active").length}
+              {medications.filter((m) => m.status === 'active').length}
             </div>
             <div className="text-sm text-gray-500">Active</div>
           </div>
@@ -591,7 +590,7 @@ const PharmacyManagement: React.FC = () => {
           </div>
           <div className="text-center">
             <div className="text-3xl font-bold text-indigo-600">
-              {prescriptions.filter((p) => p.status === "filled").length}
+              {prescriptions.filter((p) => p.status === 'filled').length}
             </div>
             <div className="text-sm text-gray-500">Filled</div>
           </div>

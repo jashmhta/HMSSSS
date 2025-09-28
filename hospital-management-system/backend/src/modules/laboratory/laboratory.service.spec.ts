@@ -6,6 +6,8 @@ import { LabTestStatus } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 
 import { LaboratoryService } from './laboratory.service';
+import { LISIntegrationService } from './lis-integration.service';
+import { BarcodeService } from './barcode.service';
 
 describe('LaboratoryService', () => {
   let service: LaboratoryService;
@@ -29,6 +31,17 @@ describe('LaboratoryService', () => {
     },
   };
 
+  const mockLISIntegrationService = {
+    sendOrderToLIS: jest.fn(),
+    getTestResults: jest.fn(),
+    updateTestStatus: jest.fn(),
+  };
+
+  const mockBarcodeService = {
+    generateBarcode: jest.fn(),
+    validateBarcode: jest.fn(),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -36,6 +49,14 @@ describe('LaboratoryService', () => {
         {
           provide: PrismaService,
           useValue: mockPrismaService,
+        },
+        {
+          provide: LISIntegrationService,
+          useValue: mockLISIntegrationService,
+        },
+        {
+          provide: BarcodeService,
+          useValue: mockBarcodeService,
         },
       ],
     }).compile();
@@ -558,33 +579,38 @@ describe('LaboratoryService', () => {
   });
 
   describe('validateStatusTransition', () => {
-    it('should allow valid status transitions', () => {
+    it('should allow valid status transitions', async () => {
       // Test ORDERED -> SAMPLE_COLLECTED
-      expect(() =>
+      await expect(
         (service as any).validateStatusTransition('ORDERED', 'SAMPLE_COLLECTED'),
-      ).not.toThrow();
+      ).resolves.not.toThrow();
 
-      // Test SAMPLE_COLLECTED -> IN_PROGRESS
-      expect(() =>
-        (service as any).validateStatusTransition('SAMPLE_COLLECTED', 'IN_PROGRESS'),
-      ).not.toThrow();
+      // Test SAMPLE_COLLECTED -> RECEIVED
+      await expect(
+        (service as any).validateStatusTransition('SAMPLE_COLLECTED', 'RECEIVED'),
+      ).resolves.not.toThrow();
+
+      // Test RECEIVED -> IN_PROGRESS
+      await expect(
+        (service as any).validateStatusTransition('RECEIVED', 'IN_PROGRESS'),
+      ).resolves.not.toThrow();
 
       // Test IN_PROGRESS -> COMPLETED
-      expect(() =>
+      await expect(
         (service as any).validateStatusTransition('IN_PROGRESS', 'COMPLETED'),
-      ).not.toThrow();
+      ).resolves.not.toThrow();
     });
 
-    it('should reject invalid status transitions', () => {
+    it('should reject invalid status transitions', async () => {
       // Test ORDERED -> COMPLETED (invalid)
-      expect(() => (service as any).validateStatusTransition('ORDERED', 'COMPLETED')).toThrow(
-        BadRequestException,
-      );
+      await expect(
+        (service as any).validateStatusTransition('ORDERED', 'COMPLETED'),
+      ).rejects.toThrow(BadRequestException);
 
       // Test COMPLETED -> ORDERED (invalid - terminal state)
-      expect(() => (service as any).validateStatusTransition('COMPLETED', 'ORDERED')).toThrow(
-        BadRequestException,
-      );
+      await expect(
+        (service as any).validateStatusTransition('COMPLETED', 'ORDERED'),
+      ).rejects.toThrow(BadRequestException);
     });
   });
 });

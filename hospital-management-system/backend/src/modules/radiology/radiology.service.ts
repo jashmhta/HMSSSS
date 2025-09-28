@@ -23,9 +23,9 @@ export class RadiologyService {
     modality: string;
     orderedBy: string;
     scheduledDate?: Date;
+    clinicalInfo?: string;
+    diagnosis?: string;
     urgent?: boolean;
-    clinicalIndication?: string;
-    notes?: string;
   }) {
     // Verify patient exists
     const patient = await this.prisma.patient.findUnique({
@@ -44,6 +44,7 @@ export class RadiologyService {
         modality: data.modality as any,
         orderedBy: data.orderedBy,
         scheduledDate: data.scheduledDate,
+        urgent: data.urgent,
       },
       include: {
         patient: {
@@ -53,6 +54,16 @@ export class RadiologyService {
                 firstName: true,
                 lastName: true,
                 email: true,
+              },
+            },
+          },
+        },
+        radiologist: {
+          include: {
+            user: {
+              select: {
+                firstName: true,
+                lastName: true,
               },
             },
           },
@@ -120,7 +131,7 @@ export class RadiologyService {
         },
         skip,
         take: limit,
-        orderBy: { orderedDate: 'desc' },
+        orderBy: { createdAt: 'desc' },
       }),
       this.prisma.radiologyTest.count({ where }),
     ]);
@@ -281,7 +292,7 @@ export class RadiologyService {
       data: {
         status: 'IN_PROGRESS',
         performedDate: new Date(),
-        performedBy,
+        radiologistId: performedBy,
       },
       include: {
         patient: {
@@ -333,7 +344,7 @@ export class RadiologyService {
         impression: data.impression,
         recommendations: data.recommendations,
         images: data.images || [],
-        performedBy: data.performedBy,
+        radiologistId: data.performedBy,
       },
       include: {
         patient: {

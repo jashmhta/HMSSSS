@@ -2,8 +2,21 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
 import * as request from 'supertest';
 import { AppModule } from '../../src/app.module';
-import { TestApp, setupTestEnvironment, teardownTestEnvironment, createAuthHelper, TestDataBuilder, TestAssertions, TestSecurity, generateTestData } from '../test-helpers';
-import { TestDatabaseManager, setupTestDatabase, teardownTestDatabase } from '../test-database.config';
+import {
+  TestApp,
+  setupTestEnvironment,
+  teardownTestEnvironment,
+  createAuthHelper,
+  TestDataBuilder,
+  TestAssertions,
+  TestSecurity,
+  generateTestData,
+} from '../test-helpers';
+import {
+  TestDatabaseManager,
+  setupTestDatabase,
+  teardownTestDatabase,
+} from '../test-database.config';
 
 describe('Patients Integration Tests', () => {
   let app: TestApp;
@@ -193,7 +206,11 @@ describe('Patients Integration Tests', () => {
       // Try to upload executable file
       const maliciousFile = Buffer.from('malicious content');
       const formData = new FormData();
-      formData.append('photo', new Blob([maliciousFile], { type: 'application/exe' }), 'malware.exe');
+      formData.append(
+        'photo',
+        new Blob([maliciousFile], { type: 'application/exe' }),
+        'malware.exe',
+      );
       formData.append('data', JSON.stringify(patientData));
 
       const response = await fetch(`${app.getApp().getHttpServer()}/api/patients`, {
@@ -250,16 +267,20 @@ describe('Patients Integration Tests', () => {
       const authHeaders = authHelper.getAuthHeaders('ADMIN');
 
       // Create specific patient
-      await app.post('/api/patients', TestDataBuilder.patient({
-        firstName: 'Searchable',
-        lastName: 'Patient',
-      }), authHeaders);
+      await app.post(
+        '/api/patients',
+        TestDataBuilder.patient({
+          firstName: 'Searchable',
+          lastName: 'Patient',
+        }),
+        authHeaders,
+      );
 
       const response = await app.get('/api/patients?search=Searchable', authHeaders);
 
       TestAssertions.expectSuccess(response, 200);
-      const foundPatient = response.body.data.find((p: any) =>
-        p.firstName.includes('Searchable') || p.lastName.includes('Searchable')
+      const foundPatient = response.body.data.find(
+        (p: any) => p.firstName.includes('Searchable') || p.lastName.includes('Searchable'),
       );
       expect(foundPatient).toBeDefined();
     });
@@ -268,15 +289,23 @@ describe('Patients Integration Tests', () => {
       const authHeaders = authHelper.getAuthHeaders('ADMIN');
 
       // Create patients with different blood types
-      await app.post('/api/patients', TestDataBuilder.patient({
-        firstName: 'TypeA',
-        bloodType: 'A+',
-      }), authHeaders);
+      await app.post(
+        '/api/patients',
+        TestDataBuilder.patient({
+          firstName: 'TypeA',
+          bloodType: 'A+',
+        }),
+        authHeaders,
+      );
 
-      await app.post('/api/patients', TestDataBuilder.patient({
-        firstName: 'TypeO',
-        bloodType: 'O+',
-      }), authHeaders);
+      await app.post(
+        '/api/patients',
+        TestDataBuilder.patient({
+          firstName: 'TypeO',
+          bloodType: 'O+',
+        }),
+        authHeaders,
+      );
 
       const response = await app.get('/api/patients?bloodType=A+', authHeaders);
 
@@ -447,7 +476,11 @@ describe('Patients Integration Tests', () => {
       const authHeaders = authHelper.getAuthHeaders('ADMIN');
 
       // Create another patient
-      const otherPatientResponse = await app.post('/api/patients', TestDataBuilder.patient(), authHeaders);
+      const otherPatientResponse = await app.post(
+        '/api/patients',
+        TestDataBuilder.patient(),
+        authHeaders,
+      );
       const otherPatient = otherPatientResponse.body.data;
 
       // Try to update first patient with second patient's email
@@ -465,23 +498,35 @@ describe('Patients Integration Tests', () => {
       const currentData = getCurrentResponse.body.data;
 
       // Simulate concurrent updates
-      const update1 = app.put(`/api/patients/${testPatient.id}`, {
-        ...currentData,
-        firstName: 'Update1',
-        version: currentData.version,
-      }, authHeaders);
+      const update1 = app.put(
+        `/api/patients/${testPatient.id}`,
+        {
+          ...currentData,
+          firstName: 'Update1',
+          version: currentData.version,
+        },
+        authHeaders,
+      );
 
-      const update2 = app.put(`/api/patients/${testPatient.id}`, {
-        ...currentData,
-        firstName: 'Update2',
-        version: currentData.version,
-      }, authHeaders);
+      const update2 = app.put(
+        `/api/patients/${testPatient.id}`,
+        {
+          ...currentData,
+          firstName: 'Update2',
+          version: currentData.version,
+        },
+        authHeaders,
+      );
 
       const [response1, response2] = await Promise.allSettled([update1, update2]);
 
       // One should succeed, one should fail due to version conflict
-      expect([response1, response2].some(r => r.status === 'fulfilled' && r.value.status === 200)).toBe(true);
-      expect([response1, response2].some(r => r.status === 'rejected' || r.value.status === 409)).toBe(true);
+      expect(
+        [response1, response2].some(r => r.status === 'fulfilled' && r.value.status === 200),
+      ).toBe(true);
+      expect(
+        [response1, response2].some(r => r.status === 'rejected' || r.value.status === 409),
+      ).toBe(true);
     });
   });
 
@@ -533,15 +578,19 @@ describe('Patients Integration Tests', () => {
 
       // Create appointment for patient
       const doctor = await testDbManager.getTestUser('DOCTOR');
-      await app.post('/api/appointments', {
-        patientId: testPatient.id,
-        doctorId: doctor.id,
-        appointmentDate: new Date(Date.now() + 24 * 60 * 60 * 1000),
-        appointmentTime: '09:00',
-        duration: 30,
-        status: 'SCHEDULED',
-        type: 'GENERAL_CONSULTATION',
-      }, authHeaders);
+      await app.post(
+        '/api/appointments',
+        {
+          patientId: testPatient.id,
+          doctorId: doctor.id,
+          appointmentDate: new Date(Date.now() + 24 * 60 * 60 * 1000),
+          appointmentTime: '09:00',
+          duration: 30,
+          status: 'SCHEDULED',
+          type: 'GENERAL_CONSULTATION',
+        },
+        authHeaders,
+      );
 
       const response = await app.delete(`/api/patients/${testPatient.id}`, authHeaders);
 
@@ -553,20 +602,27 @@ describe('Patients Integration Tests', () => {
 
       // Create medical record for patient
       const doctor = await testDbManager.getTestUser('DOCTOR');
-      await app.post('/api/medical-records', {
-        patientId: testPatient.id,
-        doctorId: doctor.id,
-        diagnosis: 'Test diagnosis',
-        treatment: 'Test treatment',
-        visitDate: new Date(),
-      }, authHeaders);
+      await app.post(
+        '/api/medical-records',
+        {
+          patientId: testPatient.id,
+          doctorId: doctor.id,
+          diagnosis: 'Test diagnosis',
+          treatment: 'Test treatment',
+          visitDate: new Date(),
+        },
+        authHeaders,
+      );
 
       // Delete patient
       const deleteResponse = await app.delete(`/api/patients/${testPatient.id}`, authHeaders);
       TestAssertions.expectSuccess(deleteResponse, 200);
 
       // Verify related records are also deleted or handled appropriately
-      const recordsResponse = await app.get(`/api/medical-records?patientId=${testPatient.id}`, authHeaders);
+      const recordsResponse = await app.get(
+        `/api/medical-records?patientId=${testPatient.id}`,
+        authHeaders,
+      );
       expect(recordsResponse.body.data).toHaveLength(0);
     });
   });
@@ -576,27 +632,38 @@ describe('Patients Integration Tests', () => {
 
     beforeEach(async () => {
       const authHeaders = authHelper.getAuthHeaders('ADMIN');
-      const patientResponse = await app.post('/api/patients', TestDataBuilder.patient(), authHeaders);
+      const patientResponse = await app.post(
+        '/api/patients',
+        TestDataBuilder.patient(),
+        authHeaders,
+      );
       testPatient = patientResponse.body.data;
 
       const doctor = await testDbManager.getTestUser('DOCTOR');
 
       // Create medical records
       for (let i = 0; i < 3; i++) {
-        await app.post('/api/medical-records', {
-          patientId: testPatient.id,
-          doctorId: doctor.id,
-          diagnosis: `Diagnosis ${i + 1}`,
-          treatment: `Treatment ${i + 1}`,
-          visitDate: new Date(Date.now() - i * 24 * 60 * 60 * 1000),
-        }, authHeaders);
+        await app.post(
+          '/api/medical-records',
+          {
+            patientId: testPatient.id,
+            doctorId: doctor.id,
+            diagnosis: `Diagnosis ${i + 1}`,
+            treatment: `Treatment ${i + 1}`,
+            visitDate: new Date(Date.now() - i * 24 * 60 * 60 * 1000),
+          },
+          authHeaders,
+        );
       }
     });
 
     it('should retrieve patient medical history', async () => {
       const authHeaders = authHelper.getAuthHeaders('ADMIN');
 
-      const response = await app.get(`/api/patients/${testPatient.id}/medical-history`, authHeaders);
+      const response = await app.get(
+        `/api/patients/${testPatient.id}/medical-history`,
+        authHeaders,
+      );
 
       TestAssertions.expectSuccess(response, 200);
       expect(Array.isArray(response.body.data)).toBe(true);
@@ -612,7 +679,10 @@ describe('Patients Integration Tests', () => {
     it('should respect data ownership', async () => {
       const patientHeaders = authHelper.getAuthHeaders('PATIENT');
 
-      const response = await app.get(`/api/patients/${testPatient.id}/medical-history`, patientHeaders);
+      const response = await app.get(
+        `/api/patients/${testPatient.id}/medical-history`,
+        patientHeaders,
+      );
 
       expect([403, 404]).toContain(response.status);
     });
@@ -624,7 +694,7 @@ describe('Patients Integration Tests', () => {
 
       const response = await app.get(
         `/api/patients/${testPatient.id}/medical-history?startDate=${startDate.toISOString()}&endDate=${endDate.toISOString()}`,
-        authHeaders
+        authHeaders,
       );
 
       TestAssertions.expectSuccess(response, 200);
@@ -640,22 +710,30 @@ describe('Patients Integration Tests', () => {
 
     beforeEach(async () => {
       const authHeaders = authHelper.getAuthHeaders('ADMIN');
-      const patientResponse = await app.post('/api/patients', TestDataBuilder.patient(), authHeaders);
+      const patientResponse = await app.post(
+        '/api/patients',
+        TestDataBuilder.patient(),
+        authHeaders,
+      );
       testPatient = patientResponse.data;
 
       const doctor = await testDbManager.getTestUser('DOCTOR');
 
       // Create appointments
       for (let i = 0; i < 3; i++) {
-        await app.post('/api/appointments', {
-          patientId: testPatient.id,
-          doctorId: doctor.id,
-          appointmentDate: new Date(Date.now() + i * 24 * 60 * 60 * 1000),
-          appointmentTime: '09:00',
-          duration: 30,
-          status: 'SCHEDULED',
-          type: 'GENERAL_CONSULTATION',
-        }, authHeaders);
+        await app.post(
+          '/api/appointments',
+          {
+            patientId: testPatient.id,
+            doctorId: doctor.id,
+            appointmentDate: new Date(Date.now() + i * 24 * 60 * 60 * 1000),
+            appointmentTime: '09:00',
+            duration: 30,
+            status: 'SCHEDULED',
+            type: 'GENERAL_CONSULTATION',
+          },
+          authHeaders,
+        );
       }
     });
 
@@ -675,7 +753,10 @@ describe('Patients Integration Tests', () => {
     it('should support filtering by appointment status', async () => {
       const authHeaders = authHelper.getAuthHeaders('ADMIN');
 
-      const response = await app.get(`/api/patients/${testPatient.id}/appointments?status=SCHEDULED`, authHeaders);
+      const response = await app.get(
+        `/api/patients/${testPatient.id}/appointments?status=SCHEDULED`,
+        authHeaders,
+      );
 
       TestAssertions.expectSuccess(response, 200);
       response.body.data.forEach((appointment: any) => {
@@ -686,13 +767,19 @@ describe('Patients Integration Tests', () => {
     it('should support sorting by appointment date', async () => {
       const authHeaders = authHelper.getAuthHeaders('ADMIN');
 
-      const response = await app.get(`/api/patients/${testPatient.id}/appointments?sortBy=appointmentDate&order=asc`, authHeaders);
+      const response = await app.get(
+        `/api/patients/${testPatient.id}/appointments?sortBy=appointmentDate&order=asc`,
+        authHeaders,
+      );
 
       TestAssertions.expectSuccess(response, 200);
       const appointments = response.body.data;
 
       for (let i = 1; i < appointments.length; i++) {
-        expect(new Date(appointments[i - 1].appointmentDate) <= new Date(appointments[i].appointmentDate)).toBe(true);
+        expect(
+          new Date(appointments[i - 1].appointmentDate) <=
+            new Date(appointments[i].appointmentDate),
+        ).toBe(true);
       }
     });
   });
@@ -702,18 +789,26 @@ describe('Patients Integration Tests', () => {
 
     beforeEach(async () => {
       const authHeaders = authHelper.getAuthHeaders('ADMIN');
-      const patientResponse = await app.post('/api/patients', TestDataBuilder.patient(), authHeaders);
+      const patientResponse = await app.post(
+        '/api/patients',
+        TestDataBuilder.patient(),
+        authHeaders,
+      );
       testPatient = patientResponse.data;
 
       // Create billing records
       for (let i = 0; i < 3; i++) {
-        await app.post('/api/billing', {
-          patientId: testPatient.id,
-          amount: 100 + i * 50,
-          description: `Billing item ${i + 1}`,
-          status: 'PENDING',
-          dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-        }, authHeaders);
+        await app.post(
+          '/api/billing',
+          {
+            patientId: testPatient.id,
+            amount: 100 + i * 50,
+            description: `Billing item ${i + 1}`,
+            status: 'PENDING',
+            dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+          },
+          authHeaders,
+        );
       }
     });
 
@@ -814,10 +909,14 @@ Test3,Patient3,test3@test.com,+1234567892,1992-03-03,MALE,O+`;
       it('should export patients to CSV', async () => {
         const authHeaders = authHelper.getAuthHeaders('ADMIN');
 
-        const response = await app.post('/api/patients/bulk-export', {
-          format: 'csv',
-          filters: {},
-        }, authHeaders);
+        const response = await app.post(
+          '/api/patients/bulk-export',
+          {
+            format: 'csv',
+            filters: {},
+          },
+          authHeaders,
+        );
 
         TestAssertions.expectSuccess(response, 200);
         expect(response.body).toHaveProperty('downloadUrl');
@@ -828,10 +927,14 @@ Test3,Patient3,test3@test.com,+1234567892,1992-03-03,MALE,O+`;
       it('should export patients to JSON', async () => {
         const authHeaders = authHelper.getAuthHeaders('ADMIN');
 
-        const response = await app.post('/api/patients/bulk-export', {
-          format: 'json',
-          filters: {},
-        }, authHeaders);
+        const response = await app.post(
+          '/api/patients/bulk-export',
+          {
+            format: 'json',
+            filters: {},
+          },
+          authHeaders,
+        );
 
         TestAssertions.expectSuccess(response, 200);
         expect(response.body).toHaveProperty('downloadUrl');
@@ -841,13 +944,17 @@ Test3,Patient3,test3@test.com,+1234567892,1992-03-03,MALE,O+`;
       it('should apply filters to export', async () => {
         const authHeaders = authHelper.getAuthHeaders('ADMIN');
 
-        const response = await app.post('/api/patients/bulk-export', {
-          format: 'csv',
-          filters: {
-            bloodType: 'A+',
-            gender: 'MALE',
+        const response = await app.post(
+          '/api/patients/bulk-export',
+          {
+            format: 'csv',
+            filters: {
+              bloodType: 'A+',
+              gender: 'MALE',
+            },
           },
-        }, authHeaders);
+          authHeaders,
+        );
 
         TestAssertions.expectSuccess(response, 200);
         expect(response.body).toHaveProperty('filters');
@@ -862,23 +969,35 @@ Test3,Patient3,test3@test.com,+1234567892,1992-03-03,MALE,O+`;
       const authHeaders = authHelper.getAuthHeaders('ADMIN');
 
       // Create patients with different demographics
-      await app.post('/api/patients', TestDataBuilder.patient({
-        firstName: 'MaleA',
-        gender: 'MALE',
-        bloodType: 'A+',
-      }), authHeaders);
+      await app.post(
+        '/api/patients',
+        TestDataBuilder.patient({
+          firstName: 'MaleA',
+          gender: 'MALE',
+          bloodType: 'A+',
+        }),
+        authHeaders,
+      );
 
-      await app.post('/api/patients', TestDataBuilder.patient({
-        firstName: 'FemaleO',
-        gender: 'FEMALE',
-        bloodType: 'O+',
-      }), authHeaders);
+      await app.post(
+        '/api/patients',
+        TestDataBuilder.patient({
+          firstName: 'FemaleO',
+          gender: 'FEMALE',
+          bloodType: 'O+',
+        }),
+        authHeaders,
+      );
 
-      await app.post('/api/patients', TestDataBuilder.patient({
-        firstName: 'MaleB',
-        gender: 'MALE',
-        bloodType: 'B+',
-      }), authHeaders);
+      await app.post(
+        '/api/patients',
+        TestDataBuilder.patient({
+          firstName: 'MaleB',
+          gender: 'MALE',
+          bloodType: 'B+',
+        }),
+        authHeaders,
+      );
     });
 
     describe('GET /api/patients/statistics', () => {
@@ -906,7 +1025,7 @@ Test3,Patient3,test3@test.com,+1234567892,1992-03-03,MALE,O+`;
 
         const response = await app.get(
           `/api/patients/statistics?startDate=${startDate.toISOString()}&endDate=${endDate.toISOString()}`,
-          authHeaders
+          authHeaders,
         );
 
         TestAssertions.expectSuccess(response, 200);
@@ -932,9 +1051,7 @@ Test3,Patient3,test3@test.com,+1234567892,1992-03-03,MALE,O+`;
       // Create many patients
       const createPromises = [];
       for (let i = 0; i < 50; i++) {
-        createPromises.push(
-          app.post('/api/patients', TestDataBuilder.patient(), authHeaders)
-        );
+        createPromises.push(app.post('/api/patients', TestDataBuilder.patient(), authHeaders));
       }
       await Promise.all(createPromises);
 
@@ -952,13 +1069,13 @@ Test3,Patient3,test3@test.com,+1234567892,1992-03-03,MALE,O+`;
 
       const concurrentCreates = [];
       for (let i = 0; i < 20; i++) {
-        concurrentCreates.push(
-          app.post('/api/patients', TestDataBuilder.patient(), authHeaders)
-        );
+        concurrentCreates.push(app.post('/api/patients', TestDataBuilder.patient(), authHeaders));
       }
 
       const results = await Promise.allSettled(concurrentCreates);
-      const successful = results.filter(r => r.status === 'fulfilled' && r.value.status === 201).length;
+      const successful = results.filter(
+        r => r.status === 'fulfilled' && r.value.status === 201,
+      ).length;
 
       expect(successful).toBeGreaterThan(15); // At least 75% success rate
     });

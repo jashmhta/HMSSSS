@@ -30,7 +30,8 @@ export class TestDatabaseManager {
 
   constructor() {
     this.testDbName = `hms_test_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    this.originalDbUrl = process.env.DATABASE_URL || 'postgresql://test:test@localhost:5432/hms_dev';
+    this.originalDbUrl =
+      process.env.DATABASE_URL || 'postgresql://test:test@localhost:5432/hms_dev';
   }
 
   async initialize(): Promise<void> {
@@ -81,7 +82,7 @@ export class TestDatabaseManager {
       // Run Prisma migrations
       execSync('npx prisma migrate deploy', {
         stdio: 'inherit',
-        env: { ...process.env, DATABASE_URL: process.env.DATABASE_URL }
+        env: { ...process.env, DATABASE_URL: process.env.DATABASE_URL },
       });
       console.log('Migrations completed successfully');
     } catch (error) {
@@ -245,8 +246,15 @@ export class TestDatabaseManager {
     }
 
     const tables = [
-      'Appointment', 'MedicalRecord', 'Prescription', 'LabTest', 'RadiologyTest',
-      'Billing', 'Payment', 'Patient', 'User'
+      'Appointment',
+      'MedicalRecord',
+      'Prescription',
+      'LabTest',
+      'RadiologyTest',
+      'Billing',
+      'Payment',
+      'Patient',
+      'User',
     ];
 
     for (const table of tables) {
@@ -393,10 +401,10 @@ export const createTestAuthToken = (user: TestUser): string => {
     {
       sub: user.id,
       email: user.email,
-      role: user.role
+      role: user.role,
     },
     process.env.JWT_SECRET || 'test-jwt-secret',
-    { expiresIn: '1h' }
+    { expiresIn: '1h' },
   );
 };
 
@@ -412,7 +420,7 @@ export const createTestRequest = (
   method: string,
   path: string,
   data?: any,
-  headers?: Record<string, string>
+  headers?: Record<string, string>,
 ) => {
   return {
     method,
@@ -438,7 +446,9 @@ export const expectErrorResponse = (response: any, expectedStatus = 400) => {
 };
 
 export const expectValidUUID = (uuid: string) => {
-  expect(uuid).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
+  expect(uuid).toMatch(
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+  );
 };
 
 export const expectValidEmail = (email: string) => {

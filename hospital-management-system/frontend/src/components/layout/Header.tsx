@@ -1,15 +1,17 @@
-import React from "react";
+import React from 'react';
+
 import {
   Bars3Icon,
   BellIcon,
   MagnifyingGlassIcon,
-} from "@heroicons/react/24/outline";
+} from '@heroicons/react/24/outline';
 
-interface HeaderProps {
+interface IHeaderProps {
   onMenuClick: () => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
+// eslint-disable-next-line max-lines-per-function
+const Header: React.FC<IHeaderProps> = ({ onMenuClick }) => {
   return (
     <header className="bg-white shadow-sm border-b border-gray-200">
       <div className="flex items-center justify-between h-16 px-4 sm:px-6 lg:px-8">
@@ -47,7 +49,7 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
           {/* Notifications */}
           <button className="p-2 text-gray-400 hover:text-gray-500 relative" aria-label="Notifications">
             <BellIcon className="h-6 w-6" />
-            <span className="absolute top-0 right-0 block h-2 w-2 rounded-full bg-red-400 ring-2 ring-white"></span>
+            <span className="absolute top-0 right-0 block h-2 w-2 rounded-full bg-red-400 ring-2 ring-white" />
           </button>
 
           {/* Profile dropdown */}

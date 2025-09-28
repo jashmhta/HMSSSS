@@ -49,14 +49,13 @@
     "setup:env": "cp .env.example .env",
     "setup:db": "cd backend && npm run db:migrate && npm run db:seed",
     "test:staging": "cd backend && npm run test:e2e -- --config=test/staging.config.js",
-    "test:quality": "npm run lint:all && npm run format:all && npm run typecheck:all",
-    "prepare": "husky install"
+    "test:quality": "npm run lint:all && npm run format:all && npm run typecheck:all"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
-    "@typescript-eslint/eslint-plugin": "^6.0.0",
-    "@typescript-eslint/parser": "^6.0.0",
-    "eslint": "^8.0.0",
+    "@typescript-eslint/eslint-plugin": "^8.0.0",
+    "@typescript-eslint/parser": "^8.0.0",
+    "eslint": "^9.29.0",
     "husky": "^8.0.3",
     "lint-staged": "^15.2.0",
     "prettier": "^3.0.0",

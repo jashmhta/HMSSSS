@@ -3,13 +3,37 @@
 // Import polyfills first
 import './jest.polyfills.js';
 
+// Critical mocks that must be set up before Next.js loads
+// Mock IntersectionObserver - must be set before Next.js use-intersection
+const MockIntersectionObserver = class IntersectionObserver {
+  constructor(callback, options) {
+    this.callback = callback;
+    this.options = options;
+    this.observe = jest.fn();
+    this.unobserve = jest.fn();
+    this.disconnect = jest.fn();
+    this.takeRecords = jest.fn(() => []);
+  }
+};
+
+global.IntersectionObserver = MockIntersectionObserver;
+window.IntersectionObserver = MockIntersectionObserver;
+
+// Mock ResizeObserver
+const MockResizeObserver = class ResizeObserver {
+  constructor(callback) {
+    this.callback = callback;
+    this.observe = jest.fn();
+    this.unobserve = jest.fn();
+    this.disconnect = jest.fn();
+  }
+};
+
+global.ResizeObserver = MockResizeObserver;
+window.ResizeObserver = MockResizeObserver;
+
 // Import testing library setup
 import '@testing-library/jest-dom';
-import '@testing-library/user-event';
-
-// Import necessary polyfills
-import 'whatwg-fetch';
-import 'abort-controller/polyfill';
 
 // Mock Next.js router
 jest.mock('next/router', () => ({
@@ -44,10 +68,28 @@ jest.mock('next/image', () => ({
   },
 }));
 
+// Mock Next.js Link component
+jest.mock('next/link', () => ({
+  __esModule: true,
+  default: ({ children, ...props }) => {
+    return <a {...props}>{children}</a>;
+  },
+}));
+
 // Mock Next.js document component
 jest.mock('next/document', () => ({
   __esModule: true,
   default: () => null,
+}));
+
+// Mock Next.js use-intersection hook
+jest.mock('next/dist/client/use-intersection', () => ({
+  useIntersection: () => [jest.fn(), false],
+}));
+
+// Also try mocking the internal use-intersection
+jest.mock('next/dist/shared/lib/use-intersection', () => ({
+  useIntersection: () => [jest.fn(), false],
 }));
 
 // Mock environment variables
@@ -65,20 +107,7 @@ Object.defineProperty(window, 'matchMedia', {
   })),
 });
 
-// Mock ResizeObserver
-global.ResizeObserver = jest.fn().mockImplementation(() => ({
-  observe: jest.fn(),
-  unobserve: jest.fn(),
-  disconnect: jest.fn(),
-}));
-
-// Mock IntersectionObserver
-global.IntersectionObserver = jest.fn().mockImplementation(() => ({
-  observe: jest.fn(),
-  unobserve: jest.fn(),
-  disconnect: jest.fn(),
-  takeRecords: jest.fn(),
-}));
+// ResizeObserver and IntersectionObserver are now mocked at the top of the file
 
 // Mock window.scrollTo
 Object.defineProperty(window, 'scrollTo', {
@@ -278,6 +307,27 @@ global.HTMLElement.prototype.animate = jest.fn().mockReturnValue({
 
 // Mock getComputedStyle
 global.getComputedStyle = jest.fn().mockReturnValue({
+  display: 'block',
+  visibility: 'visible',
+  opacity: '1',
+  width: 'auto',
+  height: 'auto',
+  color: 'black',
+  'background-color': 'transparent',
+  border: 'none',
+  margin: '0',
+  padding: '0',
+  'font-size': '16px',
+  'line-height': '1.5',
+  position: 'static',
+  top: 'auto',
+  left: 'auto',
+  right: 'auto',
+  bottom: 'auto',
+  'z-index': 'auto',
+  overflow: 'visible',
+  'overflow-x': 'visible',
+  'overflow-y': 'visible',
   getPropertyValue: jest.fn(prop => {
     const defaults = {
       'display': 'block',
@@ -292,6 +342,15 @@ global.getComputedStyle = jest.fn().mockReturnValue({
       'padding': '0',
       'font-size': '16px',
       'line-height': '1.5',
+      'position': 'static',
+      'top': 'auto',
+      'left': 'auto',
+      'right': 'auto',
+      'bottom': 'auto',
+      'z-index': 'auto',
+      'overflow': 'visible',
+      'overflow-x': 'visible',
+      'overflow-y': 'visible',
     };
     return defaults[prop] || '';
   }),
@@ -450,25 +509,18 @@ beforeEach(() => {
     document.documentElement.appendChild(document.body);
   }
 
-  // Clear document body
+  // Clear document body completely
   document.body.innerHTML = '';
 
-  // Ensure root container exists for React Testing Library
-  let rootContainer = document.getElementById('root');
-  if (!rootContainer) {
-    rootContainer = document.createElement('div');
-    rootContainer.id = 'root';
-    document.body.appendChild(rootContainer);
-  }
+  // Create all necessary containers fresh for each test
+  const rootContainer = document.createElement('div');
+  rootContainer.id = 'root';
+  document.body.appendChild(rootContainer);
 
-  // Also create a default container for React Testing Library
-  if (!document.body.querySelector('[data-testid]')) {
-    const defaultContainer = document.createElement('div');
-    defaultContainer.setAttribute('data-testid', 'default-test-container');
-    document.body.appendChild(defaultContainer);
-  }
+  const testingContainer = document.createElement('div');
+  testingContainer.id = 'testing-library-container';
+  document.body.appendChild(testingContainer);
 
-  // Create additional container for React 18 createRoot
   const reactRootContainer = document.createElement('div');
   reactRootContainer.id = 'react-root';
   document.body.appendChild(reactRootContainer);

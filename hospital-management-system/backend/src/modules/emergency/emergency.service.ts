@@ -66,10 +66,10 @@ export class EmergencyService {
       include: {
         patient: true,
         vitals: {
-          orderBy: { timestamp: 'desc' },
+          orderBy: { recordedAt: 'desc' },
         },
         medications: {
-          orderBy: { prescribedAt: 'desc' },
+          orderBy: { administeredAt: 'desc' },
         },
         procedures: {
           orderBy: { performedAt: 'desc' },
@@ -181,7 +181,7 @@ export class EmergencyService {
     // Create alert record and trigger notifications
     await this.prisma.emergencyAlert.create({
       data: {
-        visitId,
+        emergencyVisitId: visitId,
         alertType: 'CRITICAL_PATIENT',
         message: 'Critical patient admitted to emergency',
         severity: 'HIGH',

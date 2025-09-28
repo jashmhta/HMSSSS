@@ -213,4 +213,59 @@ export const testUtils = {
       },
     });
   },
+
+  // Create test radiology test
+  async createTestRadiologyTest(
+    patientId: string,
+    orderedBy: string,
+    prisma: PrismaService,
+    additionalData = {},
+  ) {
+    // First create a test radiology catalog entry if it doesn't exist
+    const testCatalog = await prisma.radiologyTestCatalog.upsert({
+      where: { id: additionalData.testCatalogId || 'test-radiology-catalog-id' },
+      update: {},
+      create: {
+        id: additionalData.testCatalogId || 'test-radiology-catalog-id',
+        testName: additionalData.testName || 'Chest X-Ray PA and Lateral',
+        testCode: additionalData.testCode || 'CXR',
+        category: additionalData.category || 'CHEST',
+        modality: additionalData.modality || 'XRAY',
+        description: additionalData.description || 'Standard chest X-ray examination',
+        preparation: additionalData.preparation || 'Remove clothing from waist up',
+        contraindications: additionalData.contraindications || 'Pregnancy - consult physician',
+        cost: additionalData.cost || 75.0,
+        estimatedDuration: additionalData.estimatedDuration || 15,
+        isActive: true,
+      },
+    });
+
+    return prisma.radiologyTest.create({
+      data: {
+        patientId,
+        testCatalogId: testCatalog.id,
+        orderedBy,
+        status: additionalData.status || 'ORDERED',
+        clinicalInfo: additionalData.clinicalInfo || 'Chest pain evaluation',
+        diagnosis: additionalData.diagnosis || 'Suspected pneumonia',
+        bodyPart: additionalData.bodyPart || 'CHEST',
+        modality: additionalData.modality || 'XRAY',
+        priority: additionalData.priority || 'ROUTINE',
+      },
+      include: {
+        patient: {
+          include: {
+            user: {
+              select: {
+                firstName: true,
+                lastName: true,
+                email: true,
+              },
+            },
+          },
+        },
+        testCatalog: true,
+      },
+    });
+  },
 };

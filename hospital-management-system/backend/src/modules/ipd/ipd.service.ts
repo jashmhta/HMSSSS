@@ -25,6 +25,12 @@ import {
   NoteType,
   ShiftType,
 } from './dto/ipd-admission.dto';
+import {
+  ICUTransferDto,
+  ICUProgressNoteDto,
+  ICUDischargeReadinessDto,
+  ICUAssessmentDto,
+} from './dto/icu-management.dto';
 
 /**
  *
@@ -788,7 +794,7 @@ export class IPDService {
    *
    */
   private transformMedicalRecordToIPDAdmission(record: any) {
-    const treatmentPlan = record.treatmentPlan;
+    const treatmentPlan = record.treatmentPlan ? JSON.parse(record.treatmentPlan) : {};
     const patient = record.patient;
     const doctor = record.doctor;
 
@@ -823,6 +829,7 @@ export class IPDService {
       status: treatmentPlan.status,
       insuranceInfo: treatmentPlan.insuranceInfo,
       admittingNotes: treatmentPlan.admittingNotes,
+      treatmentPlan: treatmentPlan, // Include parsed treatment plan
       createdAt: record.createdAt,
       updatedAt: record.updatedAt,
     };
@@ -928,6 +935,299 @@ export class IPDService {
         const treatmentPlan = a.treatmentPlan;
         outcomes[treatmentPlan.dischargeSummary.outcome]++;
       });
+
+    return outcomes;
+  }
+
+  // ICU/CCU Management Methods
+
+  /**
+   * Transfer patient to ICU with critical care assessment
+   */
+  async transferToICU(admissionId: string, data: ICUTransferDto & { transferredBy: string }) {
+    const admission = await this.getIPDAdmissionById(admissionId);
+    if (!admission) {
+      throw new NotFoundException('IPD admission not found');
+    }
+
+    // Update admission with ICU transfer details
+    const updatedAdmission = {
+      ...admission,
+      wardType: WardType.ICU,
+      priority: AdmissionPriority.CRITICAL,
+      treatmentPlan: {
+        ...admission.treatmentPlan,
+        icuTransfer: {
+          ...data,
+          transferDate: new Date(),
+          transferredBy: data.transferredBy,
+        },
+      },
+    };
+
+    // Log compliance event for ICU transfer
+    await this.complianceService.logComplianceEvent({
+      userId: data.transferredBy,
+      action: 'ICU_TRANSFER',
+      resource: 'ipd_admission',
+      resourceId: admissionId,
+      eventType: 'ICU_TRANSFER',
+      details: {
+        patientId: admission.patient.id,
+        admissionId,
+        reason: data.admissionReason,
+        apacheIIScore: data.apacheIIScore,
+        sofaScore: data.sofaScore,
+      },
+      complianceFlags: ['CRITICAL_PATIENT_TRANSFER', 'ICU_ADMISSION'],
+    });
+
+    return updatedAdmission;
+  }
+
+  /**
+   * Record ICU progress note with comprehensive assessment
+   */
+  async recordICUProgress(admissionId: string, data: ICUProgressNoteDto & { recordedBy: string }) {
+    const admission = await this.getIPDAdmissionById(admissionId);
+    if (!admission) {
+      throw new NotFoundException('IPD admission not found');
+    }
+
+    const progressNote = {
+      id: `icu-progress-${Date.now()}`,
+      admissionId,
+      ...data,
+      recordedAt: new Date(),
+      recordedBy: data.recordedBy,
+    };
+
+    // In a real implementation, this would be saved to database
+    // For now, we'll add it to the admission's treatment plan
+    const updatedAdmission = {
+      ...admission,
+      treatmentPlan: {
+        ...admission.treatmentPlan,
+        icuProgressNotes: [...(admission.treatmentPlan.icuProgressNotes || []), progressNote],
+      },
+    };
+
+    return progressNote;
+  }
+
+  /**
+   * Assess ICU discharge readiness
+   */
+  async assessICUDischargeReadiness(
+    admissionId: string,
+    data: ICUDischargeReadinessDto & { assessedBy: string },
+  ) {
+    const admission = await this.getIPDAdmissionById(admissionId);
+    if (!admission) {
+      throw new NotFoundException('IPD admission not found');
+    }
+
+    const assessment = {
+      id: `icu-readiness-${Date.now()}`,
+      admissionId,
+      ...data,
+      assessedAt: new Date(),
+      assessedBy: data.assessedBy,
+    };
+
+    // Update admission with discharge readiness assessment
+    const updatedAdmission = {
+      ...admission,
+      treatmentPlan: {
+        ...admission.treatmentPlan,
+        icuDischargeReadiness: assessment,
+      },
+    };
+
+    // Log compliance event
+    await this.complianceService.logComplianceEvent({
+      userId: data.assessedBy,
+      action: 'ICU_DISCHARGE_ASSESSMENT',
+      resource: 'ipd_admission',
+      resourceId: admissionId,
+      eventType: 'ICU_DISCHARGE_ASSESSMENT',
+      details: {
+        patientId: admission.patient.id,
+        admissionId,
+        readyForDischarge: data.readyForDischarge,
+        destination: data.dischargeDestination,
+      },
+      complianceFlags: ['CRITICAL_PATIENT_DISCHARGE'],
+    });
+
+    return assessment;
+  }
+
+  /**
+   * Get all ICU patients
+   */
+  async getICUPatients() {
+    const allAdmissions = await this.getIPDAdmissions();
+    return allAdmissions.filter(
+      admission => admission.wardType === WardType.ICU || admission.wardType === WardType.CCU,
+    );
+  }
+
+  /**
+   * Get ICU bed occupancy
+   */
+  async getICUBedOccupancy() {
+    const icuBeds = this.mockBeds.filter(
+      bed => bed.wardType === WardType.ICU || bed.wardType === WardType.CCU,
+    );
+
+    return {
+      totalBeds: icuBeds.length,
+      occupiedBeds: icuBeds.filter(bed => bed.status === 'OCCUPIED').length,
+      availableBeds: icuBeds.filter(bed => bed.status === 'AVAILABLE').length,
+      maintenanceBeds: icuBeds.filter(bed => bed.status === 'MAINTENANCE').length,
+      occupancyRate:
+        icuBeds.length > 0
+          ? icuBeds.filter(bed => bed.status === 'OCCUPIED').length / icuBeds.length
+          : 0,
+      beds: icuBeds,
+    };
+  }
+
+  /**
+   * Get ICU performance metrics
+   */
+  async getICUPerformanceMetrics(startDate: Date, endDate: Date) {
+    const icuAdmissions = await this.getICUPatients();
+
+    return {
+      totalICUPatients: icuAdmissions.length,
+      averageLengthOfStay: this.calculateAverageLOS(icuAdmissions),
+      mortalityRate: this.calculateICUMortalityRate(icuAdmissions),
+      ventilatorUsage: this.calculateVentilatorUsage(icuAdmissions),
+      bedOccupancyRate: await this.calculateICUBedOccupancyRate(startDate, endDate),
+      apacheIIScoreDistribution: this.calculateAPACHEDistribution(icuAdmissions),
+      sofaScoreDistribution: this.calculateSOFADistribution(icuAdmissions),
+      dischargeOutcomes: this.calculateICUDischargeOutcomes(icuAdmissions),
+    };
+  }
+
+  /**
+   * Calculate average length of stay for ICU patients
+   */
+  private calculateAverageLOS(admissions: any[]): number {
+    const completedAdmissions = admissions.filter(a => a.dischargeDate);
+    if (completedAdmissions.length === 0) return 0;
+
+    const totalLOS = completedAdmissions.reduce((sum, admission) => {
+      const los = Math.ceil(
+        (new Date(admission.dischargeDate).getTime() -
+          new Date(admission.admissionDate).getTime()) /
+          (1000 * 60 * 60 * 24),
+      );
+      return sum + los;
+    }, 0);
+
+    return totalLOS / completedAdmissions.length;
+  }
+
+  /**
+   * Calculate ICU mortality rate
+   */
+  private calculateICUMortalityRate(admissions: any[]): number {
+    const dischargedPatients = admissions.filter(a => a.status === 'DISCHARGED');
+    if (dischargedPatients.length === 0) return 0;
+
+    const deaths = dischargedPatients.filter(
+      a =>
+        a.treatmentPlan.dischargeSummary?.outcome === 'WORSENED' ||
+        a.dischargeType === DischargeType.EXPIRED,
+    ).length;
+
+    return deaths / dischargedPatients.length;
+  }
+
+  /**
+   * Calculate ventilator usage percentage
+   */
+  private calculateVentilatorUsage(admissions: any[]): number {
+    const icuAssessments = admissions.flatMap(a => a.treatmentPlan.icuProgressNotes || []);
+
+    if (icuAssessments.length === 0) return 0;
+
+    const ventilatorCases = icuAssessments.filter(note => note.assessment?.onVentilator).length;
+
+    return ventilatorCases / icuAssessments.length;
+  }
+
+  /**
+   * Calculate ICU bed occupancy rate over time period
+   */
+  private async calculateICUBedOccupancyRate(startDate: Date, endDate: Date): Promise<number> {
+    // Simplified calculation - in real implementation would analyze historical data
+    const icuBeds = this.mockBeds.filter(
+      bed => bed.wardType === WardType.ICU || bed.wardType === WardType.CCU,
+    );
+
+    const occupiedBeds = icuBeds.filter(bed => bed.status === 'OCCUPIED').length;
+    return icuBeds.length > 0 ? occupiedBeds / icuBeds.length : 0;
+  }
+
+  /**
+   * Calculate APACHE II score distribution
+   */
+  private calculateAPACHEDistribution(admissions: any[]) {
+    const scores = admissions
+      .map(a => a.treatmentPlan.icuTransfer?.apacheIIScore)
+      .filter(score => score !== undefined);
+
+    return {
+      low: scores.filter(s => s < 15).length,
+      moderate: scores.filter(s => s >= 15 && s < 25).length,
+      high: scores.filter(s => s >= 25 && s < 35).length,
+      veryHigh: scores.filter(s => s >= 35).length,
+      average: scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 0,
+    };
+  }
+
+  /**
+   * Calculate SOFA score distribution
+   */
+  private calculateSOFADistribution(admissions: any[]) {
+    const scores = admissions
+      .map(a => a.treatmentPlan.icuTransfer?.sofaScore)
+      .filter(score => score !== undefined);
+
+    return {
+      low: scores.filter(s => s < 6).length,
+      moderate: scores.filter(s => s >= 6 && s < 12).length,
+      high: scores.filter(s => s >= 12).length,
+      average: scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 0,
+    };
+  }
+
+  /**
+   * Calculate ICU discharge outcomes
+   */
+  private calculateICUDischargeOutcomes(admissions: any[]) {
+    const outcomes = {
+      IMPROVED: 0,
+      TRANSFERRED_TO_WARD: 0,
+      EXPIRED: 0,
+      STILL_IN_ICU: 0,
+    };
+
+    admissions.forEach(admission => {
+      if (admission.status === 'ADMITTED') {
+        outcomes.STILL_IN_ICU++;
+      } else if (admission.dischargeType === DischargeType.EXPIRED) {
+        outcomes.EXPIRED++;
+      } else if (admission.dischargeType === DischargeType.TRANSFER) {
+        outcomes.TRANSFERRED_TO_WARD++;
+      } else {
+        outcomes.IMPROVED++;
+      }
+    });
 
     return outcomes;
   }

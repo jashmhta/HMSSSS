@@ -1,20 +1,20 @@
 import { useState, useCallback, useEffect } from 'react';
 
-export interface LoadingState {
+export interface ILoadingState {
   isLoading: boolean;
   progress?: number;
   message?: string;
   error?: string | null;
 }
 
-export interface UseLoadingOptions {
+export interface IUseLoadingOptions {
   initialMessage?: string;
   timeout?: number;
   onError?: (error: Error) => void;
   onSuccess?: () => void;
 }
 
-export interface LoadingTask<T = any> {
+export interface ILoadingTask<T = any> {
   id: string;
   name: string;
   status: 'pending' | 'loading' | 'completed' | 'failed';
@@ -26,14 +26,14 @@ export interface LoadingTask<T = any> {
   endTime?: number;
 }
 
-export function useLoading(options: UseLoadingOptions = {}) {
-  const [loadingState, setLoadingState] = useState<LoadingState>({
+export function useLoading(options: IUseLoadingOptions = {}) {
+  const [loadingState, setLoadingState] = useState<ILoadingState>({
     isLoading: false,
-    message: options.initialMessage,
+    ...(options.initialMessage && { message: options.initialMessage }),
     error: null,
   });
 
-  const [tasks, setTasks] = useState<LoadingTask[]>([]);
+  const [tasks, setTasks] = useState<ILoadingTask[]>([]);
 
   const startLoading = useCallback((message?: string) => {
     setLoadingState({
@@ -47,7 +47,6 @@ export function useLoading(options: UseLoadingOptions = {}) {
     setLoadingState(prev => ({
       ...prev,
       isLoading: false,
-      progress: undefined,
     }));
     options.onSuccess?.();
   }, [options.onSuccess]);
@@ -56,7 +55,7 @@ export function useLoading(options: UseLoadingOptions = {}) {
     setLoadingState(prev => ({
       ...prev,
       progress,
-      message: message || prev.message,
+      ...(message || prev.message ? { message: message || prev.message } : {}),
     }));
   }, []);
 
@@ -73,8 +72,7 @@ export function useLoading(options: UseLoadingOptions = {}) {
   const reset = useCallback(() => {
     setLoadingState({
       isLoading: false,
-      progress: undefined,
-      message: options.initialMessage,
+      ...(options.initialMessage && { message: options.initialMessage }),
       error: null,
     });
   }, [options.initialMessage]);
@@ -82,7 +80,7 @@ export function useLoading(options: UseLoadingOptions = {}) {
   // Task management
   const addTask = useCallback(<T = any>(name: string, taskFn: () => Promise<T>): Promise<T> => {
     const taskId = Math.random().toString(36).substr(2, 9);
-    const newTask: LoadingTask<T> = {
+    const newTask: ILoadingTask<T> = {
       id: taskId,
       name,
       status: 'pending',
@@ -91,9 +89,9 @@ export function useLoading(options: UseLoadingOptions = {}) {
 
     setTasks(prev => [...prev, newTask]);
 
-    const updateTask = (updates: Partial<LoadingTask<T>>) => {
+    const updateTask = (updates: Partial<ILoadingTask<T>>) => {
       setTasks(prev => prev.map(task =>
-        task.id === taskId ? { ...task, ...updates } : task
+        task.id === taskId ? { ...task, ...updates } : task,
       ));
     };
 
@@ -157,6 +155,7 @@ export function useLoading(options: UseLoadingOptions = {}) {
 
       return () => clearTimeout(timer);
     }
+    return () => {}; // Return empty cleanup function when no timer is set
   }, [loadingState.isLoading, options.timeout, setError]);
 
   return {
@@ -177,7 +176,7 @@ export function useLoading(options: UseLoadingOptions = {}) {
 // Specialized hooks for common loading patterns
 export function useAsyncData<T>(
   asyncFn: () => Promise<T>,
-  options: UseLoadingOptions & { immediate?: boolean; deps?: any[] } = {}
+  options: IUseLoadingOptions & { immediate?: boolean; deps?: any[] } = {},
 ) {
   const {
     immediate = true,
@@ -187,10 +186,10 @@ export function useAsyncData<T>(
     ...loadingOptions
   } = options;
 
-  const { loadingState, setError, addTask } = useLoading({
+  const { loadingState, addTask } = useLoading({
     ...loadingOptions,
-    onError,
-    onSuccess,
+    ...(onError && { onError }),
+    ...(onSuccess && { onSuccess }),
   });
 
   const [data, setData] = useState<T | null>(null);
@@ -222,7 +221,7 @@ export function useAsyncData<T>(
 
 export function useFormSubmission<T>(
   submitFn: (data: T) => Promise<any>,
-  options: UseLoadingOptions & { resetOnSuccess?: boolean } = {}
+  options: IUseLoadingOptions & { resetOnSuccess?: boolean } = {},
 ) {
   const { resetOnSuccess = false, ...loadingOptions } = options;
   const { loadingState, setError, reset } = useLoading(loadingOptions);
@@ -234,7 +233,7 @@ export function useFormSubmission<T>(
         reset();
       }
     } catch (error) {
-      setError(error);
+      setError(error as Error | string);
       throw error;
     }
   }, [submitFn, setError, reset, resetOnSuccess]);
@@ -249,7 +248,7 @@ export function useFormSubmission<T>(
 
 export function useInfiniteScroll<T>(
   loadMoreFn: (page: number) => Promise<{ items: T[]; hasMore: boolean }>,
-  options: UseLoadingOptions = {}
+  options: IUseLoadingOptions = {},
 ) {
   const { loadingState, setError, addTask } = useLoading(options);
   const [items, setItems] = useState<T[]>([]);
@@ -265,7 +264,7 @@ export function useInfiniteScroll<T>(
       setHasMore(result.hasMore);
       setPage(prev => prev + 1);
     } catch (error) {
-      setError(error);
+      setError(error as Error | string);
     }
   }, [page, hasMore, loadingState.isLoading, loadMoreFn, addTask, setError]);
 
@@ -286,7 +285,7 @@ export function useInfiniteScroll<T>(
 
 export function useRealtimeStatus<T>(
   getStatusFn: () => Promise<T>,
-  options: UseLoadingOptions & { interval?: number } = {}
+  options: IUseLoadingOptions & { interval?: number } = {},
 ) {
   const { interval = 5000, ...loadingOptions } = options;
   const { loadingState, setError, addTask } = useLoading(loadingOptions);
@@ -298,7 +297,7 @@ export function useRealtimeStatus<T>(
         const result = await addTask('Status check', getStatusFn);
         setStatus(result);
       } catch (error) {
-        setError(error);
+        setError(error as Error | string);
       }
     };
 
@@ -316,7 +315,7 @@ export function useRealtimeStatus<T>(
 
 // Smart loading utilities
 export const loadingUtils = {
-  getEstimatedTime: (tasks: LoadingTask[]): number => {
+  getEstimatedTime: (tasks: ILoadingTask[]): number => {
     const completedTasks = tasks.filter(t => t.status === 'completed');
     if (completedTasks.length === 0) return 0;
 
@@ -327,7 +326,7 @@ export const loadingUtils = {
     return totalTime / completedTasks.length;
   },
 
-  getSmartMessage: (state: LoadingState, tasks: LoadingTask[]): string => {
+  getSmartMessage: (state: ILoadingState, tasks: ILoadingTask[]): string => {
     if (state.error) return `Error: ${state.error}`;
     if (state.message) return state.message;
 
@@ -335,20 +334,20 @@ export const loadingUtils = {
     if (activeTasks.length === 0) return 'Loading...';
 
     if (activeTasks.length === 1) {
-      return activeTasks[0].name || 'Loading...';
+      return activeTasks[0]?.name || 'Loading...';
     }
 
     return `${activeTasks.length} tasks in progress...`;
   },
 
-  calculateProgress: (tasks: LoadingTask[]): number => {
+  calculateProgress: (tasks: ILoadingTask[]): number => {
     if (tasks.length === 0) return 0;
 
     const completedTasks = tasks.filter(t => t.status === 'completed').length;
     return Math.round((completedTasks / tasks.length) * 100);
   },
 
-  shouldShowSkeleton: (state: LoadingState, delay: number = 300): boolean => {
+  shouldShowSkeleton: (state: ILoadingState, delay: number = 300): boolean => {
     return state.isLoading && Date.now() - (state.progress || 0) > delay;
   },
 };

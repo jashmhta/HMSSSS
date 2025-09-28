@@ -1,10 +1,13 @@
-import React from 'react';
-import { render, RenderOptions } from '@testing-library/react';
+import type React from 'react';
+
+import { render } from '@testing-library/react';
+
+import type { RenderOptions } from '@testing-library/react';
 
 // Custom render function that works with the existing Jest setup
 const customRender = (
   ui: React.ReactElement,
-  options?: Omit<RenderOptions, 'wrapper'>
+  options?: Omit<RenderOptions, 'wrapper'>,
 ) => {
   // Use the standard React Testing Library render
   const result = render(ui, {
@@ -25,7 +28,7 @@ const customRender = (
         document.body.removeChild(result.container);
       }
       result.unmount();
-    }
+    },
   };
 };
 
