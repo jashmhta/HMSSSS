@@ -90,7 +90,6 @@ xcuserdata/
 *.moved-aside
 
 # Android/IntelliJ
-*.iml
 *.hprof
 
 # Temporary folders
@@ -187,13 +186,10 @@ istio-*/tools/_istioctl
 .helm/
 
 # Additional IDE files
-.idea/
 *.sublime-project
 *.sublime-workspace
 
 # OS specific
-.DS_Store
-Thumbs.db
 
 # Claude-specific files
 .claude/
