@@ -75,6 +75,7 @@ export class AuthController {
       lastName: string;
       phone?: string;
       role?: UserRole;
+      tenantId: string;
     },
   ) {
     try {

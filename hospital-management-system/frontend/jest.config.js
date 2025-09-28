@@ -37,29 +37,35 @@ const customJestConfig = {
   ],
   coverageThreshold: {
     global: {
-      branches: 85,
-      functions: 90,
-      lines: 90,
-      statements: 90,
+      branches: 95,
+      functions: 95,
+      lines: 95,
+      statements: 95,
     },
     // Critical components have higher thresholds
     './src/components/auth/': {
+      branches: 98,
+      functions: 98,
+      lines: 98,
+      statements: 98
+    },
+    './src/components/common/': {
       branches: 95,
       functions: 95,
       lines: 95,
       statements: 95
     },
-    './src/components/common/': {
+    './src/hooks/': {
+      branches: 95,
+      functions: 98,
+      lines: 98,
+      statements: 98
+    },
+    './src/pages/': {
       branches: 90,
       functions: 90,
       lines: 90,
       statements: 90
-    },
-    './src/hooks/': {
-      branches: 90,
-      functions: 95,
-      lines: 95,
-      statements: 95
     }
   },
   testMatch: [
@@ -122,9 +128,10 @@ const customJestConfig = {
     '<rootDir>/jest.polyfills.js'
   ],
   // Setup files to run after the test environment is established
-  setupFilesAfterEnv: [
-    '<rootDir>/jest.react18.setup.js'
-  ],
+   setupFilesAfterEnv: [
+    '<rootDir>/jest.react18.setup.js',
+    '<rootDir>/jest.accessibility.setup.js'
+   ],
   // Mock files
   moduleDirectories: ['node_modules', '<rootDir>/src'],
   // Clear mocks before each test

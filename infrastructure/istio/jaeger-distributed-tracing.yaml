@@ -1,0 +1,148 @@
+---
+# Jaeger Distributed Tracing for HMS
+apiVersion: jaegertracing.io/v1
+kind: Jaeger
+metadata:
+  name: hms-jaeger
+  namespace: ultimate-hms
+spec:
+  strategy: production
+  collector:
+    options:
+      collector.otlp.enabled: true
+      collector.zipkin.host-port: :9411
+      collector.grpc.host-port: :14250
+      collector.http.host-port: :14268
+  storage:
+    type: elasticsearch
+    options:
+      es:
+        server-urls: http://elasticsearch:9200
+        index-prefix: jaeger
+        tls:
+          enabled: false
+        authentication:
+          enabled: false
+  ui:
+    options:
+      dependencies:
+        menuEnabled: false
+      query:
+        base-path: /jaeger
+  ingress:
+    enabled: true
+    hosts:
+    - tracing.hms.local
+    tls:
+    - secretName: jaeger-tls
+      hosts:
+      - tracing.hms.local
+
+---
+# Telemetry Configuration with Custom Tags
+apiVersion: telemetry.istio.io/v1alpha1
+kind: Telemetry
+metadata:
+  name: hms-distributed-tracing
+  namespace: ultimate-hms
+spec:
+  selector:
+    matchLabels:
+      app: hospital-management-system
+  tracing:
+  - providers:
+    - name: jaeger
+    randomSamplingPercentage: 100.0
+    customTags:
+    - tag: tenant-id
+      literal:
+        value: "%REQ(X-TENANT-ID)%"
+    - tag: user-id
+      header:
+        name: x-jwt-payload
+        defaultValue: "anonymous"
+    - tag: service-version
+      literal:
+        value: "%META_WORKLOAD_NAME%"
+    - tag: request-id
+      header:
+        name: x-request-id
+        defaultValue: "%UUID%"
+    - tag: user-agent
+      header:
+        name: user-agent
+    - tag: client-ip
+      header:
+        name: x-forwarded-for
+        defaultValue: "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"
+  accessLogging:
+  - providers:
+    - name: envoy
+    filter:
+      expression: "response.code >= 400"
+
+---
+# Service Annotations for Tracing
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hms-backend
+  namespace: ultimate-hms
+  annotations:
+    sidecar.jaegertracing.io/inject: "true"
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9464"
+spec:
+  template:
+    metadata:
+      annotations:
+        kubectl.kubernetes.io/default-container: hms-backend
+        kubectl.kubernetes.io/default-logs-container: hms-backend
+        sidecar.istio.io/status: '{"version":"12345","initContainers":["istio-init"],"containers":["istio-proxy"],"volumes":["istiod-data","istio-podinfo","istio-token","istiod-ca-cert"]}'
+    spec:
+      containers:
+      - name: hms-backend
+        env:
+        - name: JAEGER_SERVICE_NAME
+          value: "hms-backend"
+        - name: JAEGER_AGENT_HOST
+          value: "jaeger-agent"
+        - name: JAEGER_AGENT_PORT
+          value: "6831"
+        - name: JAEGER_SAMPLER_TYPE
+          value: "const"
+        - name: JAEGER_SAMPLER_PARAM
+          value: "1"
+
+---
+# Jaeger Agent as Sidecar
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jaeger-agent
+  namespace: ultimate-hms
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: jaeger-agent
+  template:
+    metadata:
+      labels:
+        app: jaeger-agent
+    spec:
+      containers:
+      - name: jaeger-agent
+        image: jaegertracing/jaeger-agent:latest
+        ports:
+        - containerPort: 6831
+          protocol: UDP
+        - containerPort: 6832
+          protocol: UDP
+        - containerPort: 14271
+          protocol: TCP
+        command:
+        - /go/bin/agent-linux
+        - --reporter.grpc.host-port=jaeger-collector:14250
+        - --reporter.grpc.retry.max=1000
+        - --http-server.host-port=:14271

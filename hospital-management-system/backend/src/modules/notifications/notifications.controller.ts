@@ -49,6 +49,7 @@ export class NotificationsController {
   ) {
     return this.notificationsService.create({
       userId: req.user.sub,
+      tenantId: req.user.tenantId,
       title: createNotificationDto.title,
       message: createNotificationDto.message,
       type: createNotificationDto.type,

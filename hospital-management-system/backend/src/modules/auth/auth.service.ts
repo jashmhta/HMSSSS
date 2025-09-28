@@ -229,6 +229,7 @@ export class AuthService {
     firstName: string;
     lastName: string;
     role: string;
+    tenantId: string;
   }) {
     const hashedPassword = await bcrypt.hash(userData.password, 10);
 
@@ -239,6 +240,7 @@ export class AuthService {
         firstName: userData.firstName,
         lastName: userData.lastName,
         role: userData.role as any,
+        tenantId: userData.tenantId,
       },
     });
 

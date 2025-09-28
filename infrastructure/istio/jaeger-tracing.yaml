@@ -1,0 +1,122 @@
+---
+# Jaeger Distributed Tracing for Ultimate HMS
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: tracing-system
+  labels:
+    app: hospital-management-system
+    component: tracing
+
+---
+# Jaeger Operator
+apiVersion: jaegertracing.io/v1
+kind: Jaeger
+metadata:
+  name: hms-jaeger
+  namespace: tracing-system
+  labels:
+    app: hospital-management-system
+    component: tracing
+spec:
+  strategy: allInOne
+  allInOne:
+    image: jaegertracing/all-in-one:latest
+    options:
+      log-level: info
+      query:
+        base-path: /jaeger
+      memory:
+        max-traces: 50000
+  storage:
+    type: memory
+    options:
+      memory:
+        max-traces: 100000
+  ingress:
+    enabled: true
+    hosts:
+    - tracing.hms.local
+    annotations:
+      nginx.ingress.kubernetes.io/ssl-redirect: "true"
+      cert-manager.io/cluster-issuer: "letsencrypt-prod"
+  ui:
+    options:
+      dependencies:
+        menuEnabled: false
+      archiveEnabled: true
+      tracking:
+        gaID: UA-000000-2
+
+---
+# Jaeger Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: jaeger-collector
+  namespace: tracing-system
+  labels:
+    app: hospital-management-system
+    component: tracing
+spec:
+  selector:
+    app: jaeger
+  ports:
+  - name: http
+    port: 14268
+    targetPort: 14268
+    protocol: TCP
+  - name: grpc
+    port: 14250
+    targetPort: 14250
+    protocol: TCP
+  type: ClusterIP
+
+---
+# Istio Telemetry for Jaeger
+apiVersion: telemetry.istio.io/v1alpha1
+kind: Telemetry
+metadata:
+  name: hms-jaeger-telemetry
+  namespace: ultimate-hms
+  labels:
+    app: hospital-management-system
+spec:
+  selector:
+    matchLabels:
+      app: hospital-management-system
+  tracing:
+  - providers:
+    - name: jaeger
+    randomSamplingPercentage: 100.0
+    customTags:
+    - tag: tenant-id
+      literal:
+        value: "%REQ(X-TENANT-ID)%"
+    - tag: user-id
+      literal:
+        value: "%DYNAMIC_METADATA(envoy.filters.http.jwt_authn:payload.sub)%"
+    - tag: service-version
+      literal:
+        value: "%META(service-version)%"
+  accessLogging:
+  - providers:
+    - name: envoy
+    filter:
+      expression: "response.code >= 400"
+  metrics:
+  - providers:
+    - name: prometheus
+    overrides:
+    - match:
+        metric: REQUEST_COUNT
+        mode: CLIENT_AND_SERVER
+      tagOverrides:
+        request_operation:
+          value: "istio_operationId"
+    - match:
+        metric: REQUEST_DURATION
+        mode: CLIENT_AND_SERVER
+      tagOverrides:
+        response_code:
+          value: "istio_responseCode"

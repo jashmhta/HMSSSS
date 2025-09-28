@@ -1,0 +1,91 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: elk-config
+  namespace: hms
+data:
+  logstash.conf: |
+    input {
+      beats {
+        port => 5044
+      }
+    }
+
+    filter {
+      if [kubernetes][labels][app] == "hms-backend" {
+        grok {
+          match => { "message" => "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} \[%{DATA:class}\] %{DATA:thread} - %{GREEDYDATA:message}" }
+        }
+
+        # Security event detection
+        if [message] =~ /FAILED LOGIN|UNAUTHORIZED|SECURITY|BREACH/ {
+          mutate {
+            add_tag => ["security_event"]
+            add_field => { "event_type" => "security" }
+          }
+        }
+
+        # PHI access logging
+        if [message] =~ /patient.*record|medical.*data|PHI/ {
+          mutate {
+            add_tag => ["phi_access"]
+            add_field => { "compliance" => "HIPAA" }
+          }
+        }
+
+        # Audit log enrichment
+        if [class] == "AuditService" {
+          json {
+            source => "message"
+            target => "audit_data"
+          }
+        }
+      }
+    }
+
+    output {
+      elasticsearch {
+        hosts => ["elasticsearch:9200"]
+        index => "hms-logs-%{+YYYY.MM.dd}"
+      }
+
+      # Security events to separate index
+      if "security_event" in [tags] {
+        elasticsearch {
+          hosts => ["elasticsearch:9200"]
+          index => "hms-security-%{+YYYY.MM.dd}"
+        }
+      }
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: logstash
+  namespace: hms
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: logstash
+  template:
+    metadata:
+      labels:
+        app: logstash
+    spec:
+      containers:
+      - name: logstash
+        image: docker.elastic.co/logstash/logstash:8.11.0
+        ports:
+        - containerPort: 5044
+        volumeMounts:
+        - name: config
+          mountPath: /usr/share/logstash/pipeline/
+        - name: data
+          mountPath: /usr/share/logstash/data
+      volumes:
+      - name: config
+        configMap:
+          name: elk-config
+      - name: data
+        emptyDir: {}

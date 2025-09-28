@@ -80,7 +80,7 @@ export class TestDatabaseManager {
 
     try {
       // Run Prisma migrations
-      execSync('npx prisma migrate deploy', {
+      execSync('npx prisma migrate deploy --schema=./prisma/schema.prisma', {
         stdio: 'inherit',
         env: { ...process.env, DATABASE_URL: process.env.DATABASE_URL },
       });

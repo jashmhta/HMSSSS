@@ -36,6 +36,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
           id: true,
           email: true,
           role: true,
+          tenantId: true,
           isActive: true,
           lastLogin: true,
           failedLoginAttempts: true,
@@ -62,6 +63,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         sub: user.id,
         email: user.email,
         role: user.role,
+        tenantId: user.tenantId,
       };
     } catch (error) {
       throw new Error('Invalid token');

@@ -1,369 +1,553 @@
-/*[object Object]*/
-import * as fs from 'fs';
-import * as path from 'path';
-
-import { Injectable, Logger } from '@nestjs/common';
-
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  InvoiceStatus,
+  ExpenseCategory,
+  AssetCategory,
+  AssetStatus,
+  ReferralStatus,
+} from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
+import { ComplianceService } from '../compliance/compliance.service';
+import {
+  CreateInvoiceDto,
+  UpdateInvoiceDto,
+  CreateExpenseDto,
+  CreateAssetDto,
+  UpdateAssetDto,
+  CreateReferralIncomeDto,
+  AccountingReportDto,
+  FinancialSummaryDto,
+} from './dto/accounting.dto';
 
-/**
- *
- */
 @Injectable()
 export class AccountingService {
-  private readonly logger = new Logger(AccountingService.name);
+  constructor(
+    private prisma: PrismaService,
+    private complianceService: ComplianceService,
+  ) {}
 
   /**
-   *
+   * Create a new invoice
    */
-  constructor(private prisma: PrismaService) {}
+  async createInvoice(data: CreateInvoiceDto) {
+    // Validate patient exists
+    const patient = await this.prisma.patient.findUnique({
+      where: { id: data.patientId },
+    });
 
-  /**
-   *
-   */
-  async exportToTally(startDate: Date, endDate: Date, hospitalId: string) {
-    // Get all financial transactions for the period
-    const transactions = await this.getTransactionsForPeriod(startDate, endDate, hospitalId);
-
-    // Generate Tally XML format
-    const tallyXML = this.generateTallyXML(transactions, hospitalId);
-
-    // Save to file
-    const filename = `tally_export_${hospitalId}_${startDate.toISOString().split('T')[0]}_${endDate.toISOString().split('T')[0]}.xml`;
-    const filepath = path.join(process.cwd(), 'exports', filename);
-
-    // Ensure exports directory exists
-    if (!fs.existsSync(path.dirname(filepath))) {
-      fs.mkdirSync(path.dirname(filepath), { recursive: true });
+    if (!patient) {
+      throw new NotFoundException('Patient not found');
     }
 
-    fs.writeFileSync(filepath, tallyXML);
+    const dueDate = data.dueDate
+      ? new Date(data.dueDate)
+      : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days from now
 
-    return {
-      filename,
-      filepath,
-      transactionCount: transactions.length,
-      totalAmount: transactions.reduce((sum, t) => sum + t.amount, 0),
-    };
-  }
-
-  /**
-   *
-   */
-  async exportToExcel(startDate: Date, endDate: Date, hospitalId: string) {
-    // Get financial data
-    const data = await this.getFinancialReport(startDate, endDate, hospitalId);
-
-    // Generate Excel format (simplified - in real implementation use exceljs or similar)
-    const excelData = this.generateExcelData(data);
-
-    const filename = `financial_report_${hospitalId}_${startDate.toISOString().split('T')[0]}_${endDate.toISOString().split('T')[0]}.xlsx`;
-    const filepath = path.join(process.cwd(), 'exports', filename);
-
-    // In a real implementation, you'd use a library like exceljs to create the actual Excel file
-    // For now, we'll just return the data structure
-
-    return {
-      filename,
-      data: excelData,
-      filepath,
-    };
-  }
-
-  /**
-   *
-   */
-  async getReferralIncome(startDate: Date, endDate: Date) {
-    return this.prisma.referralIncome.findMany({
-      where: {
-        createdAt: {
-          gte: startDate,
-          lte: endDate,
-        },
+    const invoice = await this.prisma.invoice.create({
+      data: {
+        invoiceNumber: await this.generateInvoiceNumber(),
+        patientId: data.patientId,
+        amount: data.amount,
+        status: InvoiceStatus.PENDING,
+        issuedAt: new Date(),
+        dueDate,
       },
-    });
-  }
-
-  /**
-   *
-   */
-  async getOutsourcedServicesAccounting(startDate: Date, endDate: Date) {
-    return this.prisma.outsourcedService.findMany({
-      where: {
-        createdAt: {
-          gte: startDate,
-          lte: endDate,
-        },
-      },
-    });
-  }
-
-  /**
-   *
-   */
-  async getDepartmentWiseRevenue(startDate: Date, endDate: Date) {
-    const invoices = await this.prisma.invoice.findMany({
-      where: {
-        status: 'PAID',
-        createdAt: {
-          gte: startDate,
-          lte: endDate,
+      include: {
+        patient: {
+          include: {
+            user: {
+              select: { firstName: true, lastName: true },
+            },
+          },
         },
       },
     });
 
-    // For now, return total revenue without department breakdown
-    const totalRevenue = invoices.reduce((sum, invoice) => sum + Number(invoice.amount), 0);
-
-    return [
-      {
-        department: 'ALL',
-        revenue: totalRevenue,
+    // Log compliance event
+    await this.complianceService.logAuditEvent({
+      userId: data.createdBy,
+      action: 'INVOICE_CREATED',
+      resource: 'invoices',
+      resourceId: invoice.id,
+      details: {
+        invoiceNumber: invoice.invoiceNumber,
+        patientId: data.patientId,
+        amount: data.amount,
+        dueDate: dueDate.toISOString(),
       },
-    ];
+      complianceFlags: ['FINANCIAL', 'PATIENT_DATA'],
+    });
+
+    return invoice;
   }
 
   /**
-   *
+   * Update invoice
    */
-  async calculateBreakEvenAnalysis(hospitalId: string) {
-    // Get fixed costs
-    const fixedCosts = await this.prisma.fixedCost.findMany({
-      where: { hospitalId },
+  async updateInvoice(id: string, data: UpdateInvoiceDto) {
+    const invoice = await this.prisma.invoice.findUnique({
+      where: { id },
     });
 
-    // Get variable costs and revenue data
-    const lastYear = new Date();
-    lastYear.setFullYear(lastYear.getFullYear() - 1);
+    if (!invoice) {
+      throw new NotFoundException('Invoice not found');
+    }
 
-    const revenueData = await this.prisma.invoice.findMany({
-      where: {
-        status: 'PAID',
-        createdAt: { gte: lastYear },
+    const updatedInvoice = await this.prisma.invoice.update({
+      where: { id },
+      data: {
+        status: data.status,
+        amount: data.amount,
+        dueDate: data.dueDate ? new Date(data.dueDate) : undefined,
       },
-      select: { amount: true, createdAt: true },
+      include: {
+        patient: {
+          include: {
+            user: {
+              select: { firstName: true, lastName: true },
+            },
+          },
+        },
+      },
     });
 
-    const totalFixedCosts = fixedCosts.reduce((sum, cost) => sum + Number(cost.amount), 0);
-    const totalRevenue = revenueData.reduce((sum, invoice) => sum + Number(invoice.amount), 0);
+    // Log compliance event
+    await this.complianceService.logAuditEvent({
+      userId: data.updatedBy,
+      action: 'INVOICE_UPDATED',
+      resource: 'invoices',
+      resourceId: id,
+      details: {
+        oldStatus: invoice.status,
+        newStatus: data.status,
+        oldAmount: invoice.amount,
+        newAmount: data.amount,
+      },
+      complianceFlags: ['FINANCIAL'],
+    });
 
-    // Calculate break-even point
-    const averageRevenuePerMonth = totalRevenue / 12;
-    const breakEvenMonths = totalFixedCosts / averageRevenuePerMonth;
+    return updatedInvoice;
+  }
+
+  /**
+   * Get invoices with filtering
+   */
+  async getInvoices(
+    status?: InvoiceStatus,
+    patientId?: string,
+    page: number = 1,
+    limit: number = 10,
+  ) {
+    const skip = (page - 1) * limit;
+    const where: any = {};
+
+    if (status) where.status = status;
+    if (patientId) where.patientId = patientId;
+
+    const [invoices, total] = await Promise.all([
+      this.prisma.invoice.findMany({
+        where,
+        include: {
+          patient: {
+            include: {
+              user: {
+                select: { firstName: true, lastName: true },
+              },
+            },
+          },
+        },
+        skip,
+        take: limit,
+        orderBy: { issuedAt: 'desc' },
+      }),
+      this.prisma.invoice.count({ where }),
+    ]);
 
     return {
-      totalFixedCosts,
-      averageMonthlyRevenue: averageRevenuePerMonth,
-      breakEvenPointMonths: breakEvenMonths,
-      breakEvenAchieved: breakEvenMonths <= 12,
+      data: invoices,
+      meta: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
     };
   }
 
   /**
-   *
+   * Get invoice by ID
    */
-  async getAssetTracking(hospitalId: string) {
-    return this.prisma.asset.findMany({
-      where: { hospitalId },
+  async getInvoiceById(id: string) {
+    const invoice = await this.prisma.invoice.findUnique({
+      where: { id },
+      include: {
+        patient: {
+          include: {
+            user: {
+              select: { firstName: true, lastName: true, phone: true },
+            },
+          },
+        },
+      },
     });
+
+    if (!invoice) {
+      throw new NotFoundException('Invoice not found');
+    }
+
+    return invoice;
   }
 
   /**
-   *
+   * Create expense
    */
-  async calculateAssetDepreciation(assetId: string) {
+  async createExpense(data: CreateExpenseDto) {
+    const expense = await this.prisma.expense.create({
+      data: {
+        description: data.description,
+        amount: data.amount,
+        category: data.category,
+        expenseDate: data.expenseDate ? new Date(data.expenseDate) : new Date(),
+        hospitalId: data.hospitalId,
+      },
+    });
+
+    // Log compliance event
+    await this.complianceService.logAuditEvent({
+      userId: data.createdBy,
+      action: 'EXPENSE_CREATED',
+      resource: 'expenses',
+      resourceId: expense.id,
+      details: {
+        description: data.description,
+        amount: data.amount,
+        category: data.category,
+      },
+      complianceFlags: ['FINANCIAL'],
+    });
+
+    return expense;
+  }
+
+  /**
+   * Get expenses
+   */
+  async getExpenses(
+    category?: ExpenseCategory,
+    startDate?: Date,
+    endDate?: Date,
+    page: number = 1,
+    limit: number = 10,
+  ) {
+    const skip = (page - 1) * limit;
+    const where: any = {};
+
+    if (category) where.category = category;
+    if (startDate || endDate) {
+      where.expenseDate = {};
+      if (startDate) where.expenseDate.gte = startDate;
+      if (endDate) where.expenseDate.lte = endDate;
+    }
+
+    const [expenses, total] = await Promise.all([
+      this.prisma.expense.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { expenseDate: 'desc' },
+      }),
+      this.prisma.expense.count({ where }),
+    ]);
+
+    return {
+      data: expenses,
+      meta: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  /**
+   * Create asset
+   */
+  async createAsset(data: CreateAssetDto) {
+    const asset = await this.prisma.asset.create({
+      data: {
+        name: data.name,
+        description: data.description,
+        category: data.category,
+        value: data.value,
+        purchaseDate: new Date(data.purchaseDate),
+        depreciationRate: data.depreciationRate,
+        currentValue: data.value, // Initial current value equals purchase value
+        hospitalId: data.hospitalId,
+      },
+    });
+
+    // Log compliance event
+    await this.complianceService.logAuditEvent({
+      userId: data.createdBy,
+      action: 'ASSET_CREATED',
+      resource: 'assets',
+      resourceId: asset.id,
+      details: {
+        name: data.name,
+        category: data.category,
+        value: data.value,
+      },
+      complianceFlags: ['FINANCIAL', 'ASSET_MANAGEMENT'],
+    });
+
+    return asset;
+  }
+
+  /**
+   * Update asset
+   */
+  async updateAsset(id: string, data: UpdateAssetDto) {
     const asset = await this.prisma.asset.findUnique({
-      where: { id: assetId },
+      where: { id },
     });
 
-    if (!asset) throw new Error('Asset not found');
+    if (!asset) {
+      throw new NotFoundException('Asset not found');
+    }
 
-    const currentDate = new Date();
-    const purchaseDate = asset.purchaseDate;
-    const usefulLife = 10; // Default useful life in years
+    const updatedAsset = await this.prisma.asset.update({
+      where: { id },
+      data: {
+        name: data.name,
+        description: data.description,
+        category: data.category,
+        value: data.value,
+        depreciationRate: data.depreciationRate,
+        status: data.status,
+        currentValue: data.value || asset.currentValue,
+      },
+    });
 
-    // Calculate straight-line depreciation
-    const totalDepreciation = Number(asset.value) - 0; // Use asset value as purchase cost
-    const annualDepreciation = totalDepreciation / usefulLife;
+    // Log compliance event
+    await this.complianceService.logAuditEvent({
+      userId: data.updatedBy,
+      action: 'ASSET_UPDATED',
+      resource: 'assets',
+      resourceId: id,
+      details: {
+        name: data.name || asset.name,
+        oldValue: asset.value,
+        newValue: data.value,
+      },
+      complianceFlags: ['FINANCIAL', 'ASSET_MANAGEMENT'],
+    });
 
-    const yearsElapsed =
-      (currentDate.getTime() - purchaseDate.getTime()) / (1000 * 60 * 60 * 24 * 365);
-    const accumulatedDepreciation = Math.min(annualDepreciation * yearsElapsed, totalDepreciation);
-    const currentValue = Number(asset.value) - accumulatedDepreciation;
+    return updatedAsset;
+  }
+
+  /**
+   * Get assets
+   */
+  async getAssets(
+    category?: AssetCategory,
+    status?: AssetStatus,
+    page: number = 1,
+    limit: number = 10,
+  ) {
+    const skip = (page - 1) * limit;
+    const where: any = {};
+
+    if (category) where.category = category;
+    if (status) where.status = status;
+
+    const [assets, total] = await Promise.all([
+      this.prisma.asset.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { purchaseDate: 'desc' },
+      }),
+      this.prisma.asset.count({ where }),
+    ]);
 
     return {
-      assetId,
-      originalCost: Number(asset.value),
-      accumulatedDepreciation,
-      currentValue,
-      annualDepreciation,
-      depreciationMethod: 'Straight Line',
+      data: assets,
+      meta: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
     };
   }
 
   /**
-   *
+   * Create referral income
    */
-  async getProfitLossReport(startDate: Date, endDate: Date, hospitalId: string) {
-    const [revenue, expenses, fixedCosts, variableCosts] = await Promise.all([
+  async createReferralIncome(data: CreateReferralIncomeDto) {
+    const referralIncome = await this.prisma.referralIncome.create({
+      data: {
+        source: data.source,
+        amount: data.amount,
+        referralDate: data.referralDate ? new Date(data.referralDate) : new Date(),
+        status: ReferralStatus.PENDING,
+        hospitalId: data.hospitalId,
+      },
+    });
+
+    // Log compliance event
+    await this.complianceService.logAuditEvent({
+      userId: data.createdBy,
+      action: 'REFERRAL_INCOME_CREATED',
+      resource: 'referral_incomes',
+      resourceId: referralIncome.id,
+      details: {
+        source: data.source,
+        amount: data.amount,
+      },
+      complianceFlags: ['FINANCIAL'],
+    });
+
+    return referralIncome;
+  }
+
+  /**
+   * Get financial summary report
+   */
+  async getFinancialSummary(reportData: AccountingReportDto): Promise<FinancialSummaryDto> {
+    const startDate = new Date(reportData.startDate);
+    const endDate = new Date(reportData.endDate);
+
+    // Get total revenue (invoices + referral income)
+    const [invoiceRevenue, referralRevenue] = await Promise.all([
       this.prisma.invoice.aggregate({
         where: {
-          status: 'PAID',
-          createdAt: { gte: startDate, lte: endDate },
+          issuedAt: { gte: startDate, lte: endDate },
+          status: InvoiceStatus.PAID,
         },
         _sum: { amount: true },
       }),
-      this.prisma.expense.findMany({
+      this.prisma.referralIncome.aggregate({
         where: {
-          expenseDate: { gte: startDate, lte: endDate },
+          referralDate: { gte: startDate, lte: endDate },
+          status: ReferralStatus.COMPLETED,
         },
+        _sum: { amount: true },
       }),
-      this.prisma.fixedCost.findMany({ where: { isActive: true } }),
-      this.prisma.variableCost.findMany(),
     ]);
 
-    const totalRevenue = revenue._sum.amount ? Number(revenue._sum.amount) : 0;
-    const totalExpenses = expenses.reduce((sum, exp) => sum + Number(exp.amount), 0);
-    const totalFixedCosts = fixedCosts.reduce((sum, cost) => sum + Number(cost.amount), 0);
-    const totalVariableCosts = variableCosts.reduce((sum, cost) => sum + Number(cost.unitCost), 0);
+    const totalRevenue =
+      Number(invoiceRevenue._sum.amount?.toNumber() || 0) +
+      Number(referralRevenue._sum.amount?.toNumber() || 0);
 
-    const grossProfit = totalRevenue - totalVariableCosts;
-    const netProfit = grossProfit - totalFixedCosts;
+    // Get total expenses
+    const expenses = await this.prisma.expense.aggregate({
+      where: {
+        expenseDate: { gte: startDate, lte: endDate },
+      },
+      _sum: { amount: true },
+    });
+
+    const totalExpenses = Number(expenses._sum.amount?.toNumber() || 0);
+    const netIncome = totalRevenue - totalExpenses;
+
+    // Get asset total value
+    const assets = await this.prisma.asset.aggregate({
+      where: {
+        status: AssetStatus.ACTIVE,
+      },
+      _sum: { currentValue: true },
+    });
+
+    const totalAssets = Number(assets._sum.currentValue?.toNumber() || 0);
+
+    // Get invoice statistics
+    const [totalInvoices, paidInvoices, overdueInvoices] = await Promise.all([
+      this.prisma.invoice.count({
+        where: { issuedAt: { gte: startDate, lte: endDate } },
+      }),
+      this.prisma.invoice.count({
+        where: {
+          issuedAt: { gte: startDate, lte: endDate },
+          status: InvoiceStatus.PAID,
+        },
+      }),
+      this.prisma.invoice.count({
+        where: {
+          dueDate: { lt: new Date() },
+          status: { in: [InvoiceStatus.PENDING, InvoiceStatus.OVERDUE] },
+        },
+      }),
+    ]);
+
+    const pendingInvoices = totalInvoices - paidInvoices;
 
     return {
+      totalRevenue,
+      totalExpenses,
+      netIncome,
+      totalAssets,
+      totalInvoices,
+      paidInvoices,
+      pendingInvoices,
+      overdueInvoices,
       period: { startDate, endDate },
-      revenue: totalRevenue,
-      expenses: {
-        fixed: totalFixedCosts,
-        variable: totalVariableCosts,
-        total: totalExpenses,
-      },
-      grossProfit,
-      netProfit,
-      profitMargin: totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0,
     };
   }
 
   /**
-   *
+   * Get expense breakdown by category
    */
-  private async getTransactionsForPeriod(startDate: Date, endDate: Date, hospitalId: string) {
-    const transactions = await this.prisma.invoice.findMany({
+  async getExpenseBreakdown(startDate: Date, endDate: Date) {
+    const expenses = await this.prisma.expense.groupBy({
+      by: ['category'],
       where: {
-        status: 'PAID',
-        createdAt: {
-          gte: startDate,
-          lte: endDate,
-        },
+        expenseDate: { gte: startDate, lte: endDate },
       },
+      _sum: { amount: true },
+      _count: true,
     });
 
-    return transactions.map(invoice => ({
-      date: invoice.createdAt,
-      voucherType: 'Sales',
-      voucherNumber: invoice.invoiceNumber,
-      amount: Number(invoice.amount),
-      partyName: 'Patient', // Simplified since we don't have patient relation loaded
-      narration: `Payment for services`,
+    return expenses.map(expense => ({
+      category: expense.category,
+      totalAmount: expense._sum.amount || 0,
+      transactionCount: expense._count,
     }));
   }
 
   /**
-   *
+   * Get revenue trends
    */
-  private generateTallyXML(transactions: any[], hospitalId: string): string {
-    const voucherXML = transactions
-      .map(
-        transaction => `
-      <VOUCHER>
-        <DATE>${transaction.date.toISOString().split('T')[0]}</DATE>
-        <VOUCHERTYPE>${transaction.voucherType}</VOUCHERTYPE>
-        <VOUCHERNUMBER>${transaction.voucherNumber}</VOUCHERNUMBER>
-        <PARTYNAME>${transaction.partyName}</PARTYNAME>
-        <AMOUNT>${transaction.amount}</AMOUNT>
-        <NARRATION>${transaction.narration}</NARRATION>
-      </VOUCHER>
-    `,
-      )
-      .join('');
+  async getRevenueTrends(startDate: Date, endDate: Date) {
+    // Monthly revenue data
+    const monthlyRevenue = await this.prisma.$queryRaw`
+      SELECT
+        DATE_TRUNC('month', "issuedAt") as month,
+        SUM(amount) as revenue
+      FROM invoices
+      WHERE "issuedAt" >= ${startDate} AND "issuedAt" <= ${endDate} AND status = 'PAID'
+      GROUP BY DATE_TRUNC('month', "issuedAt")
+      ORDER BY month
+    `;
 
-    return `<?xml version="1.0" encoding="UTF-8"?>
-<TALLYMESSAGE xmlns:UDF="TallyUDF">
-  <VOUCHER>
-    <VOUCHERTYPE>Sales</VOUCHERTYPE>
-    <VOUCHERNUMBER>001</VOUCHERNUMBER>
-    <DATE>${new Date().toISOString().split('T')[0]}</DATE>
-    <NARRATION>Hospital Management System Export</NARRATION>
-    ${voucherXML}
-  </VOUCHER>
-</TALLYMESSAGE>`;
+    return monthlyRevenue;
   }
 
   /**
-   *
+   * Generate unique invoice number
    */
-  private async getFinancialReport(startDate: Date, endDate: Date, hospitalId: string) {
-    const [invoices, expenses, assets] = await Promise.all([
-      this.prisma.invoice.findMany({
-        where: {
-          createdAt: { gte: startDate, lte: endDate },
+  private async generateInvoiceNumber(): Promise<string> {
+    const year = new Date().getFullYear();
+    const count = await this.prisma.invoice.count({
+      where: {
+        issuedAt: {
+          gte: new Date(year, 0, 1),
+          lt: new Date(year + 1, 0, 1),
         },
-        include: { patient: true },
-      }),
-      this.prisma.expense.findMany({
-        where: {
-          expenseDate: { gte: startDate, lte: endDate },
-        },
-      }),
-      this.prisma.asset.findMany({ where: { hospitalId } }),
-    ]);
+      },
+    });
 
-    return {
-      invoices,
-      expenses,
-      assets,
-      period: { startDate, endDate },
-    };
-  }
-
-  /**
-   *
-   */
-  private generateExcelData(data: any) {
-    // Simplified Excel data structure
-    return {
-      sheets: [
-        {
-          name: 'Invoices',
-          data: data.invoices.map(inv => [
-            inv.id,
-            inv.patient.name,
-            inv.totalAmount,
-            inv.status,
-            inv.createdAt,
-          ]),
-        },
-        {
-          name: 'Expenses',
-          data: data.expenses.map(exp => [
-            exp.id,
-            exp.description,
-            exp.amount,
-            exp.category,
-            exp.date,
-          ]),
-        },
-        {
-          name: 'Assets',
-          data: data.assets.map(asset => [
-            asset.id,
-            asset.name,
-            asset.purchaseCost,
-            asset.currentValue,
-            asset.purchaseDate,
-          ]),
-        },
-      ],
-    };
+    return `INV${year}${(count + 1).toString().padStart(6, '0')}`;
   }
 }

@@ -1,0 +1,239 @@
+# Default values for hms-phase3
+global:
+  imageRegistry: ""
+  imagePullSecrets: []
+  storageClass: ""
+
+# Analytics Service
+analytics:
+  enabled: true
+  replicaCount: 2
+  image:
+    repository: node
+    tag: "18-alpine"
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 80
+    targetPort: 3001
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+    requests:
+      cpu: 500m
+      memory: 1Gi
+  config:
+    elasticsearchUrl: "http://elasticsearch-hms.monitoring.svc.cluster.local:9200"
+    databaseHost: "postgresql-hms.ultimate-hms.svc.cluster.local"
+    databasePort: "5432"
+    databaseName: "hms_db"
+    redisUrl: "redis://redis.graphql-system.svc.cluster.local:6379"
+    prometheusUrl: "http://prometheus-operated.monitoring.svc.cluster.local:9090"
+  secrets:
+    dbUsername: "hms_user"
+    dbPassword: "hms_user_password"
+    redisPassword: "redis_passw0rd"
+    jwtSecret: "analytics-jwt-secret"
+
+# Mobile API Service
+mobile:
+  enabled: true
+  replicaCount: 2
+  image:
+    repository: node
+    tag: "18-alpine"
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 80
+    targetPort: 3002
+  ingress:
+    enabled: true
+    className: nginx
+    hosts:
+    - host: mobile-api.hms.local
+      paths:
+      - path: /
+        pathType: Prefix
+    tls:
+    - secretName: mobile-api-tls
+      hosts:
+      - mobile-api.hms.local
+  resources:
+    limits:
+      cpu: 500m
+      memory: 1Gi
+    requests:
+      cpu: 200m
+      memory: 512Mi
+  config:
+    databaseHost: "postgresql-hms.ultimate-hms.svc.cluster.local"
+    databasePort: "5432"
+    databaseName: "hms_db"
+    redisUrl: "redis://redis.graphql-system.svc.cluster.local:6379"
+    graphqlUrl: "http://graphql-api.graphql-system.svc.cluster.local"
+    analyticsUrl: "http://analytics-service.analytics-system.svc.cluster.local"
+  secrets:
+    dbUsername: "hms_user"
+    dbPassword: "hms_user_password"
+    redisPassword: "redis_passw0rd"
+    jwtSecret: "mobile-api-jwt-secret"
+
+# Security Services
+security:
+  enabled: true
+  keycloak:
+    enabled: true
+    replicaCount: 1
+    image:
+      repository: quay.io/keycloak/keycloak
+      tag: "22.0"
+    service:
+      type: ClusterIP
+      port: 80
+      targetPort: 8080
+    ingress:
+      enabled: true
+      className: nginx
+      hosts:
+      - host: auth.hms.local
+        paths:
+        - path: /
+          pathType: Prefix
+      tls:
+      - secretName: keycloak-tls
+        hosts:
+        - auth.hms.local
+    resources:
+      limits:
+        cpu: 1000m
+        memory: 2Gi
+      requests:
+        cpu: 500m
+        memory: 1Gi
+    config:
+      adminUser: "admin"
+      adminPassword: "admin_passw0rd"
+      database:
+        vendor: postgres
+        hostname: "postgresql-hms.ultimate-hms.svc.cluster.local"
+        port: "5432"
+        name: "keycloak"
+        username: "hms_user"
+        password: "hms_user_password"
+      hostname: "auth.hms.local"
+
+  rbac:
+    enabled: true
+    replicaCount: 2
+    image:
+      repository: node
+      tag: "18-alpine"
+      pullPolicy: IfNotPresent
+    service:
+      type: ClusterIP
+      port: 80
+      targetPort: 3003
+    resources:
+      limits:
+        cpu: 500m
+        memory: 1Gi
+      requests:
+        cpu: 200m
+        memory: 512Mi
+    config:
+      databaseHost: "postgresql-hms.ultimate-hms.svc.cluster.local"
+      databasePort: "5432"
+      databaseName: "hms_db"
+      redisUrl: "redis://redis.graphql-system.svc.cluster.local:6379"
+      jwtSecret: "rbac-jwt-secret"
+
+  audit:
+    enabled: true
+    replicaCount: 1
+    image:
+      repository: node
+      tag: "18-alpine"
+      pullPolicy: IfNotPresent
+    service:
+      type: ClusterIP
+      port: 80
+      targetPort: 3004
+    resources:
+      limits:
+        cpu: 200m
+        memory: 512Mi
+      requests:
+        cpu: 100m
+        memory: 256Mi
+    config:
+      databaseHost: "postgresql-hms.ultimate-hms.svc.cluster.local"
+      databasePort: "5432"
+      databaseName: "hms_db"
+      redisUrl: "redis://redis.graphql-system.svc.cluster.local:6379"
+
+# Database dependencies
+postgresql:
+  enabled: false  # Use existing PostgreSQL
+
+redis:
+  enabled: false  # Use existing Redis
+
+# Monitoring
+monitoring:
+  enabled: true
+  prometheusRule:
+    enabled: true
+    rules:
+    - alert: HighErrorRate
+      expr: rate(http_requests_total{status=~"5.."}[5m]) / rate(http_requests_total[5m]) > 0.05
+      for: 5m
+      labels:
+        severity: critical
+      annotations:
+        summary: "High error rate detected"
+        description: "Error rate is {{ $value }} which is above 5%"
+
+# HPA Configuration
+hpa:
+  enabled: true
+  analytics:
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+  mobile:
+    minReplicas: 3
+    maxReplicas: 20
+    targetCPUUtilizationPercentage: 60
+    targetMemoryUtilizationPercentage: 75
+  rbac:
+    minReplicas: 2
+    maxReplicas: 8
+    targetCPUUtilizationPercentage: 50
+
+# Tracing
+tracing:
+  enabled: true
+  jaeger:
+    enabled: true
+    collector:
+      service:
+        port: 14268
+    query:
+      service:
+        port: 16686
+    agent:
+      service:
+        port: 6831
+
+# Chaos Engineering
+chaos:
+  enabled: false
+  mesh:
+    enabled: true
+    experiments:
+    - podFailure
+    - networkDelay
+    - cpuStress

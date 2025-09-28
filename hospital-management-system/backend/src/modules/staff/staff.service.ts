@@ -27,6 +27,7 @@ export class StaffService {
     schedule?: any;
     isAvailable?: boolean;
     createdBy?: string;
+    tenantId: string;
   }) {
     // Check if user already exists as doctor
     const existingDoctor = await this.prisma.doctor.findUnique({
@@ -49,6 +50,7 @@ export class StaffService {
     return this.prisma.doctor.create({
       data: {
         userId: data.userId,
+        tenantId: data.tenantId,
         licenseNumber: data.licenseNumber,
         specialization: data.specialization,
         department: data.department,

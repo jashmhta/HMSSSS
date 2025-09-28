@@ -22,6 +22,7 @@ export class EmergencyService {
     const emergencyVisit = await this.prisma.emergencyVisit.create({
       data: {
         patientId: data.patientId,
+        tenantId: data.tenantId,
         visitNumber: data.visitNumber || `EMG-${Date.now()}`,
         triageLevel: data.triageLevel || TriageLevel.LEVEL_3,
         chiefComplaint: data.chiefComplaint,

@@ -68,6 +68,7 @@ export class PatientsService {
     // Registration metadata
     registeredBy: string; // User ID of staff registering
     registrationType: 'SELF' | 'STAFF' | 'EMERGENCY';
+    tenantId: string;
   }) {
     // Validate age (must be 18+ for self-registration, no restriction for staff)
     const age = this.calculateAge(data.dateOfBirth);
@@ -97,6 +98,7 @@ export class PatientsService {
         role: 'PATIENT',
         isActive: true,
         createdBy: data.registeredBy,
+        tenantId: data.tenantId,
       },
     });
 
@@ -104,6 +106,7 @@ export class PatientsService {
     const patient = await this.prisma.patient.create({
       data: {
         userId: user.id,
+        tenantId: data.tenantId,
         mrn,
         dateOfBirth: data.dateOfBirth,
         gender: data.gender,
@@ -540,10 +543,12 @@ export class PatientsService {
     medicalHistory?: any;
     allergies?: string[];
     currentMedications?: string[];
+    tenantId: string;
   }) {
     return this.prisma.patient.create({
       data: {
         userId: data.userId,
+        tenantId: data.tenantId,
         mrn: data.mrn,
         dateOfBirth: data.dateOfBirth,
         gender: data.gender as any,

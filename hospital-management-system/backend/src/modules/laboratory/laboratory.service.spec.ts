@@ -80,6 +80,7 @@ describe('LaboratoryService', () => {
       clinicalInfo: 'Routine check',
       diagnosis: 'Anemia',
       priority: 'ROUTINE' as const,
+      tenantId: 'test-tenant',
     };
 
     const mockPatient = {
@@ -121,14 +122,15 @@ describe('LaboratoryService', () => {
       const result = await service.createTestOrder(createData);
 
       expect(mockPrismaService.patient.findUnique).toHaveBeenCalledWith({
-        where: { id: createData.patientId },
+        where: { id: createData.patientId, tenantId: createData.tenantId },
       });
       expect(mockPrismaService.labTestCatalog.findUnique).toHaveBeenCalledWith({
-        where: { id: createData.testCatalogId },
+        where: { id: createData.testCatalogId, tenantId: createData.tenantId },
       });
       expect(mockPrismaService.labTest.create).toHaveBeenCalledWith({
         data: {
           patientId: createData.patientId,
+          tenantId: createData.tenantId,
           testCatalogId: createData.testCatalogId,
           orderedBy: createData.orderedBy,
           clinicalInfo: createData.clinicalInfo,
@@ -159,7 +161,7 @@ describe('LaboratoryService', () => {
 
       await expect(service.createTestOrder(createData)).rejects.toThrow(NotFoundException);
       expect(mockPrismaService.patient.findUnique).toHaveBeenCalledWith({
-        where: { id: createData.patientId },
+        where: { id: createData.patientId, tenantId: createData.tenantId },
       });
       expect(mockPrismaService.labTestCatalog.findUnique).not.toHaveBeenCalled();
       expect(mockPrismaService.labTest.create).not.toHaveBeenCalled();

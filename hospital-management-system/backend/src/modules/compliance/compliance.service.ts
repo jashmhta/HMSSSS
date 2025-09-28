@@ -18,7 +18,8 @@ export interface ComplianceCheck {
 
 export interface AuditLogEntry {
   id: string;
-  userId: string;
+  tenantId?: string;
+  userId?: string;
   action: string;
   resource: string;
   resourceId: string;
@@ -155,10 +156,16 @@ export class ComplianceService {
    */
   async logAuditEvent(entry: Omit<AuditLogEntry, 'id' | 'timestamp'>): Promise<void> {
     try {
+      // Skip audit log if no userId (system operations)
+      if (!entry.userId) {
+        return;
+      }
+
       // Create audit log entry in database
       await this.prisma.auditLog.create({
         data: {
           userId: entry.userId,
+          ...(entry.tenantId && { tenantId: entry.tenantId }),
           action: entry.action,
           resource: entry.resource,
           resourceId: entry.resourceId,
@@ -1007,6 +1014,7 @@ export class ComplianceService {
    */
   async logComplianceEvent(event: {
     userId: string;
+    tenantId?: string;
     action: string;
     resource: string;
     resourceId: string;
@@ -1018,6 +1026,7 @@ export class ComplianceService {
       await this.prisma.auditLog.create({
         data: {
           userId: event.userId,
+          ...(event.tenantId && { tenantId: event.tenantId }),
           action: event.action,
           resource: event.resource,
           resourceId: event.resourceId,

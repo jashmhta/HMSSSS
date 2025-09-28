@@ -1,282 +1,231 @@
-/*[object Object]*/
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { Controller, Get, Post, Body, Query, UseGuards, ValidationPipe } from '@nestjs/common';
 import { UserRole } from '@prisma/client';
-
-import { JwtAuthGuard } from '../../shared/guards/jwt-auth.guard';
-import { RolesGuard } from '../../modules/auth/roles.guard';
 import { Roles } from '../../shared/decorators/roles.decorator';
-
+import { JwtAuthGuard } from '../../shared/guards/jwt-auth.guard';
+import { RolesGuard } from '../../shared/guards/roles.guard';
 import { ReportsService } from './reports.service';
+import { GenerateReportDto } from './dto/reports.dto';
+import { ReportType } from './dto/report.enums';
 
-/**
- *
- */
-@ApiTags('reports')
-@ApiBearerAuth()
 @Controller('reports')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class ReportsController {
-  /**
-   *
-   */
   constructor(private readonly reportsService: ReportsService) {}
 
-  // Patient Reports
   /**
-   *
+   * Generate a comprehensive report
+   */
+  @Post('generate')
+  @Roles(UserRole.ADMIN, UserRole.DOCTOR, UserRole.SUPERADMIN)
+  async generateReport(@Body(ValidationPipe) data: GenerateReportDto) {
+    return this.reportsService.generateReport(data);
+  }
+
+  /**
+   * Get patient demographics report
    */
   @Get('patients/demographics')
   @Roles(UserRole.ADMIN, UserRole.DOCTOR, UserRole.SUPERADMIN)
-  @ApiOperation({ summary: 'Get patient demographics report' })
-  @ApiResponse({ status: 200, description: 'Patient demographics data' })
   async getPatientDemographics(
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
   ) {
-    return this.reportsService.getPatientDemographics(startDate, endDate);
+    return this.reportsService.generateReport({
+      reportType: ReportType.PATIENT_SUMMARY,
+      startDate,
+      endDate,
+    });
   }
 
   /**
-   *
+   * Get appointment analytics
    */
-  @Get('patients/registrations')
-  @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
-  @ApiOperation({ summary: 'Get patient registration trends' })
-  @ApiResponse({ status: 200, description: 'Patient registration trends' })
-  async getPatientRegistrationTrends(
-    @Query('period') period: string = 'monthly',
-    @Query('year') year?: number,
-  ) {
-    return this.reportsService.getPatientRegistrationTrends(period, year);
-  }
-
-  // Appointment Reports
-  /**
-   *
-   */
-  @Get('appointments/summary')
+  @Get('appointments/analytics')
   @Roles(UserRole.ADMIN, UserRole.DOCTOR, UserRole.RECEPTIONIST, UserRole.SUPERADMIN)
-  @ApiOperation({ summary: 'Get appointment summary report' })
-  @ApiResponse({ status: 200, description: 'Appointment summary data' })
-  async getAppointmentSummary(
+  async getAppointmentAnalytics(
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
+    @Query('department') department?: string,
+    @Query('doctorId') doctorId?: string,
   ) {
-    return this.reportsService.getAppointmentSummary(startDate, endDate);
+    return this.reportsService.generateReport({
+      reportType: ReportType.APPOINTMENT_ANALYTICS,
+      startDate,
+      endDate,
+      department,
+      doctorId,
+    });
   }
 
   /**
-   *
+   * Get financial summary report
    */
-  @Get('appointments/utilization')
-  @Roles(UserRole.ADMIN, UserRole.DOCTOR, UserRole.SUPERADMIN)
-  @ApiOperation({ summary: 'Get doctor utilization report' })
-  @ApiResponse({ status: 200, description: 'Doctor utilization data' })
-  async getDoctorUtilization(
-    @Query('startDate') startDate?: string,
-    @Query('endDate') endDate?: string,
-  ) {
-    return this.reportsService.getDoctorUtilization(startDate, endDate);
-  }
-
-  // Revenue Reports
-  /**
-   *
-   */
-  @Get('revenue/summary')
+  @Get('financial/summary')
   @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
-  @ApiOperation({ summary: 'Get revenue summary report' })
-  @ApiResponse({ status: 200, description: 'Revenue summary data' })
-  async getRevenueSummary(
-    @Query('startDate') startDate?: string,
-    @Query('endDate') endDate?: string,
-    @Query('groupBy') groupBy: string = 'monthly',
-  ) {
-    return this.reportsService.getRevenueSummary(startDate, endDate, groupBy);
-  }
-
-  /**
-   *
-   */
-  @Get('revenue/department')
-  @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
-  @ApiOperation({ summary: 'Get department-wise revenue report' })
-  @ApiResponse({ status: 200, description: 'Department revenue data' })
-  async getDepartmentRevenue(
+  async getFinancialSummary(
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
   ) {
-    return this.reportsService.getDepartmentRevenue(startDate, endDate);
+    return this.reportsService.generateReport({
+      reportType: ReportType.FINANCIAL_SUMMARY,
+      startDate,
+      endDate,
+    });
   }
 
   /**
-   *
+   * Get inventory status report
    */
-  @Get('revenue/payment-methods')
-  @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
-  @ApiOperation({ summary: 'Get payment methods distribution' })
-  @ApiResponse({ status: 200, description: 'Payment methods data' })
-  async getPaymentMethodsDistribution(
-    @Query('startDate') startDate?: string,
-    @Query('endDate') endDate?: string,
-  ) {
-    return this.reportsService.getPaymentMethodsDistribution(startDate, endDate);
-  }
-
-  // Laboratory Reports
-  /**
-   *
-   */
-  @Get('laboratory/tests')
-  @Roles(UserRole.ADMIN, UserRole.LAB_TECHNICIAN, UserRole.DOCTOR, UserRole.SUPERADMIN)
-  @ApiOperation({ summary: 'Get laboratory test statistics' })
-  @ApiResponse({ status: 200, description: 'Lab test statistics' })
-  async getLabTestStatistics(
-    @Query('startDate') startDate?: string,
-    @Query('endDate') endDate?: string,
-  ) {
-    return this.reportsService.getLabTestStatistics(startDate, endDate);
-  }
-
-  /**
-   *
-   */
-  @Get('laboratory/turnaround-time')
-  @Roles(UserRole.ADMIN, UserRole.LAB_TECHNICIAN, UserRole.SUPERADMIN)
-  @ApiOperation({ summary: 'Get lab test turnaround time report' })
-  @ApiResponse({ status: 200, description: 'Turnaround time data' })
-  async getLabTurnaroundTime(
-    @Query('startDate') startDate?: string,
-    @Query('endDate') endDate?: string,
-  ) {
-    return this.reportsService.getLabTurnaroundTime(startDate, endDate);
-  }
-
-  // Pharmacy Reports
-  /**
-   *
-   */
-  @Get('pharmacy/dispensing')
+  @Get('inventory/status')
   @Roles(UserRole.ADMIN, UserRole.PHARMACIST, UserRole.SUPERADMIN)
-  @ApiOperation({ summary: 'Get pharmacy dispensing report' })
-  @ApiResponse({ status: 200, description: 'Pharmacy dispensing data' })
-  async getPharmacyDispensingReport(
-    @Query('startDate') startDate?: string,
-    @Query('endDate') endDate?: string,
-  ) {
-    return this.reportsService.getPharmacyDispensingReport(startDate, endDate);
-  }
-
-  // OT/Surgery Reports
-  /**
-   *
-   */
-  @Get('ot/surgeries')
-  @Roles(UserRole.ADMIN, UserRole.DOCTOR, UserRole.SUPERADMIN)
-  @ApiOperation({ summary: 'Get surgery statistics report' })
-  @ApiResponse({ status: 200, description: 'Surgery statistics' })
-  async getSurgeryStatistics(
-    @Query('startDate') startDate?: string,
-    @Query('endDate') endDate?: string,
-  ) {
-    return this.reportsService.getSurgeryStatistics(startDate, endDate);
+  async getInventoryStatus() {
+    return this.reportsService.generateReport({
+      reportType: ReportType.INVENTORY_STATUS,
+    });
   }
 
   /**
-   *
-   */
-  @Get('ot/utilization')
-  @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
-  @ApiOperation({ summary: 'Get OT utilization report' })
-  @ApiResponse({ status: 200, description: 'OT utilization data' })
-  async getOTUtilization(
-    @Query('startDate') startDate?: string,
-    @Query('endDate') endDate?: string,
-  ) {
-    return this.reportsService.getOTUtilization(startDate, endDate);
-  }
-
-  // Emergency Department Reports
-  /**
-   *
-   */
-  @Get('emergency/triage')
-  @Roles(UserRole.ADMIN, UserRole.DOCTOR, UserRole.SUPERADMIN)
-  @ApiOperation({ summary: 'Get emergency triage statistics' })
-  @ApiResponse({ status: 200, description: 'Triage statistics' })
-  async getEmergencyTriageStats(
-    @Query('startDate') startDate?: string,
-    @Query('endDate') endDate?: string,
-  ) {
-    return this.reportsService.getEmergencyTriageStats(startDate, endDate);
-  }
-
-  // Inventory Reports
-  /**
-   *
-   */
-  @Get('inventory/stock-levels')
-  @Roles(UserRole.ADMIN, UserRole.PHARMACIST, UserRole.SUPERADMIN)
-  @ApiOperation({ summary: 'Get inventory stock levels report' })
-  @ApiResponse({ status: 200, description: 'Stock levels data' })
-  async getInventoryStockLevels() {
-    return this.reportsService.getInventoryStockLevels();
-  }
-
-  /**
-   *
-   */
-  @Get('inventory/expiry-alerts')
-  @Roles(UserRole.ADMIN, UserRole.PHARMACIST, UserRole.SUPERADMIN)
-  @ApiOperation({ summary: 'Get inventory expiry alerts' })
-  @ApiResponse({ status: 200, description: 'Expiry alerts data' })
-  async getInventoryExpiryAlerts(@Query('days') days: number = 30) {
-    return this.reportsService.getInventoryExpiryAlerts(days);
-  }
-
-  // Staff Performance Reports
-  /**
-   *
+   * Get staff performance report
    */
   @Get('staff/performance')
   @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
-  @ApiOperation({ summary: 'Get staff performance report' })
-  @ApiResponse({ status: 200, description: 'Staff performance data' })
-  async getStaffPerformanceReport(
+  async getStaffPerformance(
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
   ) {
-    return this.reportsService.getStaffPerformanceReport(startDate, endDate);
+    return this.reportsService.generateReport({
+      reportType: ReportType.STAFF_PERFORMANCE,
+      startDate,
+      endDate,
+    });
   }
 
-  // Dashboard Summary
   /**
-   *
+   * Get lab results summary
    */
-  @Get('dashboard/summary')
+  @Get('laboratory/results')
+  @Roles(UserRole.ADMIN, UserRole.LAB_TECHNICIAN, UserRole.DOCTOR, UserRole.SUPERADMIN)
+  async getLabResultsSummary(
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+    @Query('patientId') patientId?: string,
+  ) {
+    return this.reportsService.generateReport({
+      reportType: ReportType.LAB_RESULTS_SUMMARY,
+      startDate,
+      endDate,
+      patientId,
+    });
+  }
+
+  /**
+   * Get radiology reports
+   */
+  @Get('radiology/reports')
   @Roles(UserRole.ADMIN, UserRole.DOCTOR, UserRole.SUPERADMIN)
-  @ApiOperation({ summary: 'Get dashboard summary data' })
-  @ApiResponse({ status: 200, description: 'Dashboard summary' })
-  async getDashboardSummary() {
-    return this.reportsService.getDashboardSummary();
+  async getRadiologyReports(
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+    @Query('patientId') patientId?: string,
+  ) {
+    return this.reportsService.generateReport({
+      reportType: ReportType.RADIOLOGY_REPORTS,
+      startDate,
+      endDate,
+      patientId,
+    });
   }
 
-  // Custom Report Generation
   /**
-   *
+   * Get pharmacy dispensation report
    */
-  @Get('custom')
-  @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
-  @ApiOperation({ summary: 'Generate custom report' })
-  @ApiResponse({ status: 200, description: 'Custom report data' })
-  async generateCustomReport(
-    @Query('type') type: string,
-    @Query('filters') filters: string,
+  @Get('pharmacy/dispensation')
+  @Roles(UserRole.ADMIN, UserRole.PHARMACIST, UserRole.SUPERADMIN)
+  async getPharmacyDispensation(
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
   ) {
-    const parsedFilters = filters ? JSON.parse(filters) : {};
-    return this.reportsService.generateCustomReport(type, parsedFilters, startDate, endDate);
+    return this.reportsService.generateReport({
+      reportType: ReportType.PHARMACY_DISPENSATION,
+      startDate,
+      endDate,
+    });
+  }
+
+  /**
+   * Get emergency response report
+   */
+  @Get('emergency/response')
+  @Roles(UserRole.ADMIN, UserRole.DOCTOR, UserRole.SUPERADMIN)
+  async getEmergencyResponse(
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    return this.reportsService.generateReport({
+      reportType: ReportType.EMERGENCY_RESPONSE,
+      startDate,
+      endDate,
+    });
+  }
+
+  /**
+   * Get surgery outcomes report
+   */
+  @Get('surgery/outcomes')
+  @Roles(UserRole.ADMIN, UserRole.DOCTOR, UserRole.SUPERADMIN)
+  async getSurgeryOutcomes(
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+    @Query('doctorId') doctorId?: string,
+  ) {
+    return this.reportsService.generateReport({
+      reportType: ReportType.SURGERY_OUTCOMES,
+      startDate,
+      endDate,
+      doctorId,
+    });
+  }
+
+  /**
+   * Get IPD admission summary
+   */
+  @Get('ipd/admissions')
+  @Roles(UserRole.ADMIN, UserRole.DOCTOR, UserRole.SUPERADMIN)
+  async getIPDAdmissions(
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    return this.reportsService.generateReport({
+      reportType: ReportType.IPD_ADMISSION_SUMMARY,
+      startDate,
+      endDate,
+    });
+  }
+
+  /**
+   * Get blood bank inventory report
+   */
+  @Get('blood-bank/inventory')
+  @Roles(UserRole.ADMIN, UserRole.LAB_TECHNICIAN, UserRole.SUPERADMIN)
+  async getBloodBankInventory() {
+    return this.reportsService.generateReport({
+      reportType: ReportType.BLOOD_BANK_INVENTORY,
+    });
+  }
+
+  /**
+   * Get compliance audit report
+   */
+  @Get('compliance/audit')
+  @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
+  async getComplianceAudit(
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    return this.reportsService.generateReport({
+      reportType: ReportType.COMPLIANCE_AUDIT,
+      startDate,
+      endDate,
+    });
   }
 }

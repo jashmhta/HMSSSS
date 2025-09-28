@@ -301,6 +301,7 @@ export class PharmacyService {
     duration: number;
     quantity: number;
     instructions?: string;
+    tenantId: string;
   }) {
     // Check if medication exists and has sufficient stock
     const medication = await this.prisma.medication.findUnique({
@@ -318,6 +319,7 @@ export class PharmacyService {
     return this.prisma.prescription.create({
       data: {
         patientId: data.patientId,
+        tenantId: data.tenantId,
         doctorId: data.doctorId,
         medicationId: data.medicationId,
         dosage: data.dosage,

@@ -1,0 +1,87 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vault
+  namespace: hms
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: vault
+  template:
+    metadata:
+      labels:
+        app: vault
+    spec:
+      serviceAccountName: vault-auth
+      containers:
+      - name: vault
+        image: hashicorp/vault:1.15
+        ports:
+        - containerPort: 8200
+          name: http
+        env:
+        - name: VAULT_DEV_ROOT_TOKEN_ID
+          value: "hms-root-token"
+        - name: VAULT_DEV_LISTEN_ADDRESS
+          value: "0.0.0.0:8200"
+        - name: VAULT_LOG_LEVEL
+          value: "info"
+        volumeMounts:
+        - name: vault-data
+          mountPath: /vault/data
+        - name: vault-config
+          mountPath: /vault/config
+      volumes:
+      - name: vault-data
+        persistentVolumeClaim:
+          claimName: vault-data-pvc
+      - name: vault-config
+        configMap:
+          name: vault-config
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vault-config
+  namespace: hms
+data:
+  vault.hcl: |
+    storage "file" {
+      path = "/vault/data"
+    }
+
+    listener "tcp" {
+      address = "0.0.0.0:8200"
+      tls_disable = "true"
+    }
+
+    seal "transit" {
+      address = "https://hsm.example.com:8200"
+      token = "s-xxxxxxxxxx"
+      key_name = "hms-seal"
+    }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vault
+  namespace: hms
+spec:
+  ports:
+  - port: 8200
+    targetPort: 8200
+  selector:
+    app: vault
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: vault-data-pvc
+  namespace: hms
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi

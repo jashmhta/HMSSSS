@@ -1,21 +1,113 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, HttpException, HttpStatus } from '@nestjs/common';
+import axios, { AxiosInstance } from 'axios';
+import * as https from 'https';
+import { CircuitBreaker } from 'opossum';
 
 import { PrismaService } from '../../database/prisma.service';
 
 /**
- *
+ * Enhanced FHIR Service with real server integration
  */
 @Injectable()
 export class FhirService {
   private readonly logger = new Logger(FhirService.name);
+  private fhirClient: AxiosInstance;
+  private circuitBreaker: CircuitBreaker;
+  private rateLimiter: { requests: number[]; limit: number; period: number };
+
+  constructor(private prisma: PrismaService) {
+    this.initializeFHIRClient();
+  }
+
+  private initializeFHIRClient() {
+    // Configure FHIR server connection
+    const fhirServerUrl = process.env.FHIR_SERVER_URL || 'https://hapi.fhir.org/baseR4';
+    const apiKey = process.env.FHIR_API_KEY;
+
+    this.fhirClient = axios.create({
+      baseURL: fhirServerUrl,
+      timeout: 30000,
+      httpsAgent: new https.Agent({
+        rejectUnauthorized: true,
+      }),
+      headers: {
+        'User-Agent': 'HMS-FHIR-Client/1.0',
+        Accept: 'application/fhir+json',
+        'Content-Type': 'application/fhir+json',
+        ...(apiKey && { 'X-API-Key': apiKey }),
+      },
+    });
+
+    // Initialize circuit breaker
+    this.circuitBreaker = new CircuitBreaker(
+      async (requestFn: () => Promise<any>) => {
+        return await requestFn();
+      },
+      {
+        timeout: 30000,
+        errorThresholdPercentage: 50,
+        resetTimeout: 60000,
+        name: 'FHIR_SERVER',
+      },
+    );
+
+    this.circuitBreaker.on('open', () => this.logger.error('FHIR server circuit breaker opened'));
+    this.circuitBreaker.on('halfOpen', () =>
+      this.logger.log('FHIR server circuit breaker half-open'),
+    );
+    this.circuitBreaker.on('close', () => this.logger.log('FHIR server circuit breaker closed'));
+
+    // Initialize rate limiter (100 requests per minute)
+    this.rateLimiter = {
+      requests: [],
+      limit: 100,
+      period: 60000,
+    };
+  }
+
+  private async checkRateLimit(): Promise<void> {
+    const now = Date.now();
+    this.rateLimiter.requests = this.rateLimiter.requests.filter(
+      time => now - time < this.rateLimiter.period,
+    );
+
+    if (this.rateLimiter.requests.length >= this.rateLimiter.limit) {
+      const oldestRequest = Math.min(...this.rateLimiter.requests);
+      const waitTime = this.rateLimiter.period - (now - oldestRequest);
+      throw new HttpException(
+        `FHIR API rate limit exceeded. Try again in ${Math.ceil(waitTime / 1000)} seconds.`,
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+
+    this.rateLimiter.requests.push(now);
+  }
+
+  private async makeFHIRRequest(requestFn: () => Promise<any>, retries: number = 3): Promise<any> {
+    for (let attempt = 1; attempt <= retries; attempt++) {
+      try {
+        await this.checkRateLimit();
+        const response = await this.circuitBreaker.fire(requestFn);
+        return response;
+      } catch (error) {
+        this.logger.warn(`FHIR request attempt ${attempt} failed: ${error.message}`);
+
+        if (attempt === retries) {
+          throw new HttpException(
+            `FHIR server error after ${retries} attempts: ${error.message}`,
+            HttpStatus.BAD_GATEWAY,
+          );
+        }
+
+        // Exponential backoff
+        const delay = Math.pow(2, attempt) * 1000;
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+  }
 
   /**
-   *
-   */
-  constructor(private prisma: PrismaService) {}
-
-  /**
-   * Store FHIR resource in database
+   * Store FHIR resource in database and sync to FHIR server
    */
   async storeFHIRResource(
     resourceType: string,
@@ -25,6 +117,11 @@ export class FhirService {
     source?: string,
   ) {
     try {
+      // Validate FHIR resource
+      if (!this.validateFHIRResource(data)) {
+        throw new HttpException('Invalid FHIR resource structure', HttpStatus.BAD_REQUEST);
+      }
+
       // Check if resource already exists
       const existingResource = await this.prisma.fHIRResource.findFirst({
         where: {
@@ -33,9 +130,10 @@ export class FhirService {
         },
       });
 
+      let storedResource;
       if (existingResource) {
         // Update existing resource
-        return this.prisma.fHIRResource.update({
+        storedResource = await this.prisma.fHIRResource.update({
           where: { id: existingResource.id },
           data: {
             lastUpdated: new Date(),
@@ -47,7 +145,7 @@ export class FhirService {
         });
       } else {
         // Create new resource
-        return this.prisma.fHIRResource.create({
+        storedResource = await this.prisma.fHIRResource.create({
           data: {
             resourceType,
             resourceId,
@@ -58,9 +156,95 @@ export class FhirService {
           },
         });
       }
+
+      // Sync to FHIR server if configured
+      try {
+        await this.syncResourceToFHIRServer(storedResource);
+      } catch (syncError) {
+        this.logger.warn(`Failed to sync resource to FHIR server: ${syncError.message}`);
+        // Don't fail the operation, just log the warning
+      }
+
+      return storedResource;
     } catch (error) {
       this.logger.error(`Failed to store FHIR resource: ${error.message}`, error.stack);
       throw error;
+    }
+  }
+
+  /**
+   * Sync resource to FHIR server
+   */
+  private async syncResourceToFHIRServer(resource: any): Promise<void> {
+    const { resourceType, resourceId, data } = resource;
+
+    await this.makeFHIRRequest(async () => {
+      const response = await this.fhirClient.put(`/${resourceType}/${resourceId}`, data);
+      this.logger.log(`Synced ${resourceType}/${resourceId} to FHIR server`);
+      return response.data;
+    });
+  }
+
+  /**
+   * Get FHIR resource from server or local cache
+   */
+  async getFHIRResourceFromServer(resourceType: string, resourceId: string) {
+    try {
+      // Try to get from FHIR server first
+      const response = await this.makeFHIRRequest(async () => {
+        return this.fhirClient.get(`/${resourceType}/${resourceId}`);
+      });
+
+      // Update local cache
+      await this.storeFHIRResource(resourceType, resourceId, response.data, null, 'FHIR_SERVER');
+
+      return response.data;
+    } catch (error) {
+      this.logger.warn(`Failed to get from FHIR server, falling back to local: ${error.message}`);
+
+      // Fallback to local cache
+      return this.getFHIRResource(resourceType, resourceId);
+    }
+  }
+
+  /**
+   * Search FHIR resources on server
+   */
+  async searchFHIRResourcesOnServer(resourceType: string, searchParams: any) {
+    try {
+      const params = new URLSearchParams();
+
+      // Convert search params to FHIR search syntax
+      Object.keys(searchParams).forEach(key => {
+        if (searchParams[key] !== undefined && searchParams[key] !== null) {
+          params.append(key, searchParams[key]);
+        }
+      });
+
+      const response = await this.makeFHIRRequest(async () => {
+        return this.fhirClient.get(`/${resourceType}?${params.toString()}`);
+      });
+
+      // Cache results locally
+      if (response.data.entry) {
+        for (const entry of response.data.entry) {
+          const resource = entry.resource;
+          await this.storeFHIRResource(
+            resource.resourceType,
+            resource.id,
+            resource,
+            resource.subject?.reference?.split('/')[1],
+            'FHIR_SERVER',
+          );
+        }
+      }
+
+      return response.data;
+    } catch (error) {
+      this.logger.warn(`Failed to search on FHIR server, falling back to local: ${error.message}`);
+
+      // Fallback to local search
+      return this.searchFHIRResources(resourceType, searchParams);
     }
   }
 

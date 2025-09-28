@@ -28,10 +28,12 @@ export class MedicalRecordsService {
     medications?: any;
     followUpDate?: Date;
     notes?: string;
+    tenantId: string;
   }) {
     return this.prisma.medicalRecord.create({
       data: {
         patientId: data.patientId,
+        tenantId: data.tenantId,
         doctorId: data.doctorId,
         visitDate: data.visitDate,
         chiefComplaint: data.chiefComplaint,

@@ -38,10 +38,11 @@ export class LaboratoryService {
     diagnosis?: string;
     priority?: 'ROUTINE' | 'URGENT' | 'STAT';
     urgent?: boolean;
+    tenantId: string;
   }) {
     // Verify patient exists
     const patient = await this.prisma.patient.findUnique({
-      where: { id: data.patientId },
+      where: { id: data.patientId, tenantId: data.tenantId },
     });
 
     if (!patient) {
@@ -50,7 +51,7 @@ export class LaboratoryService {
 
     // Verify test catalog exists
     const testCatalog = await this.prisma.labTestCatalog.findUnique({
-      where: { id: data.testCatalogId },
+      where: { id: data.testCatalogId, tenantId: data.tenantId },
     });
 
     if (!testCatalog) {
@@ -63,6 +64,7 @@ export class LaboratoryService {
     const labTest = await this.prisma.labTest.create({
       data: {
         patientId: data.patientId,
+        tenantId: data.tenantId,
         testCatalogId: data.testCatalogId,
         orderNumber,
         priority: data.priority || 'ROUTINE',
@@ -109,6 +111,7 @@ export class LaboratoryService {
     diagnosis?: string;
     priority?: 'ROUTINE' | 'URGENT' | 'STAT';
     urgent?: boolean;
+    tenantId: string;
   }) {
     const orders = [];
 
@@ -121,6 +124,7 @@ export class LaboratoryService {
         diagnosis: data.diagnosis,
         priority: data.priority,
         urgent: data.urgent,
+        tenantId: data.tenantId,
       });
       orders.push(order);
     }

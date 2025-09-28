@@ -1,0 +1,280 @@
+---
+# Chaos Engineering for Ultimate HMS using Chaos Mesh
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: chaos-testing
+  labels:
+    app: hospital-management-system
+    component: chaos
+
+---
+# Chaos Mesh Installation
+apiVersion: chaos-mesh.org/v1alpha1
+kind: ChaosDashboard
+metadata:
+  name: chaos-dashboard
+  namespace: chaos-testing
+  labels:
+    app: hospital-management-system
+    component: chaos
+spec:
+  permission:
+    serviceAccount: chaos-controller-manager
+    namespace: chaos-testing
+
+---
+# Pod Failure Chaos Experiment
+apiVersion: chaos-mesh.org/v1alpha1
+kind: PodChaos
+metadata:
+  name: pod-failure-experiment
+  namespace: chaos-testing
+  labels:
+    app: hospital-management-system
+    component: chaos
+spec:
+  action: pod-failure
+  mode: one
+  selector:
+    namespaces:
+    - ultimate-hms
+    labelSelectors:
+      app: hospital-management-system
+      component: analytics
+  duration: "30s"
+  scheduler:
+    cron: "@every 24h"
+
+---
+# Network Delay Chaos Experiment
+apiVersion: chaos-mesh.org/v1alpha1
+kind: NetworkChaos
+metadata:
+  name: network-delay-experiment
+  namespace: chaos-testing
+  labels:
+    app: hospital-management-system
+    component: chaos
+spec:
+  action: delay
+  mode: all
+  selector:
+    namespaces:
+    - ultimate-hms
+    labelSelectors:
+      app: hospital-management-system
+  delay:
+    latency: "100ms"
+    correlation: "25"
+    jitter: "0ms"
+  duration: "60s"
+  scheduler:
+    cron: "@every 12h"
+
+---
+# CPU Stress Chaos Experiment
+apiVersion: chaos-mesh.org/v1alpha1
+kind: StressChaos
+metadata:
+  name: cpu-stress-experiment
+  namespace: chaos-testing
+  labels:
+    app: hospital-management-system
+    component: chaos
+spec:
+  mode: one
+  selector:
+    namespaces:
+    - ultimate-hms
+    labelSelectors:
+      app: hospital-management-system
+      component: mobile
+  stressors:
+    cpu:
+      workers: 2
+      load: 80
+  duration: "120s"
+  scheduler:
+    cron: "@every 6h"
+
+---
+# IO Chaos Experiment
+apiVersion: chaos-mesh.org/v1alpha1
+kind: IOChaos
+metadata:
+  name: io-chaos-experiment
+  namespace: chaos-testing
+  labels:
+    app: hospital-management-system
+    component: chaos
+spec:
+  action: delay
+  mode: one
+  selector:
+    namespaces:
+    - ultimate-hms
+    labelSelectors:
+      app: hospital-management-system
+      component: database
+  delay: "100ms"
+  duration: "30s"
+  scheduler:
+    cron: "@every 8h"
+
+---
+# Time Skew Chaos Experiment
+apiVersion: chaos-mesh.org/v1alpha1
+kind: TimeChaos
+metadata:
+  name: time-skew-experiment
+  namespace: chaos-testing
+  labels:
+    app: hospital-management-system
+    component: chaos
+spec:
+  mode: one
+  selector:
+    namespaces:
+    - ultimate-hms
+    labelSelectors:
+      app: hospital-management-system
+      component: security
+  timeOffset: "-1h"
+  duration: "60s"
+  scheduler:
+    cron: "@weekly"
+
+---
+# Chaos Mesh Workflow for Automated Testing
+apiVersion: chaos-mesh.org/v1alpha1
+kind: Workflow
+metadata:
+  name: hms-chaos-workflow
+  namespace: chaos-testing
+  labels:
+    app: hospital-management-system
+    component: chaos
+spec:
+  entry: entry
+  templates:
+  - name: entry
+    templateType: Serial
+    deadline: 240s
+    children:
+    - pod-failure-test
+    - network-delay-test
+    - cpu-stress-test
+  - name: pod-failure-test
+    templateType: Task
+    deadline: 60s
+    task:
+      container:
+        name: pod-failure
+        image: curlimages/curl:latest
+        command:
+        - sh
+        - -c
+        - |
+          chaosctl apply -f /etc/chaos/pod-failure.yaml
+          sleep 30
+          chaosctl delete -f /etc/chaos/pod-failure.yaml
+        volumeMounts:
+        - name: chaos-config
+          mountPath: /etc/chaos
+    volumes:
+    - name: chaos-config
+      configMap:
+        name: chaos-experiments
+  - name: network-delay-test
+    templateType: Task
+    deadline: 120s
+    task:
+      container:
+        name: network-delay
+        image: curlimages/curl:latest
+        command:
+        - sh
+        - -c
+        - |
+          chaosctl apply -f /etc/chaos/network-delay.yaml
+          sleep 60
+          chaosctl delete -f /etc/chaos/network-delay.yaml
+  - name: cpu-stress-test
+    templateType: Task
+    deadline: 180s
+    task:
+      container:
+        name: cpu-stress
+        image: curlimages/curl:latest
+        command:
+        - sh
+        - -c
+        - |
+          chaosctl apply -f /etc/chaos/cpu-stress.yaml
+          sleep 120
+          chaosctl delete -f /etc/chaos/cpu-stress.yaml
+
+---
+# ConfigMap for Chaos Experiments
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: chaos-experiments
+  namespace: chaos-testing
+  labels:
+    app: hospital-management-system
+    component: chaos
+data:
+  pod-failure.yaml: |
+    apiVersion: chaos-mesh.org/v1alpha1
+    kind: PodChaos
+    metadata:
+      name: pod-failure-chaos
+      namespace: chaos-testing
+    spec:
+      action: pod-failure
+      mode: one
+      selector:
+        namespaces:
+        - ultimate-hms
+        labelSelectors:
+          app: hospital-management-system
+      duration: "30s"
+
+  network-delay.yaml: |
+    apiVersion: chaos-mesh.org/v1alpha1
+    kind: NetworkChaos
+    metadata:
+      name: network-delay-chaos
+      namespace: chaos-testing
+    spec:
+      action: delay
+      mode: all
+      selector:
+        namespaces:
+        - ultimate-hms
+        labelSelectors:
+          app: hospital-management-system
+      delay:
+        latency: "100ms"
+      duration: "60s"
+
+  cpu-stress.yaml: |
+    apiVersion: chaos-mesh.org/v1alpha1
+    kind: StressChaos
+    metadata:
+      name: cpu-stress-chaos
+      namespace: chaos-testing
+    spec:
+      mode: one
+      selector:
+        namespaces:
+        - ultimate-hms
+        labelSelectors:
+          app: hospital-management-system
+      stressors:
+        cpu:
+          workers: 2
+          load: 80
+      duration: "120s"

@@ -58,6 +58,7 @@ describe('RadiologyService', () => {
       urgent: true,
       clinicalIndication: 'Chest pain evaluation',
       notes: 'PA and lateral views',
+      tenantId: 'tenant-123',
     };
 
     const mockPatient = {
@@ -87,10 +88,11 @@ describe('RadiologyService', () => {
       const result = await service.create(createData);
 
       expect(mockPrismaService.patient.findUnique).toHaveBeenCalledWith({
-        where: { id: createData.patientId },
+        where: { id: createData.patientId, tenantId: createData.tenantId },
       });
       expect(mockPrismaService.radiologyTest.create).toHaveBeenCalledWith({
         data: {
+          tenantId: createData.tenantId,
           patientId: createData.patientId,
           testName: createData.testName,
           testCode: createData.testCode,
@@ -122,7 +124,7 @@ describe('RadiologyService', () => {
 
       await expect(service.create(createData)).rejects.toThrow(NotFoundException);
       expect(mockPrismaService.patient.findUnique).toHaveBeenCalledWith({
-        where: { id: createData.patientId },
+        where: { id: createData.patientId, tenantId: createData.tenantId },
       });
       expect(mockPrismaService.radiologyTest.create).not.toHaveBeenCalled();
     });
@@ -134,6 +136,7 @@ describe('RadiologyService', () => {
         testCode: 'XR',
         modality: RadiologyModality.XRAY,
         orderedBy: 'doctor-123',
+        tenantId: 'tenant-123',
       };
 
       mockPrismaService.patient.findUnique.mockResolvedValue(mockPatient);

@@ -26,10 +26,11 @@ export class RadiologyService {
     clinicalInfo?: string;
     diagnosis?: string;
     urgent?: boolean;
+    tenantId: string;
   }) {
     // Verify patient exists
     const patient = await this.prisma.patient.findUnique({
-      where: { id: data.patientId },
+      where: { id: data.patientId, tenantId: data.tenantId },
     });
 
     if (!patient) {
@@ -39,6 +40,7 @@ export class RadiologyService {
     return this.prisma.radiologyTest.create({
       data: {
         patientId: data.patientId,
+        tenantId: data.tenantId,
         testName: data.testName,
         testCode: data.testCode,
         modality: data.modality as any,

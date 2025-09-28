@@ -35,10 +35,12 @@ export class OPDService {
     roomNumber?: string;
     priority?: string;
     createdBy?: string;
+    tenantId: string;
   }) {
     return this.prisma.oPDVisit.create({
       data: {
         patientId: data.patientId,
+        tenantId: data.tenantId,
         doctorId: data.doctorId,
         visitNumber: data.visitNumber,
         chiefComplaint: data.chiefComplaint,
@@ -281,11 +283,13 @@ export class OPDService {
     reason?: string;
     priority?: 'ROUTINE' | 'URGENT' | 'EMERGENCY';
     scheduledBy: string;
+    tenantId: string;
   }) {
     // Check doctor availability
     const conflictingAppointment = await this.prisma.appointment.findFirst({
       where: {
         doctorId: data.doctorId,
+        tenantId: data.tenantId,
         appointmentDate: data.appointmentDate,
         status: {
           in: ['SCHEDULED', 'CONFIRMED'],
@@ -301,6 +305,7 @@ export class OPDService {
     const appointment = await this.prisma.appointment.create({
       data: {
         patientId: data.patientId,
+        tenantId: data.tenantId,
         doctorId: data.doctorId,
         appointmentDate: data.appointmentDate,
         duration: data.duration || 30,
@@ -347,9 +352,9 @@ export class OPDService {
   /**
    * Start OPD consultation from appointment
    */
-  async startConsultation(appointmentId: string, startedBy: string) {
+  async startConsultation(appointmentId: string, startedBy: string, tenantId: string) {
     const appointment = await this.prisma.appointment.findUnique({
-      where: { id: appointmentId },
+      where: { id: appointmentId, tenantId },
       include: {
         patient: true,
         doctor: true,
@@ -371,6 +376,7 @@ export class OPDService {
     const opdVisit = await this.prisma.oPDVisit.create({
       data: {
         patientId: appointment.patientId,
+        tenantId,
         doctorId: appointment.doctorId,
         visitNumber,
         chiefComplaint: appointment.reason || 'Consultation',
@@ -448,9 +454,10 @@ export class OPDService {
       notes?: string;
       completedBy: string;
     },
+    tenantId: string,
   ) {
     const visit = await this.prisma.oPDVisit.findUnique({
-      where: { id: visitId },
+      where: { id: visitId, tenantId },
       include: { patient: true },
     });
 
@@ -488,6 +495,7 @@ export class OPDService {
             patient: { connect: { id: visit.patientId } },
             doctor: { connect: { id: visit.doctorId } },
             medication: { connect: { id: prescription.medicationId } },
+            tenantId,
             dosage: prescription.dosage,
             frequency: prescription.frequency,
             duration: prescription.duration,
@@ -504,6 +512,7 @@ export class OPDService {
     await this.prisma.medicalRecord.create({
       data: {
         patientId: visit.patientId,
+        tenantId,
         doctorId: visit.doctorId,
         visitDate: new Date(),
         chiefComplaint: visit.chiefComplaint,
@@ -597,6 +606,7 @@ export class OPDService {
       department?: string;
       reason: string;
       transferredBy: string;
+      tenantId: string;
     },
   ) {
     const visit = await this.prisma.oPDVisit.findUnique({
@@ -626,6 +636,7 @@ export class OPDService {
         type: 'CONSULTATION',
         reason: `Transferred from previous consultation: ${transferData.reason}`,
         scheduledBy: transferData.transferredBy,
+        tenantId: transferData.tenantId,
       });
     }
 

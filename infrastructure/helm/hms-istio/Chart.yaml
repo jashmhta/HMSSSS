@@ -1,0 +1,27 @@
+apiVersion: v2
+name: hms-istio
+description: Istio Service Mesh Configuration for Ultimate HMS
+type: application
+version: 1.0.0
+appVersion: "1.20.0"
+keywords:
+- istio
+- service-mesh
+- hms
+- hospital-management-system
+home: https://hms.local
+sources:
+- https://github.com/hms/infrastructure
+maintainers:
+- name: HMS DevOps Team
+  email: devops@hms.local
+dependencies:
+- name: istio-base
+  version: "1.20.0"
+  repository: "https://istio-release.storage.googleapis.com/charts"
+- name: istiod
+  version: "1.20.0"
+  repository: "https://istio-release.storage.googleapis.com/charts"
+- name: istio-ingress
+  version: "1.20.0"
+  repository: "https://istio-release.storage.googleapis.com/charts"

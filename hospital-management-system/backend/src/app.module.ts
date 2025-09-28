@@ -35,10 +35,15 @@ import { ComplianceModule } from './modules/compliance/compliance.module';
 // Interoperability modules
 import { FhirHl7Module } from './modules/fhir-hl7/fhir-hl7.module';
 import { PacsModule } from './modules/pacs/pacs.module';
+import { GovernmentAPIModule } from './modules/government-apis/government-api.module';
 import { DrugInteractionsModule } from './modules/drug-interactions/drug-interactions.module';
 
 // Shared modules
 import { SharedModule } from './shared/shared.module';
+
+// Vault service for secrets management
+import { VaultService } from './shared/vault/vault.service';
+import { VaultModule } from './shared/vault/vault.module';
 
 /**
  *
@@ -109,10 +114,12 @@ import { SharedModule } from './shared/shared.module';
     // Interoperability modules
     FhirHl7Module,
     PacsModule,
+    GovernmentAPIModule,
     DrugInteractionsModule,
 
     // Shared utilities
     SharedModule,
+    VaultModule,
   ],
   controllers: [],
   providers: [],

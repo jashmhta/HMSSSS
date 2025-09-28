@@ -66,6 +66,7 @@ describe('LaboratoryController (e2e)', () => {
       // Create a test catalog item first
       const testCatalog = await prisma.labTestCatalog.create({
         data: {
+          tenantId: 'test-tenant',
           testName: 'Complete Blood Count',
           testCode: 'CBC',
           category: 'HEMATOLOGY',
@@ -349,6 +350,7 @@ describe('LaboratoryController (e2e)', () => {
       await prisma.labTestCatalog.createMany({
         data: [
           {
+            tenantId: 'test-tenant',
             testName: 'Complete Blood Count',
             testCode: 'CBC',
             category: 'HEMATOLOGY',
@@ -360,6 +362,7 @@ describe('LaboratoryController (e2e)', () => {
             isActive: true,
           },
           {
+            tenantId: 'test-tenant',
             testName: 'Liver Function Test',
             testCode: 'LFT',
             category: 'CHEMISTRY',
@@ -371,6 +374,7 @@ describe('LaboratoryController (e2e)', () => {
             isActive: true,
           },
           {
+            tenantId: 'test-tenant',
             testName: 'X-Ray',
             testCode: 'XRAY',
             category: 'IMAGING',

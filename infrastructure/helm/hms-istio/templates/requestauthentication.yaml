@@ -1,0 +1,16 @@
+apiVersion: security.istio.io/v1beta1
+kind: RequestAuthentication
+metadata:
+  name: {{ include "hms-istio.fullname" . }}-requestauth
+  namespace: {{ .Values.hms.namespace }}
+  labels:
+    {{- include "hms-istio.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      app: hospital-management-system
+  jwtRules:
+  - issuer: {{ .Values.hms.security.jwt.issuer | quote }}
+    jwksUri: {{ printf "%s/protocol/openid-connect/certs" .Values.hms.security.jwt.issuer | quote }}
+    forwardOriginalToken: true
+    outputPayloadToHeader: x-jwt-payload

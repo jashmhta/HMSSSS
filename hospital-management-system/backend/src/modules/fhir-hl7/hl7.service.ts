@@ -1,18 +1,81 @@
-import { Injectable, Logger, BadRequestException } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException, HttpException, HttpStatus } from '@nestjs/common';
+import axios, { AxiosInstance } from 'axios';
+import * as https from 'https';
+import { CircuitBreaker } from 'opossum';
 
 import { PrismaService } from '../../database/prisma.service';
+import { ComplianceService } from '../compliance/compliance.service';
 
 /**
- *
+ * Enhanced HL7 Service with robust error handling and external system integration
  */
 @Injectable()
 export class Hl7Service {
   private readonly logger = new Logger(Hl7Service.name);
+  private externalClients: Map<string, AxiosInstance> = new Map();
+  private circuitBreakers: Map<string, CircuitBreaker> = new Map();
 
-  /**
-   *
-   */
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private complianceService: ComplianceService,
+  ) {
+    this.initializeExternalClients();
+  }
+
+  private initializeExternalClients() {
+    // Get external HL7 endpoints from database
+    this.loadExternalSystems();
+  }
+
+  private async loadExternalSystems() {
+    try {
+      const externalSystems = await this.prisma.externalSystem.findMany({
+        where: {
+          type: 'HL7_ENDPOINT',
+          isActive: true,
+        },
+      });
+
+      for (const system of externalSystems) {
+        const client = axios.create({
+          baseURL: system.baseUrl,
+          timeout: 30000,
+          httpsAgent: new https.Agent({
+            rejectUnauthorized: true,
+          }),
+          headers: {
+            'User-Agent': 'HMS-HL7-Client/1.0',
+            'Content-Type': 'application/hl7-v2',
+            ...(system.apiKey && { 'X-API-Key': system.apiKey }),
+          },
+        });
+
+        this.externalClients.set(system.id, client);
+
+        // Initialize circuit breaker
+        const breaker = new CircuitBreaker(
+          async (requestFn: () => Promise<any>) => {
+            return await requestFn();
+          },
+          {
+            timeout: 30000,
+            errorThresholdPercentage: 50,
+            resetTimeout: 60000,
+            name: system.name,
+          },
+        );
+
+        breaker.on('open', () =>
+          this.logger.error(`HL7 circuit breaker opened for ${system.name}`),
+        );
+        breaker.on('close', () => this.logger.log(`HL7 circuit breaker closed for ${system.name}`));
+
+        this.circuitBreakers.set(system.id, breaker);
+      }
+    } catch (error) {
+      this.logger.error('Failed to load external HL7 systems', error);
+    }
+  }
 
   /**
    * Parse HL7 message and extract structured data
@@ -128,6 +191,104 @@ export class Hl7Service {
     } catch (error) {
       this.logger.error(`Failed to convert HL7 to FHIR: ${error.message}`, error.stack);
       throw error;
+    }
+  }
+
+  /**
+   * Send HL7 message to external system
+   */
+  async sendHL7ToExternalSystem(systemId: string, hl7Message: string): Promise<any> {
+    const client = this.externalClients.get(systemId);
+    const breaker = this.circuitBreakers.get(systemId);
+
+    if (!client || !breaker) {
+      throw new BadRequestException(`External HL7 system ${systemId} not configured or available`);
+    }
+
+    try {
+      const response = await breaker.fire(async () => {
+        return client.post('/hl7', hl7Message, {
+          headers: {
+            'Content-Type': 'application/hl7-v2',
+          },
+        });
+      });
+
+      this.logger.log(`Successfully sent HL7 message to ${systemId}`);
+      return {
+        success: true,
+        systemId,
+        response: response.data,
+        sentAt: new Date(),
+      };
+    } catch (error) {
+      this.logger.error(`Failed to send HL7 message to ${systemId}: ${error.message}`);
+
+      // Log the failure for compliance
+      await this.logHL7TransmissionFailure(systemId, hl7Message, error);
+
+      throw new HttpException(
+        `Failed to send HL7 message to external system: ${error.message}`,
+        HttpStatus.BAD_GATEWAY,
+      );
+    }
+  }
+
+  /**
+   * Broadcast HL7 message to all active external systems
+   */
+  async broadcastHL7Message(hl7Message: string, excludeSystemIds: string[] = []): Promise<any[]> {
+    const results = [];
+    const systems = await this.prisma.externalSystem.findMany({
+      where: {
+        type: 'HL7_ENDPOINT',
+        isActive: true,
+        id: { notIn: excludeSystemIds },
+      },
+    });
+
+    for (const system of systems) {
+      try {
+        const result = await this.sendHL7ToExternalSystem(system.id, hl7Message);
+        results.push(result);
+      } catch (error) {
+        results.push({
+          success: false,
+          systemId: system.id,
+          error: error.message,
+          failedAt: new Date(),
+        });
+      }
+    }
+
+    return results;
+  }
+
+  /**
+   * Log HL7 transmission failure for compliance
+   */
+  private async logHL7TransmissionFailure(
+    systemId: string,
+    message: string,
+    error: any,
+  ): Promise<void> {
+    try {
+      await this.complianceService.logAuditEvent({
+        userId: null, // System operation
+        action: 'HL7_TRANSMISSION_FAILED',
+        resource: 'HL7_MESSAGE',
+        resourceId: systemId,
+        details: {
+          systemId,
+          error: error.message,
+          messagePreview: message.substring(0, 200),
+        },
+        ipAddress: null,
+        userAgent: 'HMS-HL7-Service',
+        complianceFlags: ['HL7_TRANSMISSION', 'SYSTEM_INTEGRATION'],
+      });
+    } catch (logError) {
+      this.logger.error('Failed to log HL7 transmission failure', logError);
     }
   }
 

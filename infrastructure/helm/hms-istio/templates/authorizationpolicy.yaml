@@ -1,0 +1,30 @@
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: {{ include "hms-istio.fullname" . }}-authpolicy
+  namespace: {{ .Values.hms.namespace }}
+  labels:
+    {{- include "hms-istio.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      app: hospital-management-system
+  action: ALLOW
+  rules:
+  - from:
+    - source:
+        principals: ["cluster.local/ns/istio-system/sa/istio-ingressgateway-service-account"]
+    to:
+    - operation:
+        methods: ["GET", "POST", "PUT", "DELETE", "PATCH"]
+        paths: ["/api/v1/*", "/graphql/*", "/auth/*", "/analytics/*", "/mobile/*"]
+    when:
+    - key: request.auth.claims[preferred_username]
+      values: ["*"]
+  - from:
+    - source:
+        principals: ["cluster.local/ns/*/sa/*"]
+    to:
+    - operation:
+        methods: ["GET"]
+        paths: ["/health", "/ready", "/metrics"]

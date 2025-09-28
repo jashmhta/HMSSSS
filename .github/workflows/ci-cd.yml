@@ -328,13 +328,27 @@ jobs:
         run: npm run build
         working-directory: ./mobile
 
-      - name: Run Docker build
-        run: docker-compose build
+       - name: Run Docker build
+         run: docker-compose build
 
-      - name: Push to Docker Registry
-        run: |
-          echo ${{ secrets.DOCKER_PASSWORD }} | docker login -u ${{ secrets.DOCKER_USERNAME }} --password-stdin
-          docker-compose push
+       - name: Scan images with Trivy
+         uses: aquasecurity/trivy-action@master
+         with:
+           scan-type: 'image'
+           scan-ref: './Dockerfile'
+           format: 'sarif'
+           output: 'trivy-results.sarif'
+
+       - name: Upload Trivy scan results
+         uses: github/codeql-action/upload-sarif@v3
+         if: always()
+         with:
+           sarif_file: 'trivy-results.sarif'
+
+       - name: Push to Docker Registry
+         run: |
+           echo ${{ secrets.DOCKER_PASSWORD }} | docker login -u ${{ secrets.DOCKER_USERNAME }} --password-stdin
+           docker-compose push
 
       - name: Deploy to production
         run: |

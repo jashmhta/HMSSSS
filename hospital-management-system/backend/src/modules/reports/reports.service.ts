@@ -1,769 +1,664 @@
-/*[object Object]*/
-import { Injectable } from '@nestjs/common';
-
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
+import { ComplianceService } from '../compliance/compliance.service';
+import {
+  GenerateReportDto,
+  ReportFilterDto,
+  PatientReportDto,
+  DepartmentReportDto,
+  FinancialReportDto,
+  InventoryReportDto,
+  StaffPerformanceReportDto,
+} from './dto/reports.dto';
+import { ReportType, ReportFormat, ReportStatus } from './dto/report.enums';
 
-export interface AnalyticsFilters {
-  startDate?: Date;
-  endDate?: Date;
-  department?: string;
-  doctorId?: string;
-  patientId?: string;
-}
-
-export interface RevenueAnalytics {
-  totalRevenue: number;
-  departmentBreakdown: Record<string, number>;
-  paymentMethodBreakdown: Record<string, number>;
-  monthlyTrend: Array<{ month: string; revenue: number }>;
-  topServices: Array<{ service: string; revenue: number; count: number }>;
-}
-
-export interface OPDAnalytics {
-  totalVisits: number;
-  averageWaitTime: number;
-  departmentWiseVisits: Record<string, number>;
-  doctorPerformance: Array<{
-    doctorId: string;
-    doctorName: string;
-    visitsCount: number;
-    averageConsultationTime: number;
-  }>;
-  peakHours: Array<{ hour: number; visits: number }>;
-  patientSatisfaction: number;
-}
-
-export interface IPDAnalytics {
-  totalAdmissions: number;
-  averageLengthOfStay: number;
-  bedOccupancyRate: number;
-  departmentWiseAdmissions: Record<string, number>;
-  dischargeOutcomes: Record<string, number>;
-  readmissionRate: number;
-  mortalityRate: number;
-}
-
-export interface OccupancyAnalytics {
-  overallOccupancy: number;
-  wardWiseOccupancy: Record<string, number>;
-  bedUtilization: Array<{
-    bedId: string;
-    occupancyDays: number;
-    totalDays: number;
-    utilizationRate: number;
-  }>;
-  peakOccupancyHours: Array<{ hour: number; occupancy: number }>;
-}
-
-/**
- *
- */
 @Injectable()
 export class ReportsService {
-  /**
-   *
-   */
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private complianceService: ComplianceService,
+  ) {}
 
-  // Patient Reports
   /**
-   *
+   * Generate a report based on type and parameters
    */
-  async getPatientDemographics(startDate?: string, endDate?: string) {
-    const where: any = {};
-    if (startDate || endDate) {
-      where.createdAt = {};
-      if (startDate) where.createdAt.gte = new Date(startDate);
-      if (endDate) where.createdAt.lte = new Date(endDate);
+  async generateReport(data: GenerateReportDto) {
+    const reportData = await this.getReportData(data);
+
+    // Log report generation
+    await this.complianceService.logAuditEvent({
+      userId: data.generatedBy || 'system',
+      action: 'REPORT_GENERATED',
+      resource: 'reports',
+      resourceId: `report-${Date.now()}`,
+      details: {
+        reportType: data.reportType,
+        format: data.format,
+        startDate: data.startDate,
+        endDate: data.endDate,
+      },
+      complianceFlags: ['REPORTING', 'DATA_ACCESS'],
+    });
+
+    return {
+      reportType: data.reportType,
+      format: data.format,
+      generatedAt: new Date(),
+      data: reportData,
+    };
+  }
+
+  /**
+   * Get report data based on type
+   */
+  private async getReportData(params: GenerateReportDto): Promise<any> {
+    const { reportType, startDate, endDate, department, doctorId, patientId } = params;
+    const start = startDate ? new Date(startDate) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const end = endDate ? new Date(endDate) : new Date();
+
+    switch (reportType) {
+      case ReportType.PATIENT_SUMMARY:
+        return this.generatePatientReport(patientId!, start, end);
+
+      case ReportType.DEPARTMENT_PERFORMANCE:
+        return this.generateDepartmentReport(department!, start, end);
+
+      case ReportType.FINANCIAL_SUMMARY:
+        return this.generateFinancialReport(start, end);
+
+      case ReportType.INVENTORY_STATUS:
+        return this.generateInventoryReport();
+
+      case ReportType.STAFF_PERFORMANCE:
+        return this.generateStaffPerformanceReport(start, end);
+
+      case ReportType.APPOINTMENT_ANALYTICS:
+        return this.generateAppointmentAnalytics(start, end, department, doctorId);
+
+      case ReportType.LAB_RESULTS_SUMMARY:
+        return this.generateLabResultsReport(start, end, patientId);
+
+      case ReportType.RADIOLOGY_REPORTS:
+        return this.generateRadiologyReports(start, end, patientId);
+
+      case ReportType.PHARMACY_DISPENSATION:
+        return this.generatePharmacyReport(start, end);
+
+      case ReportType.EMERGENCY_RESPONSE:
+        return this.generateEmergencyReport(start, end);
+
+      case ReportType.SURGERY_OUTCOMES:
+        return this.generateSurgeryOutcomesReport(start, end, doctorId);
+
+      case ReportType.IPD_ADMISSION_SUMMARY:
+        return this.generateIPDAdmissionReport(start, end);
+
+      case ReportType.BLOOD_BANK_INVENTORY:
+        return this.generateBloodBankReport();
+
+      case ReportType.COMPLIANCE_AUDIT:
+        return this.generateComplianceAuditReport(start, end);
+
+      default:
+        throw new NotFoundException('Report type not supported');
     }
+  }
 
-    const patients = await this.prisma.patient.findMany({
-      where,
-      select: {
-        gender: true,
-        dateOfBirth: true,
-        bloodType: true,
-        createdAt: true,
+  /**
+   * Generate patient summary report
+   */
+  private async generatePatientReport(
+    patientId: string,
+    startDate: Date,
+    endDate: Date,
+  ): Promise<PatientReportDto> {
+    const patient = await this.prisma.patient.findUnique({
+      where: { id: patientId },
+      include: {
+        user: true,
+        medicalRecords: {
+          where: {
+            visitDate: { gte: startDate, lte: endDate },
+          },
+          orderBy: { visitDate: 'desc' },
+        },
+        prescriptions: {
+          where: {
+            prescribedDate: { gte: startDate, lte: endDate },
+          },
+          include: { medication: true },
+        },
+        labTests: {
+          where: {
+            orderedDate: { gte: startDate, lte: endDate },
+          },
+          include: { results: true },
+        },
+        radiologyTests: {
+          where: {
+            orderedDate: { gte: startDate, lte: endDate },
+          },
+        },
       },
     });
 
-    // Age distribution
-    const ageGroups = {
-      '0-18': 0,
-      '19-35': 0,
-      '36-50': 0,
-      '51-65': 0,
-      '65+': 0,
-    };
-
-    // Gender distribution
-    const genderDistribution = {
-      male: 0,
-      female: 0,
-      other: 0,
-    };
-
-    // Blood type distribution
-    const bloodTypeDistribution = {
-      'A+': 0,
-      'A-': 0,
-      'B+': 0,
-      'B-': 0,
-      'AB+': 0,
-      'AB-': 0,
-      'O+': 0,
-      'O-': 0,
-    };
-
-    patients.forEach(patient => {
-      // Age calculation
-      const age = new Date().getFullYear() - new Date(patient.dateOfBirth).getFullYear();
-      if (age <= 18) ageGroups['0-18']++;
-      else if (age <= 35) ageGroups['19-35']++;
-      else if (age <= 50) ageGroups['36-50']++;
-      else if (age <= 65) ageGroups['51-65']++;
-      else ageGroups['65+']++;
-
-      // Gender
-      if (patient.gender === 'MALE') genderDistribution.male++;
-      else if (patient.gender === 'FEMALE') genderDistribution.female++;
-      else genderDistribution.other++;
-
-      // Blood type
-      if (patient.bloodType) {
-        const bloodType = patient.bloodType.replace('_', '');
-        bloodTypeDistribution[bloodType] = (bloodTypeDistribution[bloodType] || 0) + 1;
-      }
-    });
+    if (!patient) {
+      throw new NotFoundException('Patient not found');
+    }
 
     return {
-      totalPatients: patients.length,
-      ageDistribution: ageGroups,
-      genderDistribution,
-      bloodTypeDistribution,
+      patientId: patient.id,
+      patientName: `${patient.user.firstName} ${patient.user.lastName}`,
+      dateOfBirth: patient.dateOfBirth,
+      gender: patient.gender,
+      bloodType: patient.bloodType || 'Unknown',
+      medicalHistory: patient.medicalRecords.map(record => ({
+        date: record.visitDate,
+        diagnosis: record.diagnosis,
+        treatment: record.treatmentPlan,
+        notes: record.notes,
+      })),
+      currentMedications: patient.currentMedications,
+      allergies: patient.allergies,
+      recentVisits: patient.medicalRecords.slice(0, 10),
+      labResults: patient.labTests.flatMap(test => test.results),
+      radiologyReports: patient.radiologyTests,
     };
   }
 
   /**
-   *
+   * Generate department performance report
    */
-  async getPatientRegistrationTrends(period: string = 'monthly', year?: number) {
-    const currentYear = year || new Date().getFullYear();
-    const monthlyData = [];
-
-    for (let month = 1; month <= 12; month++) {
-      const startDate = new Date(currentYear, month - 1, 1);
-      const endDate = new Date(currentYear, month, 0, 23, 59, 59);
-
-      const count = await this.prisma.patient.count({
+  private async generateDepartmentReport(
+    department: string,
+    startDate: Date,
+    endDate: Date,
+  ): Promise<DepartmentReportDto> {
+    const [appointments, procedures, revenue] = await Promise.all([
+      this.prisma.appointment.count({
         where: {
-          createdAt: {
-            gte: startDate,
-            lte: endDate,
+          doctor: { department },
+          appointmentDate: { gte: startDate, lte: endDate },
+        },
+      }),
+      this.prisma.surgery.count({
+        where: {
+          operatingTheater: { type: department as any },
+          scheduledDate: { gte: startDate, lte: endDate },
+        },
+      }),
+      this.prisma.invoice.aggregate({
+        where: {
+          patient: {
+            appointments: {
+              some: {
+                doctor: { department },
+                appointmentDate: { gte: startDate, lte: endDate },
+              },
+            },
           },
         },
-      });
-
-      monthlyData.push({
-        month: startDate.toLocaleString('default', { month: 'long' }),
-        year: currentYear,
-        count,
-      });
-    }
-
-    return {
-      period,
-      year: currentYear,
-      data: monthlyData,
-    };
-  }
-
-  // Appointment Reports
-  /**
-   *
-   */
-  async getAppointmentSummary(startDate?: string, endDate?: string) {
-    const where: any = {};
-    if (startDate || endDate) {
-      where.appointmentDate = {};
-      if (startDate) where.appointmentDate.gte = new Date(startDate);
-      if (endDate) where.appointmentDate.lte = new Date(endDate);
-    }
-
-    const [
-      totalAppointments,
-      scheduledAppointments,
-      completedAppointments,
-      cancelledAppointments,
-      noShowAppointments,
-    ] = await Promise.all([
-      this.prisma.appointment.count({ where }),
-      this.prisma.appointment.count({ where: { ...where, status: 'SCHEDULED' } }),
-      this.prisma.appointment.count({ where: { ...where, status: 'COMPLETED' } }),
-      this.prisma.appointment.count({ where: { ...where, status: 'CANCELLED' } }),
-      this.prisma.appointment.count({ where: { ...where, status: 'NO_SHOW' } }),
+        _sum: { amount: true },
+      }),
     ]);
 
-    const completionRate =
-      totalAppointments > 0
-        ? ((completedAppointments / totalAppointments) * 100).toFixed(2)
-        : '0.00';
-
     return {
-      totalAppointments,
-      scheduledAppointments,
-      completedAppointments,
-      cancelledAppointments,
-      noShowAppointments,
-      completionRate: `${completionRate}%`,
+      department,
+      totalPatients: appointments,
+      totalAppointments: appointments,
+      totalProcedures: procedures,
+      revenue: revenue._sum.amount?.toNumber() || 0,
+      averageWaitTime: 0, // Would need actual wait time tracking
+      patientSatisfaction: 0, // Would need satisfaction survey data
     };
   }
 
   /**
-   *
+   * Generate financial summary report
    */
-  async getDoctorUtilization(startDate?: string, endDate?: string) {
-    const where: any = {};
-    if (startDate || endDate) {
-      where.appointmentDate = {};
-      if (startDate) where.appointmentDate.gte = new Date(startDate);
-      if (endDate) where.appointmentDate.lte = new Date(endDate);
-    }
+  private async generateFinancialReport(
+    startDate: Date,
+    endDate: Date,
+  ): Promise<FinancialReportDto> {
+    const [revenue, expenses, invoices] = await Promise.all([
+      this.prisma.invoice.aggregate({
+        where: {
+          issuedAt: { gte: startDate, lte: endDate },
+          status: 'PAID',
+        },
+        _sum: { amount: true },
+      }),
+      this.prisma.expense.aggregate({
+        where: {
+          expenseDate: { gte: startDate, lte: endDate },
+        },
+        _sum: { amount: true },
+      }),
+      this.prisma.invoice.findMany({
+        where: {
+          issuedAt: { gte: startDate, lte: endDate },
+        },
+        select: { status: true },
+      }),
+    ]);
 
+    const totalRevenue = revenue._sum.amount?.toNumber() || 0;
+    const totalExpenses = expenses._sum.amount?.toNumber() || 0;
+    const netIncome = totalRevenue - totalExpenses;
+
+    const paidInvoices = invoices.filter(inv => inv.status === 'PAID').length;
+    const outstandingInvoices = invoices.filter(inv => inv.status === 'PENDING').length;
+
+    return {
+      period: { startDate, endDate },
+      totalRevenue,
+      totalExpenses,
+      netIncome,
+      revenueByDepartment: [], // Would need department-wise revenue calculation
+      expenseBreakdown: [], // Would need expense categorization
+      outstandingInvoices,
+      paidInvoices,
+    };
+  }
+
+  /**
+   * Generate inventory status report
+   */
+  private async generateInventoryReport(): Promise<InventoryReportDto[]> {
+    const medications = await this.prisma.medication.findMany({
+      where: { isActive: true },
+    });
+
+    return medications.map(med => ({
+      itemName: med.name,
+      category: med.category || 'General',
+      currentStock: med.stockQuantity,
+      reorderLevel: med.reorderLevel,
+      unitPrice: Number(med.unitPrice),
+      totalValue: med.stockQuantity * Number(med.unitPrice),
+      lastRestocked: med.updatedAt,
+      expiryDate: med.expiryDate || undefined,
+      status: med.stockQuantity <= med.reorderLevel ? 'LOW_STOCK' : 'IN_STOCK',
+    }));
+  }
+
+  /**
+   * Generate staff performance report
+   */
+  private async generateStaffPerformanceReport(
+    startDate: Date,
+    endDate: Date,
+  ): Promise<StaffPerformanceReportDto[]> {
     const doctors = await this.prisma.doctor.findMany({
       include: {
-        user: {
-          select: {
-            firstName: true,
-            lastName: true,
-          },
-        },
+        user: true,
         appointments: {
-          where,
-          select: {
-            status: true,
-            appointmentDate: true,
+          where: {
+            appointmentDate: { gte: startDate, lte: endDate },
+          },
+        },
+        medicalRecords: {
+          where: {
+            visitDate: { gte: startDate, lte: endDate },
           },
         },
       },
     });
 
-    const utilizationData = doctors.map(doctor => {
-      const totalAppointments = doctor.appointments.length;
-      const completedAppointments = doctor.appointments.filter(
-        apt => apt.status === 'COMPLETED',
-      ).length;
-
-      const utilizationRate =
-        totalAppointments > 0
-          ? ((completedAppointments / totalAppointments) * 100).toFixed(2)
-          : '0.00';
-
-      return {
-        doctorId: doctor.id,
-        doctorName: `${doctor.user.firstName} ${doctor.user.lastName}`,
-        totalAppointments,
-        completedAppointments,
-        utilizationRate: `${utilizationRate}%`,
-      };
-    });
-
-    return utilizationData.sort(
-      (a, b) => parseFloat(b.utilizationRate) - parseFloat(a.utilizationRate),
-    );
+    return doctors.map(doctor => ({
+      staffId: doctor.id,
+      staffName: `${doctor.user.firstName} ${doctor.user.lastName}`,
+      department: doctor.department,
+      role: 'DOCTOR',
+      totalPatients: doctor.appointments.length,
+      averageRating: 0, // Would need rating system
+      completedTasks: doctor.medicalRecords.length,
+      pendingTasks: 0, // Would need task tracking
+      workingHours: 0, // Would need time tracking
+      efficiency: doctor.medicalRecords.length / Math.max(doctor.appointments.length, 1),
+    }));
   }
 
-  // Revenue Reports
   /**
-   *
+   * Generate appointment analytics report
    */
-  async getRevenueSummary(startDate?: string, endDate?: string, groupBy: string = 'monthly') {
-    const where: any = { status: 'PAID' };
-    if (startDate || endDate) {
-      where.createdAt = {};
-      if (startDate) where.createdAt.gte = new Date(startDate);
-      if (endDate) where.createdAt.lte = new Date(endDate);
+  private async generateAppointmentAnalytics(
+    startDate: Date,
+    endDate: Date,
+    department?: string,
+    doctorId?: string,
+  ) {
+    const where: any = {
+      appointmentDate: { gte: startDate, lte: endDate },
+    };
+
+    if (department) {
+      where.doctor = { department };
     }
 
-    const bills = await this.prisma.bill.findMany({
-      where,
-      select: {
-        totalAmount: true,
-        createdAt: true,
-      },
-    });
-
-    const groupedData = {};
-
-    bills.forEach(bill => {
-      let key;
-      switch (groupBy) {
-        case 'monthly': {
-          key = bill.createdAt.toISOString().slice(0, 7); // YYYY-MM
-
-          break;
-        }
-        case 'daily': {
-          key = bill.createdAt.toISOString().slice(0, 10); // YYYY-MM-DD
-
-          break;
-        }
-        case 'yearly': {
-          key = bill.createdAt.getFullYear().toString();
-
-          break;
-        }
-        // No default
-      }
-
-      if (!groupedData[key]) {
-        groupedData[key] = 0;
-      }
-      groupedData[key] += parseFloat(bill.totalAmount.toString());
-    });
-
-    const totalRevenue = bills.reduce(
-      (sum, bill) => sum + parseFloat(bill.totalAmount.toString()),
-      0,
-    );
-
-    return {
-      totalRevenue,
-      groupBy,
-      data: Object.entries(groupedData).map(([period, amount]) => ({
-        period,
-        revenue: amount,
-      })),
-    };
-  }
-
-  /**
-   *
-   */
-  async getDepartmentRevenue(startDate?: string, endDate?: string) {
-    // This would require linking bills to departments
-    // For now, return a placeholder structure
-    return {
-      message: 'Department revenue report - requires bill department mapping',
-      data: [],
-    };
-  }
-
-  /**
-   *
-   */
-  async getPaymentMethodsDistribution(startDate?: string, endDate?: string) {
-    const where: any = { status: 'PAID' };
-    if (startDate || endDate) {
-      where.createdAt = {};
-      if (startDate) where.createdAt.gte = new Date(startDate);
-      if (endDate) where.createdAt.lte = new Date(endDate);
+    if (doctorId) {
+      where.doctorId = doctorId;
     }
 
-    const bills = await this.prisma.bill.findMany({
-      where,
-      select: {
-        paymentMethod: true,
-        totalAmount: true,
-      },
-    });
-
-    const distribution = {};
-    let totalAmount = 0;
-
-    bills.forEach(bill => {
-      const method = bill.paymentMethod || 'CASH';
-      if (!distribution[method]) {
-        distribution[method] = { count: 0, amount: 0 };
-      }
-      distribution[method].count++;
-      distribution[method].amount += parseFloat(bill.totalAmount.toString());
-      totalAmount += parseFloat(bill.totalAmount.toString());
-    });
-
-    return {
-      totalAmount,
-      distribution: Object.entries(distribution).map(([method, data]: [string, any]) => ({
-        method,
-        count: data.count,
-        amount: data.amount,
-        percentage: ((data.amount / totalAmount) * 100).toFixed(2) + '%',
-      })),
-    };
-  }
-
-  // Laboratory Reports
-  /**
-   *
-   */
-  async getLabTestStatistics(startDate?: string, endDate?: string) {
-    const where: any = {};
-    if (startDate || endDate) {
-      where.orderedDate = {};
-      if (startDate) where.orderedDate.gte = new Date(startDate);
-      if (endDate) where.orderedDate.lte = new Date(endDate);
-    }
-
-    const [totalTests, completedTests, pendingTests, cancelledTests] = await Promise.all([
-      this.prisma.labTest.count({ where }),
-      this.prisma.labTest.count({ where: { ...where, status: 'COMPLETED' } }),
-      this.prisma.labTest.count({ where: { ...where, status: 'ORDERED' } }),
-      this.prisma.labTest.count({ where: { ...where, status: 'CANCELLED' } }),
-    ]);
-
-    const completionRate =
-      totalTests > 0 ? ((completedTests / totalTests) * 100).toFixed(2) : '0.00';
-
-    return {
-      totalTests,
-      completedTests,
-      pendingTests,
-      cancelledTests,
-      completionRate: `${completionRate}%`,
-    };
-  }
-
-  /**
-   *
-   */
-  async getLabTurnaroundTime(startDate?: string, endDate?: string) {
-    const tests = await this.prisma.labTest.findMany({
-      where: {
-        status: 'COMPLETED',
-        orderedDate: {
-          gte: startDate ? new Date(startDate) : undefined,
-          lte: endDate ? new Date(endDate) : undefined,
-        },
-      },
-      include: {
-        testCatalog: {
-          select: {
-            testName: true,
-          },
-        },
-        results: {
-          select: {
-            performedDate: true,
-          },
-          orderBy: {
-            performedDate: 'desc',
-          },
-          take: 1,
-        },
-      },
-    });
-
-    const turnaroundTimes = tests
-      .filter(test => test.results.length > 0)
-      .map(test => {
-        const orderedTime = new Date(test.orderedDate).getTime();
-        const resultTime = new Date(test.results[0].performedDate).getTime();
-        const hours = (resultTime - orderedTime) / (1000 * 60 * 60);
-        return {
-          testName: test.testCatalog.testName,
-          turnaroundHours: Math.round(hours * 100) / 100,
-        };
-      });
-
-    const averageTurnaround =
-      turnaroundTimes.length > 0
-        ? turnaroundTimes.reduce((sum, test) => sum + test.turnaroundHours, 0) /
-          turnaroundTimes.length
-        : 0;
-
-    return {
-      averageTurnaroundHours: Math.round(averageTurnaround * 100) / 100,
-      testCount: tests.length,
-      turnaroundTimes: turnaroundTimes.slice(0, 10), // Top 10
-    };
-  }
-
-  // Pharmacy Reports
-  /**
-   *
-   */
-  async getPharmacyDispensingReport(startDate?: string, endDate?: string) {
-    const where: any = {};
-    if (startDate || endDate) {
-      where.dispensedDate = {};
-      if (startDate) where.dispensedDate.gte = new Date(startDate);
-      if (endDate) where.dispensedDate.lte = new Date(endDate);
-    }
-
-    const prescriptions = await this.prisma.prescription.findMany({
-      where: {
-        ...where,
-        status: 'COMPLETED',
-      },
-      include: {
-        medication: {
-          select: {
-            name: true,
-            category: true,
-          },
-        },
-      },
-    });
-
-    const medicationStats = {};
-    prescriptions.forEach(prescription => {
-      const medName = prescription.medication.name;
-      if (!medicationStats[medName]) {
-        medicationStats[medName] = {
-          name: medName,
-          category: prescription.medication.category,
-          totalDispensed: 0,
-          prescriptionCount: 0,
-        };
-      }
-      medicationStats[medName].totalDispensed += prescription.quantity;
-      medicationStats[medName].prescriptionCount++;
-    });
-
-    return {
-      totalPrescriptions: prescriptions.length,
-      medications: Object.values(medicationStats).sort(
-        (a: any, b: any) => b.totalDispensed - a.totalDispensed,
-      ),
-    };
-  }
-
-  // OT/Surgery Reports
-  /**
-   *
-   */
-  async getSurgeryStatistics(startDate?: string, endDate?: string) {
-    const where: any = {};
-    if (startDate || endDate) {
-      where.scheduledDate = {};
-      if (startDate) where.scheduledDate.gte = new Date(startDate);
-      if (endDate) where.scheduledDate.lte = new Date(endDate);
-    }
-
-    const [totalSurgeries, completedSurgeries, cancelledSurgeries, emergencySurgeries] =
+    const [totalAppointments, completedAppointments, cancelledAppointments, noShows] =
       await Promise.all([
-        this.prisma.surgery.count({ where }),
-        this.prisma.surgery.count({ where: { ...where, status: 'COMPLETED' } }),
-        this.prisma.surgery.count({ where: { ...where, status: 'CANCELLED' } }),
-        this.prisma.surgery.count({ where: { ...where, priority: 'EMERGENCY' } }),
+        this.prisma.appointment.count({ where }),
+        this.prisma.appointment.count({
+          where: { ...where, status: 'COMPLETED' },
+        }),
+        this.prisma.appointment.count({
+          where: { ...where, status: 'CANCELLED' },
+        }),
+        this.prisma.appointment.count({
+          where: { ...where, status: 'NO_SHOW' },
+        }),
       ]);
 
-    const successRate =
-      totalSurgeries > 0 ? ((completedSurgeries / totalSurgeries) * 100).toFixed(2) : '0.00';
-
     return {
-      totalSurgeries,
-      completedSurgeries,
-      cancelledSurgeries,
-      emergencySurgeries,
-      successRate: `${successRate}%`,
+      period: { startDate, endDate },
+      totalAppointments,
+      completedAppointments,
+      cancelledAppointments,
+      noShows,
+      completionRate: totalAppointments > 0 ? (completedAppointments / totalAppointments) * 100 : 0,
+      department: department || 'All',
+      doctorId,
     };
   }
 
   /**
-   *
+   * Generate lab results summary report
    */
-  async getOTUtilization(startDate?: string, endDate?: string) {
-    // This would require OT schedule data
-    return {
-      message: 'OT utilization report - requires OT schedule implementation',
-      data: [],
+  private async generateLabResultsReport(startDate: Date, endDate: Date, patientId?: string) {
+    const where: any = {
+      orderedDate: { gte: startDate, lte: endDate },
     };
-  }
 
-  // Emergency Department Reports
-  /**
-   *
-   */
-  async getEmergencyTriageStats(startDate?: string, endDate?: string) {
-    const where: any = {};
-    if (startDate || endDate) {
-      where.arrivalDate = {};
-      if (startDate) where.arrivalDate.gte = new Date(startDate);
-      if (endDate) where.arrivalDate.lte = new Date(endDate);
+    if (patientId) {
+      where.patientId = patientId;
     }
 
-    const visits = await this.prisma.emergencyVisit.findMany({
+    const labTests = await this.prisma.labTest.findMany({
       where,
-      select: {
-        triageLevel: true,
-        disposition: true,
+      include: {
+        results: true,
+        patient: {
+          include: { user: true },
+        },
+        testCatalog: true,
+      },
+    });
+
+    return labTests.map(test => ({
+      testId: test.id,
+      patientName: `${test.patient.user.firstName} ${test.patient.user.lastName}`,
+      testName: test.testCatalog?.testName || 'Unknown',
+      orderedDate: test.orderedDate,
+      status: test.status,
+      results: test.results,
+      abnormalResults: test.results.filter(result => result.flag !== 'NORMAL'),
+    }));
+  }
+
+  /**
+   * Generate radiology reports
+   */
+  private async generateRadiologyReports(startDate: Date, endDate: Date, patientId?: string) {
+    const where: any = {
+      orderedDate: { gte: startDate, lte: endDate },
+    };
+
+    if (patientId) {
+      where.patientId = patientId;
+    }
+
+    const radiologyTests = await this.prisma.radiologyTest.findMany({
+      where,
+      include: {
+        patient: {
+          include: { user: true },
+        },
+        radiologist: {
+          include: { user: true },
+        },
+      },
+    });
+
+    return radiologyTests.map(test => ({
+      testId: test.id,
+      patientName: `${test.patient.user.firstName} ${test.patient.user.lastName}`,
+      testName: test.testName,
+      modality: test.modality,
+      orderedDate: test.orderedDate,
+      performedDate: test.performedDate,
+      radiologist: test.radiologist
+        ? `${test.radiologist.user.firstName} ${test.radiologist.user.lastName}`
+        : null,
+      findings: test.findings,
+      impression: test.impression,
+      status: test.status,
+    }));
+  }
+
+  /**
+   * Generate pharmacy dispensation report
+   */
+  private async generatePharmacyReport(startDate: Date, endDate: Date) {
+    const prescriptions = await this.prisma.prescription.findMany({
+      where: {
+        prescribedDate: { gte: startDate, lte: endDate },
+      },
+      include: {
+        medication: true,
+        patient: {
+          include: { user: true },
+        },
+        doctor: {
+          include: { user: true },
+        },
+      },
+    });
+
+    return prescriptions.map(prescription => ({
+      prescriptionId: prescription.id,
+      patientName: `${prescription.patient.user.firstName} ${prescription.patient.user.lastName}`,
+      doctorName: `${prescription.doctor.user.firstName} ${prescription.doctor.user.lastName}`,
+      medication: prescription.medication.name,
+      dosage: prescription.dosage,
+      quantity: prescription.quantity,
+      prescribedDate: prescription.prescribedDate,
+      dispensedDate: prescription.dispensedDate,
+      status: prescription.status,
+    }));
+  }
+
+  /**
+   * Generate emergency response report
+   */
+  private async generateEmergencyReport(startDate: Date, endDate: Date) {
+    const emergencyVisits = await this.prisma.emergencyVisit.findMany({
+      where: {
+        arrivalDate: { gte: startDate, lte: endDate },
+      },
+      include: {
+        patient: {
+          include: { user: true },
+        },
       },
     });
 
     const triageStats = {
-      LEVEL_1: 0,
-      LEVEL_2: 0,
-      LEVEL_3: 0,
-      LEVEL_4: 0,
-      LEVEL_5: 0,
+      LEVEL_1: emergencyVisits.filter(v => v.triageLevel === 'LEVEL_1').length,
+      LEVEL_2: emergencyVisits.filter(v => v.triageLevel === 'LEVEL_2').length,
+      LEVEL_3: emergencyVisits.filter(v => v.triageLevel === 'LEVEL_3').length,
+      LEVEL_4: emergencyVisits.filter(v => v.triageLevel === 'LEVEL_4').length,
+      LEVEL_5: emergencyVisits.filter(v => v.triageLevel === 'LEVEL_5').length,
     };
 
     const dispositionStats = {
-      DISCHARGED: 0,
-      ADMITTED: 0,
-      TRANSFERRED: 0,
-      LEFT_AGAINST_ADVICE: 0,
-      EXPIRED: 0,
+      DISCHARGED: emergencyVisits.filter(v => v.disposition === 'DISCHARGED').length,
+      ADMITTED: emergencyVisits.filter(v => v.disposition === 'ADMITTED').length,
+      TRANSFERRED: emergencyVisits.filter(v => v.disposition === 'TRANSFERRED').length,
+      LEFT_AGAINST_ADVICE: emergencyVisits.filter(v => v.disposition === 'LEFT_AGAINST_ADVICE')
+        .length,
+      EXPIRED: emergencyVisits.filter(v => v.disposition === 'EXPIRED').length,
     };
 
-    visits.forEach(visit => {
-      triageStats[visit.triageLevel]++;
-      dispositionStats[visit.disposition]++;
-    });
-
     return {
-      totalVisits: visits.length,
-      triageDistribution: triageStats,
-      dispositionDistribution: dispositionStats,
+      period: { startDate, endDate },
+      totalVisits: emergencyVisits.length,
+      triageStats,
+      dispositionStats,
+      averageWaitTime: 0, // Would need actual timing data
+      criticalCases: triageStats.LEVEL_1 + triageStats.LEVEL_2,
     };
   }
 
-  // Inventory Reports
   /**
-   *
+   * Generate surgery outcomes report
    */
-  async getInventoryStockLevels() {
-    const medications = await this.prisma.medication.findMany({
-      where: { isActive: true },
-      select: {
-        name: true,
-        stockQuantity: true,
-        reorderLevel: true,
-        unitPrice: true,
-        category: true,
+  private async generateSurgeryOutcomesReport(startDate: Date, endDate: Date, doctorId?: string) {
+    const where: any = {
+      scheduledDate: { gte: startDate, lte: endDate },
+    };
+
+    if (doctorId) {
+      where.surgeonId = doctorId;
+    }
+
+    const surgeries = await this.prisma.surgery.findMany({
+      where,
+      include: {
+        patient: {
+          include: { user: true },
+        },
+        surgeon: {
+          include: { user: true },
+        },
+        operatingTheater: true,
       },
     });
 
-    const stockLevels = medications.map(med => ({
-      name: med.name,
-      category: med.category,
-      currentStock: med.stockQuantity,
-      reorderLevel: med.reorderLevel,
-      status:
-        med.stockQuantity === 0
-          ? 'OUT_OF_STOCK'
-          : med.stockQuantity <= med.reorderLevel
-            ? 'LOW_STOCK'
-            : 'IN_STOCK',
-      value: med.stockQuantity * parseFloat(med.unitPrice.toString()),
-    }));
+    const outcomes = {
+      SUCCESSFUL: surgeries.filter(s => s.outcome === 'SUCCESSFUL').length,
+      COMPLICATIONS: surgeries.filter(s => s.outcome === 'COMPLICATIONS').length,
+      UNSUCCESSFUL: surgeries.filter(s => s.outcome === 'UNSUCCESSFUL').length,
+      DEATH: surgeries.filter(s => s.outcome === 'DEATH').length,
+    };
 
     return {
-      totalItems: medications.length,
-      stockLevels: stockLevels.sort((a, b) => a.currentStock - b.currentStock),
+      period: { startDate, endDate },
+      totalSurgeries: surgeries.length,
+      outcomes,
+      successRate: surgeries.length > 0 ? (outcomes.SUCCESSFUL / surgeries.length) * 100 : 0,
+      complicationRate:
+        surgeries.length > 0 ? (outcomes.COMPLICATIONS / surgeries.length) * 100 : 0,
+      surgeries: surgeries.map(s => ({
+        id: s.id,
+        patientName: `${s.patient.user.firstName} ${s.patient.user.lastName}`,
+        procedure: s.procedureName,
+        surgeon: `${s.surgeon.user.firstName} ${s.surgeon.user.lastName}`,
+        date: s.scheduledDate,
+        outcome: s.outcome,
+        complications: s.complications,
+      })),
     };
   }
 
   /**
-   *
+   * Generate IPD admission summary report
    */
-  async getInventoryExpiryAlerts(days: number = 30) {
-    const expiryDate = new Date();
-    expiryDate.setDate(expiryDate.getDate() + days);
-
-    const medications = await this.prisma.medication.findMany({
+  private async generateIPDAdmissionReport(startDate: Date, endDate: Date) {
+    // Since IPD admissions are stored in MedicalRecord, we need to query accordingly
+    const admissions = await this.prisma.medicalRecord.findMany({
       where: {
-        isActive: true,
-        expiryDate: {
-          lte: expiryDate,
-          gte: new Date(),
+        notes: { contains: 'IPD_ADMISSION' },
+        visitDate: { gte: startDate, lte: endDate },
+      },
+      include: {
+        patient: {
+          include: { user: true },
+        },
+        doctor: {
+          include: { user: true },
         },
       },
-      select: {
-        name: true,
-        expiryDate: true,
-        stockQuantity: true,
-        batchNumber: true,
+    });
+
+    const discharged = admissions.filter(a => a.diagnosis.includes('DISCHARGED')).length;
+    const currentlyAdmitted = admissions.length - discharged;
+
+    return {
+      period: { startDate, endDate },
+      totalAdmissions: admissions.length,
+      currentlyAdmitted,
+      discharged,
+      averageLengthOfStay: 0, // Would need discharge date calculation
+      admissionByDepartment: {}, // Would need department classification
+    };
+  }
+
+  /**
+   * Generate blood bank inventory report
+   */
+  private async generateBloodBankReport() {
+    const bloodInventory = await this.prisma.bloodDonation.groupBy({
+      by: ['bloodType', 'status'],
+      _count: { id: true },
+      _sum: { quantity: true },
+      where: {
+        expiryDate: { gt: new Date() },
       },
     });
 
-    return {
-      alertDays: days,
-      expiringItems: medications
-        .map(med => ({
-          name: med.name,
-          batchNumber: med.batchNumber,
-          expiryDate: med.expiryDate,
-          currentStock: med.stockQuantity,
-          daysUntilExpiry: Math.ceil(
-            (new Date(med.expiryDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24),
-          ),
-        }))
-        .sort((a, b) => a.daysUntilExpiry - b.daysUntilExpiry),
-    };
+    const inventoryByType = bloodInventory.reduce((acc, item) => {
+      if (!acc[item.bloodType]) {
+        acc[item.bloodType] = {
+          bloodType: item.bloodType,
+          available: 0,
+          quarantined: 0,
+          totalVolume: 0,
+        };
+      }
+
+      if (item.status === 'RELEASED') {
+        acc[item.bloodType].available = item._count.id;
+        acc[item.bloodType].totalVolume = item._sum.quantity || 0;
+      } else if (item.status === 'QUARANTINED') {
+        acc[item.bloodType].quarantined = item._count.id;
+      }
+
+      return acc;
+    }, {} as any);
+
+    return Object.values(inventoryByType);
   }
 
-  // Staff Performance Reports
   /**
-   *
+   * Generate compliance audit report
    */
-  async getStaffPerformanceReport(startDate?: string, endDate?: string) {
-    // This would aggregate data from various staff activities
-    return {
-      message: 'Staff performance report - requires activity tracking implementation',
-      data: [],
-    };
-  }
+  private async generateComplianceAuditReport(startDate: Date, endDate: Date) {
+    const auditLogs = await this.prisma.auditLog.findMany({
+      where: {
+        timestamp: { gte: startDate, lte: endDate },
+      },
+      orderBy: { timestamp: 'desc' },
+    });
 
-  // Dashboard Summary
-  /**
-   *
-   */
-  async getDashboardSummary() {
-    const [totalPatients, todayAppointments, pendingBills, lowStockItems, todaySurgeries] =
-      await Promise.all([
-        this.prisma.patient.count(),
-        this.prisma.appointment.count({
-          where: {
-            appointmentDate: {
-              gte: new Date(new Date().setHours(0, 0, 0, 0)),
-              lt: new Date(new Date().setHours(23, 59, 59, 999)),
-            },
-          },
-        }),
-        this.prisma.bill.count({ where: { status: 'PENDING' } }),
-        this.prisma.medication.count({
-          where: {
-            isActive: true,
-            stockQuantity: {
-              lte: this.prisma.medication.fields.reorderLevel,
-            },
-          },
-        }),
-        this.prisma.surgery.count({
-          where: {
-            scheduledDate: {
-              gte: new Date(new Date().setHours(0, 0, 0, 0)),
-              lt: new Date(new Date().setHours(23, 59, 59, 999)),
-            },
-          },
-        }),
-      ]);
+    const complianceFlags = auditLogs.flatMap(log => log.complianceFlags);
+    const flagCounts = complianceFlags.reduce((acc, flag) => {
+      acc[flag] = (acc[flag] || 0) + 1;
+      return acc;
+    }, {} as any);
 
     return {
-      totalPatients,
-      todayAppointments,
-      pendingBills,
-      lowStockItems,
-      todaySurgeries,
-      timestamp: new Date().toISOString(),
-    };
-  }
-
-  // Custom Report Generation
-  /**
-   *
-   */
-  async generateCustomReport(type: string, filters: any, startDate?: string, endDate?: string) {
-    // This would be a flexible report generator
-    // For now, return a placeholder
-    return {
-      type,
-      filters,
-      dateRange: { startDate, endDate },
-      message: 'Custom report generation - requires implementation based on report type',
-      data: [],
+      period: { startDate, endDate },
+      totalAuditEvents: auditLogs.length,
+      complianceFlagDistribution: flagCounts,
+      criticalEvents: auditLogs.filter(log =>
+        log.complianceFlags.includes('CRITICAL_PATIENT_DATA'),
+      ),
+      recentEvents: auditLogs.slice(0, 100),
     };
   }
 }

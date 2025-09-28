@@ -1,0 +1,230 @@
+---
+# Advanced Istio Configuration for Ultimate HMS
+# Circuit Breakers, Rate Limiting, and Traffic Management
+
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: hms-circuit-breakers
+  namespace: ultimate-hms
+  labels:
+    app: hospital-management-system
+spec:
+  host: "*.ultimate-hms.svc.cluster.local"
+  trafficPolicy:
+    loadBalancer:
+      simple: LEAST_REQUEST
+    connectionPool:
+      tcp:
+        maxConnections: 100
+        connectTimeout: 30s
+      http:
+        http1MaxPendingRequests: 1024
+        http2MaxRequests: 1024
+        maxRequestsPerConnection: 10
+        maxRetries: 3
+        idleTimeout: 60s
+        h2UpgradePolicy: UPGRADE
+    outlierDetection:
+      consecutive5xxErrors: 3
+      interval: 30s
+      baseEjectionTime: 30s
+      maxEjectionPercent: 50
+      consecutiveGatewayErrors: 3
+      consecutiveLocalOriginFailures: 3
+      splitExternalLocalOriginErrors: true
+    tls:
+      mode: ISTIO_MUTUAL
+
+---
+# Rate Limiting for API Gateway
+apiVersion: networking.istio.io/v1alpha3
+kind: EnvoyFilter
+metadata:
+  name: hms-rate-limiting
+  namespace: ultimate-hms
+  labels:
+    app: hospital-management-system
+spec:
+  workloadSelector:
+    labels:
+      istio: ingressgateway
+  configPatches:
+  - applyTo: HTTP_FILTER
+    match:
+      context: GATEWAY
+      listener:
+        filterChain:
+          filter:
+            name: "envoy.filters.network.http_connection_manager"
+            subFilter:
+              name: "envoy.filters.http.router"
+    patch:
+      operation: INSERT_BEFORE
+      value:
+        name: envoy.filters.http.ratelimit
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.http.ratelimit.v3.RateLimit
+          domain: hms-api
+  - applyTo: VIRTUAL_HOST
+    match:
+      context: GATEWAY
+      routeConfiguration:
+        vhost:
+          name: "*:80"
+    patch:
+      operation: MERGE
+      value:
+        rate_limits:
+        - actions:
+          - remote_address: {}
+          - header_value_match:
+              descriptor_value: "authenticated"
+              headers:
+              - name: "authorization"
+                safe_regex_match:
+                  google_re2: {}
+                  regex: "Bearer .*"
+
+---
+# Traffic Shifting for Blue-Green Deployments
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: hms-blue-green
+  namespace: ultimate-hms
+  labels:
+    app: hospital-management-system
+spec:
+  hosts:
+  - "api.hms.local"
+  http:
+  - match:
+    - headers:
+        x-canary:
+          exact: "true"
+    route:
+    - destination:
+        host: kong-proxy.ultimate-hms.svc.cluster.local
+        subset: canary
+      weight: 100
+  - route:
+    - destination:
+        host: kong-proxy.ultimate-hms.svc.cluster.local
+        subset: stable
+      weight: 100
+
+---
+# Fault Injection for Testing
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: hms-fault-injection
+  namespace: ultimate-hms
+  labels:
+    app: hospital-management-system
+spec:
+  hosts:
+  - "analytics-service.analytics-system.svc.cluster.local"
+  http:
+  - fault:
+      abort:
+        percentage:
+          value: 10.0
+        httpStatus: 503
+      delay:
+        percentage:
+          value: 5.0
+        fixedDelay: 2s
+    route:
+    - destination:
+        host: analytics-service.analytics-system.svc.cluster.local
+
+---
+# Request Routing with Header-based Routing
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: hms-header-routing
+  namespace: ultimate-hms
+  labels:
+    app: hospital-management-system
+spec:
+  hosts:
+  - "mobile-api.mobile-system.svc.cluster.local"
+  http:
+  - match:
+    - headers:
+        x-api-version:
+          exact: "v2"
+    route:
+    - destination:
+        host: mobile-api-v2.mobile-system.svc.cluster.local
+  - route:
+    - destination:
+        host: mobile-api.mobile-system.svc.cluster.local
+
+---
+# Service Mesh Policy for Security
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: hms-service-mesh-policy
+  namespace: ultimate-hms
+  labels:
+    app: hospital-management-system
+spec:
+  selector:
+    matchLabels:
+      app: hospital-management-system
+  action: ALLOW
+  rules:
+  - from:
+    - source:
+        principals: ["cluster.local/ns/*/sa/*"]
+    to:
+    - operation:
+        methods: ["GET", "POST", "PUT", "DELETE", "PATCH"]
+        paths: ["/api/*", "/graphql/*", "/analytics/*", "/mobile/*"]
+    when:
+    - key: request.auth.claims[iss]
+      values: ["https://auth.hms.local/auth/realms/hms"]
+
+---
+# Peer Authentication with Conditional mTLS
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: hms-conditional-mtls
+  namespace: ultimate-hms
+  labels:
+    app: hospital-management-system
+spec:
+  selector:
+    matchLabels:
+      app: hospital-management-system
+  mtls:
+    mode: PERMISSIVE
+
+---
+# Request Authentication with Multiple Rules
+apiVersion: security.istio.io/v1beta1
+kind: RequestAuthentication
+metadata:
+  name: hms-multi-tenant-auth
+  namespace: ultimate-hms
+  labels:
+    app: hospital-management-system
+spec:
+  selector:
+    matchLabels:
+      app: hospital-management-system
+  jwtRules:
+  - issuer: "https://auth.hms.local/auth/realms/hms"
+    jwksUri: "https://auth.hms.local/auth/realms/hms/protocol/openid-connect/certs"
+    forwardOriginalToken: true
+    outputPayloadToHeader: x-jwt-payload
+  - issuer: "https://mobile.hms.local/auth/realms/mobile"
+    jwksUri: "https://mobile.hms.local/auth/realms/mobile/protocol/openid-connect/certs"
+    forwardOriginalToken: true
+    outputPayloadToHeader: x-mobile-jwt-payload

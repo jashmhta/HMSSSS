@@ -24,10 +24,11 @@ export class AppointmentsService {
     type?: string;
     reason?: string;
     notes?: string;
+    tenantId: string;
   }) {
     // Verify patient and doctor exist
     const patient = await this.prisma.patient.findUnique({
-      where: { id: data.patientId },
+      where: { id: data.patientId, tenantId: data.tenantId },
     });
 
     if (!patient) {
@@ -35,7 +36,7 @@ export class AppointmentsService {
     }
 
     const doctor = await this.prisma.doctor.findUnique({
-      where: { id: data.doctorId },
+      where: { id: data.doctorId, tenantId: data.tenantId },
     });
 
     if (!doctor) {
@@ -57,6 +58,7 @@ export class AppointmentsService {
 
     return this.prisma.appointment.create({
       data: {
+        tenantId: data.tenantId,
         patientId: data.patientId,
         doctorId: data.doctorId,
         appointmentDate: data.appointmentDate,

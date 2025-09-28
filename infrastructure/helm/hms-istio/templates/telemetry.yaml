@@ -1,0 +1,48 @@
+apiVersion: telemetry.istio.io/v1alpha1
+kind: Telemetry
+metadata:
+  name: {{ include "hms-istio.fullname" . }}-telemetry
+  namespace: {{ .Values.hms.namespace }}
+  labels:
+    {{- include "hms-istio.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      app: hospital-management-system
+  {{- if .Values.hms.tracing.enabled }}
+  tracing:
+  - providers:
+    - name: {{ .Values.hms.tracing.provider }}
+    randomSamplingPercentage: 100.0
+    customTags:
+    - tag: tenant-id
+      literal:
+        value: "%REQ(X-TENANT-ID)%"
+    - tag: user-id
+      literal:
+        value: "%DYNAMIC_METADATA(envoy.filters.http.jwt_authn:payload.sub)%"
+    - tag: service-version
+      literal:
+        value: "%META(service-version)%"
+  {{- end }}
+  accessLogging:
+  - providers:
+    - name: envoy
+    filter:
+      expression: "response.code >= 400"
+  metrics:
+  - providers:
+    - name: prometheus
+    overrides:
+    - match:
+        metric: REQUEST_COUNT
+        mode: CLIENT_AND_SERVER
+      tagOverrides:
+        request_operation:
+          value: "istio_operationId"
+    - match:
+        metric: REQUEST_DURATION
+        mode: CLIENT_AND_SERVER
+      tagOverrides:
+        response_code:
+          value: "istio_responseCode"

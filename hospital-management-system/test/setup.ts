@@ -24,14 +24,14 @@ async function setupTestDatabase() {
     execSync('createdb hms_test || true', { stdio: 'ignore' });
 
     // Run migrations
-    execSync('npx prisma migrate deploy', {
+    execSync('npx prisma migrate deploy --schema=./backend/prisma/schema.prisma', {
       cwd: join(__dirname, '../'),
       stdio: 'inherit'
     });
 
     // Seed test data
     execSync('npx prisma db seed', {
-      cwd: join(__dirname, '../'),
+      cwd: join(__dirname, '../backend'),
       stdio: 'inherit'
     });
   } catch (error) {

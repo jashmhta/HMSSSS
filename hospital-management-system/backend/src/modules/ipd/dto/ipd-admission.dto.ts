@@ -75,6 +75,9 @@ export class CreateIPDAdmissionDto {
   patientId: string;
 
   @IsString()
+  tenantId: string;
+
+  @IsString()
   admittingDoctorId: string;
 
   @IsString()

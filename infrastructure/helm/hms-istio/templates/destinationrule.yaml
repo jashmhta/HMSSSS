@@ -1,0 +1,33 @@
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: {{ include "hms-istio.fullname" . }}-destinationrule
+  namespace: {{ .Values.hms.namespace }}
+  labels:
+    {{- include "hms-istio.labels" . | nindent 4 }}
+spec:
+  host: "*.{{ .Values.hms.namespace }}.svc.cluster.local"
+  trafficPolicy:
+    loadBalancer:
+      simple: LEAST_REQUEST
+    connectionPool:
+      tcp:
+        maxConnections: {{ .Values.hms.circuitBreaker.maxConnections }}
+        connectTimeout: 30s
+      http:
+        http1MaxPendingRequests: 1024
+        http2MaxRequests: 1024
+        maxRequestsPerConnection: 10
+        maxRetries: {{ .Values.hms.circuitBreaker.maxRetries }}
+        idleTimeout: 60s
+        h2UpgradePolicy: UPGRADE
+    outlierDetection:
+      consecutive5xxErrors: 3
+      interval: 30s
+      baseEjectionTime: 30s
+      maxEjectionPercent: 50
+      consecutiveGatewayErrors: 3
+      consecutiveLocalOriginFailures: 3
+      splitExternalLocalOriginErrors: true
+    tls:
+      mode: ISTIO_MUTUAL

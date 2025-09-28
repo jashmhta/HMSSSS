@@ -1,0 +1,66 @@
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: {{ include "hms-istio.fullname" . }}-virtualservice
+  namespace: {{ .Values.hms.namespace }}
+  labels:
+    {{- include "hms-istio.labels" . | nindent 4 }}
+spec:
+  hosts:
+  - "*"
+  gateways:
+  - {{ include "hms-istio.fullname" . }}-gateway
+  http:
+  - match:
+    - uri:
+        prefix: "/api/v1"
+    route:
+    - destination:
+        host: kong-proxy.{{ .Values.hms.namespace }}.svc.cluster.local
+        port:
+          number: 8000
+    {{- if .Values.hms.rateLimiting.enabled }}
+    retries:
+      attempts: {{ .Values.hms.circuitBreaker.maxRetries }}
+      perTryTimeout: 5s
+    {{- end }}
+  - match:
+    - uri:
+        prefix: "/graphql"
+    route:
+    - destination:
+        host: graphql-gateway.graphql-system.svc.cluster.local
+        port:
+          number: 4000
+  - match:
+    - uri:
+        prefix: "/auth"
+    route:
+    - destination:
+        host: keycloak.security-system.svc.cluster.local
+        port:
+          number: 80
+  - match:
+    - uri:
+        prefix: "/analytics"
+    route:
+    - destination:
+        host: analytics-service.analytics-system.svc.cluster.local
+        port:
+          number: 80
+  - match:
+    - uri:
+        prefix: "/mobile"
+    route:
+    - destination:
+        host: mobile-api.mobile-system.svc.cluster.local
+        port:
+          number: 80
+  - match:
+    - uri:
+        prefix: "/health"
+    route:
+    - destination:
+        host: hms-health-check.{{ .Values.hms.namespace }}.svc.cluster.local
+        port:
+          number: 80

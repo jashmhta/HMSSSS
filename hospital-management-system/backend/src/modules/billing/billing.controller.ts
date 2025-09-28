@@ -161,6 +161,7 @@ export class BillingController {
     return this.billingService.createComprehensiveBill({
       ...data,
       createdBy: req.user.id,
+      tenantId: req.user.tenantId,
     });
   }
 

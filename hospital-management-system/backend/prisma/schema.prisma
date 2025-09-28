@@ -8,11 +8,17 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+  shadowDatabaseUrl = env("SHADOW_DATABASE_URL") // For migrations
 }
+
+// Read replicas configuration
+// Note: Prisma doesn't directly support read replicas in schema, but we can configure in connection string
+// Use DATABASE_URL with multiple hosts for load balancing
 
 // Core User Management
 model User {
   id                String      @id @default(cuid())
+  tenantId          String      // Multi-tenancy: Hospital ID
   email             String      @unique
   password          String
   firstName         String
@@ -37,30 +43,38 @@ model User {
   passwordChangedAt   DateTime?
   lastPasswordReset   DateTime?
 
-   // Relations
-   patient            Patient?
-   doctor             Doctor?
-   nurse              Nurse?
-   receptionist       Receptionist?
-   labTechnician      LabTechnician?
-   pharmacist         Pharmacist?
-    admin              Admin?
-    notifications      Notification[]
-    auditLogs          AuditLog[]
+  // Archiving
+  isArchived        Boolean     @default(false)
+  archivedAt        DateTime?
 
-   // Audit
-   createdBy          String?
-   updatedBy          String?
+   // Relations
+    patient            Patient?
+    doctor             Doctor?
+    nurse              Nurse?
+    receptionist       Receptionist?
+    labTechnician      LabTechnician?
+    pharmacist         Pharmacist?
+     admin              Admin?
+     notifications      Notification[]
+     auditLogs          AuditLog[]
+
+    // Audit
+    createdBy          String?
+    updatedBy          String?
 
   @@map("users")
 
   // Indexes for performance
+  @@index([tenantId])
   @@index([email])
   @@index([role])
   @@index([isActive])
   @@index([lastLogin])
   @@index([failedLoginAttempts])
   @@index([lockedUntil])
+  @@index([isArchived])
+  @@index([tenantId, role]) // Composite for tenant-specific queries
+  @@index([tenantId, isArchived]) // For archiving queries
 }
 
 enum MFAMethod {
@@ -83,6 +97,7 @@ enum UserRole {
 // Patient Management
 model Patient {
   id                String   @id @default(cuid())
+  tenantId          String   // Multi-tenancy
   userId            String   @unique
   mrn               String   @unique // Medical Record Number
   dateOfBirth       DateTime
@@ -95,36 +110,42 @@ model Patient {
   medicalHistory    Json?    // Medical history summary
   allergies         String[]
   currentMedications String[]
+  isArchived        Boolean  @default(false) // For archiving
+  archivedAt        DateTime?
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
-    // Relations
-    user              User     @relation(fields: [userId], references: [id])
-    appointments      Appointment[]
-    medicalRecords    MedicalRecord[]
-    prescriptions     Prescription[]
-    bills             Bill[]
-     labTests          LabTest[]
-     radiologyTests    RadiologyTest[]
-     emergencyVisits   EmergencyVisit[]
-     opdVisits         OPDVisit[]
-     surgeries         Surgery[]
-     invoices          Invoice[]
-     fhirResources     FHIRResource[]
-     hl7Messages       HL7Message[]
-     dicomStudies      DICOMStudy[]
-     interactionChecks InteractionCheck[]
-     ipdAdmissions     IPDAdmission[]
+     // Relations
+     user              User     @relation(fields: [userId], references: [id])
+     appointments      Appointment[]
+     medicalRecords    MedicalRecord[]
+     prescriptions     Prescription[]
+     bills             Bill[]
+      labTests          LabTest[]
+      radiologyTests    RadiologyTest[]
+      emergencyVisits   EmergencyVisit[]
+      opdVisits         OPDVisit[]
+      surgeries         Surgery[]
+      invoices          Invoice[]
+      fhirResources     FHIRResource[]
+      hl7Messages       HL7Message[]
+      dicomStudies      DICOMStudy[]
+      interactionChecks InteractionCheck[]
+      ipdAdmissions     IPDAdmission[]
 
   @@map("patients")
 
   // Indexes for performance
+  @@index([tenantId])
   @@index([mrn])
   @@index([userId])
   @@index([dateOfBirth])
   @@index([gender])
   @@index([bloodType])
   @@index([createdAt])
+  @@index([isArchived])
+  @@index([tenantId, mrn]) // Composite
+  @@index([tenantId, createdAt]) // For partitioning
 }
 
 enum Gender {
@@ -147,6 +168,7 @@ enum BloodType {
 // Doctor Management
 model Doctor {
   id                String   @id @default(cuid())
+  tenantId          String   // Multi-tenancy
   userId            String   @unique
   licenseNumber     String   @unique
   specialization    String
@@ -155,6 +177,8 @@ model Doctor {
   qualifications    String[]
   schedule          Json?    // Weekly schedule
   isAvailable       Boolean  @default(true)
+  isArchived        Boolean  @default(false)
+  archivedAt        DateTime?
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
@@ -167,11 +191,16 @@ model Doctor {
   radiologyTests    RadiologyTest[]
 
   @@map("doctors")
+
+  // Indexes
+  @@index([tenantId])
+  @@index([isArchived])
 }
 
 // Appointment Management
 model Appointment {
   id                String            @id @default(cuid())
+  tenantId          String            // Multi-tenancy
   patientId         String
   doctorId          String
   appointmentDate   DateTime
@@ -181,6 +210,8 @@ model Appointment {
   reason            String?
   notes             String?
   roomNumber        String?
+  isArchived        Boolean           @default(false)
+  archivedAt        DateTime?
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
 
@@ -192,12 +223,15 @@ model Appointment {
   @@map("appointments")
 
   // Indexes for performance
+  @@index([tenantId])
   @@index([patientId])
   @@index([doctorId])
   @@index([appointmentDate])
   @@index([status])
   @@index([type])
   @@index([createdAt])
+  @@index([isArchived])
+  @@index([tenantId, appointmentDate]) // Partition key
 }
 
 enum AppointmentType {
@@ -220,6 +254,7 @@ enum AppointmentStatus {
 // Medical Records
 model MedicalRecord {
   id                String   @id @default(cuid())
+  tenantId          String   // Multi-tenancy
   patientId         String
   doctorId          String
   visitDate         DateTime
@@ -231,6 +266,8 @@ model MedicalRecord {
   medications       Json?    // Prescribed medications
   followUpDate      DateTime?
   notes             String?
+  isArchived        Boolean  @default(false)
+  archivedAt        DateTime?
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
@@ -239,6 +276,15 @@ model MedicalRecord {
   doctor            Doctor   @relation(fields: [doctorId], references: [id])
 
   @@map("medical_records")
+
+  // Indexes
+  @@index([tenantId])
+  @@index([patientId])
+  @@index([doctorId])
+  @@index([visitDate])
+  @@index([isArchived])
+  @@index([tenantId, visitDate]) // Partition key
+  @@index([tenantId, patientId, visitDate]) // Composite for patient history
 }
 
 // Pharmacy Management
@@ -284,6 +330,7 @@ enum DosageForm {
 // Prescription Management
 model Prescription {
   id                String             @id @default(cuid())
+  tenantId          String             // Multi-tenancy
   patientId         String
   doctorId          String
   medicationId      String
@@ -296,6 +343,8 @@ model Prescription {
   prescribedDate    DateTime          @default(now())
   dispensedDate     DateTime?
   dispensedBy       String?
+  isArchived        Boolean           @default(false)
+  archivedAt        DateTime?
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
 
@@ -306,6 +355,10 @@ model Prescription {
    interactionChecks InteractionCheck[]
 
   @@map("prescriptions")
+
+  // Indexes
+  @@index([tenantId])
+  @@index([isArchived])
 }
 
 enum PrescriptionStatus {
@@ -318,6 +371,7 @@ enum PrescriptionStatus {
 // Laboratory Management
 model LabTestCatalog {
   id                String         @id @default(cuid())
+  tenantId          String         // Multi-tenancy
   testCode          String         @unique
   testName          String
   category          String
@@ -334,6 +388,8 @@ model LabTestCatalog {
   cost              Decimal        @db.Decimal(10,2)
   isActive          Boolean        @default(true)
   requiresApproval  Boolean        @default(false)
+  isArchived        Boolean        @default(false)
+  archivedAt        DateTime?
   createdAt         DateTime       @default(now())
   updatedAt         DateTime       @updatedAt
 
@@ -343,14 +399,17 @@ model LabTestCatalog {
   @@map("lab_test_catalog")
 
   // Indexes
+  @@index([tenantId])
   @@index([testCode])
   @@index([category])
   @@index([department])
   @@index([isActive])
+  @@index([isArchived])
 }
 
 model LabTest {
   id                String         @id @default(cuid())
+  tenantId          String         // Multi-tenancy
   patientId         String
   testCatalogId     String
   orderNumber       String         @unique
@@ -361,6 +420,8 @@ model LabTest {
   clinicalInfo      String?        // Clinical indication
   diagnosis         String?        // Suspected diagnosis
   urgent            Boolean        @default(false)
+  isArchived        Boolean        @default(false)
+  archivedAt        DateTime?
   createdAt         DateTime       @default(now())
   updatedAt         DateTime       @updatedAt
 
@@ -374,12 +435,14 @@ model LabTest {
   @@map("lab_tests")
 
   // Indexes
+  @@index([tenantId])
   @@index([patientId])
   @@index([testCatalogId])
   @@index([status])
   @@index([priority])
   @@index([orderedDate])
   @@index([urgent])
+  @@index([isArchived])
 }
 
 model LabSample {
@@ -721,6 +784,7 @@ enum SyncStatus {
 // Radiology Management
 model RadiologyTest {
   id                String               @id @default(cuid())
+  tenantId          String               // Multi-tenancy
   patientId         String
   testName          String
   testCode          String
@@ -738,6 +802,8 @@ model RadiologyTest {
   recommendations   String?
   images            String[]             // File paths/URLs
   urgent            Boolean              @default(false)
+  isArchived        Boolean              @default(false)
+  archivedAt        DateTime?
   createdAt         DateTime             @default(now())
   updatedAt         DateTime             @updatedAt
 
@@ -746,6 +812,10 @@ model RadiologyTest {
   radiologist       Doctor?              @relation(fields: [radiologistId], references: [id])
 
   @@map("radiology_tests")
+
+  // Indexes
+  @@index([tenantId])
+  @@index([isArchived])
 }
 
 enum RadiologyModality {
@@ -768,6 +838,7 @@ enum RadiologyTestStatus {
 // Billing & Invoicing
 model Bill {
   id                String         @id @default(cuid())
+  tenantId          String         // Multi-tenancy
   patientId         String
   billNumber        String         @unique
   billDate          DateTime       @default(now())
@@ -782,6 +853,8 @@ model Bill {
   paymentMethod     PaymentMethod?
   paymentDate       DateTime?
   notes             String?
+  isArchived        Boolean        @default(false)
+  archivedAt        DateTime?
   createdAt         DateTime       @default(now())
   updatedAt         DateTime       @updatedAt
 
@@ -791,6 +864,10 @@ model Bill {
   insuranceClaims   InsuranceClaim[]
 
   @@map("bills")
+
+  // Indexes
+  @@index([tenantId])
+  @@index([isArchived])
 }
 
 enum BillStatus {
@@ -841,6 +918,7 @@ enum BillItemType {
 // Emergency Department
 model EmergencyVisit {
   id                String             @id @default(cuid())
+  tenantId          String             // Multi-tenancy
   patientId         String
   visitNumber       String             @unique
   arrivalDate       DateTime           @default(now())
@@ -852,6 +930,8 @@ model EmergencyVisit {
   disposition       EmergencyDisposition
   dischargeDate     DateTime?
   notes             String?
+  isArchived        Boolean            @default(false)
+  archivedAt        DateTime?
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
 
@@ -863,6 +943,10 @@ model EmergencyVisit {
   alerts            EmergencyAlert[]
 
   @@map("emergency_visits")
+
+  // Indexes
+  @@index([tenantId])
+  @@index([isArchived])
 }
 
 enum TriageLevel {
@@ -884,6 +968,7 @@ enum EmergencyDisposition {
 // OPD (Outpatient Department) Management
 model OPDVisit {
   id                String         @id @default(cuid())
+  tenantId          String         // Multi-tenancy
   patientId         String
   doctorId          String
   visitNumber       String         @unique
@@ -899,6 +984,8 @@ model OPDVisit {
   notes             String?
   roomNumber        String?
   priority          PriorityLevel  @default(NORMAL)
+  isArchived        Boolean        @default(false)
+  archivedAt        DateTime?
   createdAt         DateTime       @default(now())
   updatedAt         DateTime       @updatedAt
 
@@ -906,6 +993,10 @@ model OPDVisit {
   patient           Patient        @relation(fields: [patientId], references: [id])
 
   @@map("opd_visits")
+
+  // Indexes
+  @@index([tenantId])
+  @@index([isArchived])
 }
 
 enum OPDVisitStatus {
@@ -926,12 +1017,15 @@ enum PriorityLevel {
 // Operating Theater (OT) Management
 model OperatingTheater {
   id          String   @id @default(cuid())
+  tenantId    String   // Multi-tenancy
   name        String   @unique
   location    String
   type        OTType
   capacity    Int      @default(1) // Number of beds/tables
   equipment   String[] // Available equipment
   isActive    Boolean  @default(true)
+  isArchived  Boolean  @default(false)
+  archivedAt  DateTime?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -939,6 +1033,10 @@ model OperatingTheater {
   surgeries   Surgery[]
 
   @@map("operating_theaters")
+
+  // Indexes
+  @@index([tenantId])
+  @@index([isArchived])
 }
 
 model Surgery {
@@ -1205,6 +1303,7 @@ enum ComplianceSeverity {
 // Audit Logging
 model AuditLog {
   id                String   @id @default(cuid())
+  tenantId          String   // Multi-tenancy
   userId            String
   user              User     @relation(fields: [userId], references: [id])
   action            String   // e.g., "PATIENT_RECORD_ACCESSED", "MEDICAL_RECORD_CREATED"
@@ -1218,16 +1317,22 @@ model AuditLog {
   complianceFlags   String[] // e.g., ["HIPAA", "PHI_ACCESS", "GDPR"]
   sessionId         String?  // For tracking user sessions
   success           Boolean  @default(true) // Whether the action succeeded
+  isArchived        Boolean  @default(false)
+  archivedAt        DateTime?
 
   @@map("audit_logs")
 
   // Indexes for performance
+  @@index([tenantId])
   @@index([userId])
   @@index([action])
   @@index([resource])
   @@index([timestamp])
   @@index([complianceFlags])
   @@index([sessionId])
+  @@index([isArchived])
+  @@index([tenantId, timestamp]) // Partition key
+  @@index([tenantId, action, timestamp]) // For compliance reporting
 }
 
 // Data Retention Tracking
@@ -1424,6 +1529,7 @@ model InsuranceClaim {
 // Notification Model
 model Notification {
   id                String      @id @default(cuid())
+  tenantId          String      // Multi-tenancy
   userId            String
   title             String
   message           String
@@ -1431,15 +1537,19 @@ model Notification {
   metadata          Json?
   isRead            Boolean     @default(false)
   readAt            DateTime?
+  isArchived        Boolean     @default(false)
+  archivedAt        DateTime?
   createdAt         DateTime    @default(now())
 
   // Relations
   user              User        @relation(fields: [userId], references: [id])
 
   @@map("notifications")
+  @@index([tenantId])
   @@index([userId])
   @@index([isRead])
   @@index([createdAt])
+  @@index([isArchived])
 }
 
 
@@ -2065,6 +2175,7 @@ model TreatmentPlan {
 // IPD Admission Model
 model IPDAdmission {
   id                String   @id @default(cuid())
+  tenantId          String   // Multi-tenancy
   admissionNumber   String   @unique
   patientId         String
   doctorId          String
@@ -2074,6 +2185,8 @@ model IPDAdmission {
   admissionType     String   // EMERGENCY, ELECTIVE, TRANSFER
   admissionReason   String
   currentStatus     String   @default("ADMITTED") // ADMITTED, DISCHARGED, TRANSFERRED
+  isArchived        Boolean  @default(false)
+  archivedAt        DateTime?
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
@@ -2082,9 +2195,11 @@ model IPDAdmission {
   treatmentPlan     TreatmentPlan?
 
   @@map("ipd_admissions")
+  @@index([tenantId])
   @@index([patientId])
   @@index([doctorId])
   @@index([admissionDate])
   @@index([currentStatus])
+  @@index([isArchived])
 }
 

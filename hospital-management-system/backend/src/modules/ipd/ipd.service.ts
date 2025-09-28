@@ -420,6 +420,7 @@ export class IPDService {
     const admission = await this.prisma.medicalRecord.create({
       data: {
         patientId: admissionData.patientId,
+        tenantId: admissionData.tenantId,
         doctorId: admissionData.admittingDoctorId,
         visitDate: new Date(),
         chiefComplaint: admissionData.primaryDiagnosis,
@@ -674,6 +675,7 @@ export class IPDService {
         await this.prisma.prescription.create({
           data: {
             patientId: record.patientId,
+            tenantId: record.tenantId,
             doctorId: record.doctorId,
             medicationId: med.medicationId,
             dosage: med.dosage,

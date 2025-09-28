@@ -1,0 +1,349 @@
+---
+# Advanced Horizontal Pod Autoscaling for Ultimate HMS
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: hpa-system
+  labels:
+    app: hospital-management-system
+    component: hpa
+
+---
+# Prometheus Adapter for Custom Metrics
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-adapter-config
+  namespace: hpa-system
+  labels:
+    app: hospital-management-system
+    component: hpa
+data:
+  config.yaml: |
+    rules:
+    - seriesQuery: 'http_requests_total{namespace!="",pod!=""}'
+      resources:
+        overrides:
+          namespace:
+            resource: namespace
+          pod:
+            resource: pod
+      name:
+        matches: "http_requests_total"
+        as: "http_requests_per_second"
+      metricsQuery: 'sum(rate(http_requests_total{<<.LabelMatchers>>}[5m])) by (<<.GroupBy>>)'
+
+    - seriesQuery: 'kafka_consumer_lag{namespace!="",pod!=""}'
+      resources:
+        overrides:
+          namespace:
+            resource: namespace
+          pod:
+            resource: pod
+      name:
+        matches: "kafka_consumer_lag"
+        as: "kafka_consumer_lag"
+      metricsQuery: 'sum(kafka_consumer_lag{<<.LabelMatchers>>}) by (<<.GroupBy>>)'
+
+    - seriesQuery: 'jvm_memory_used_bytes{namespace!="",pod!=""}'
+      resources:
+        overrides:
+          namespace:
+            resource: namespace
+          pod:
+            resource: pod
+      name:
+        matches: "jvm_memory_used_bytes"
+        as: "jvm_memory_usage_percent"
+      metricsQuery: 'sum(jvm_memory_used_bytes{<<.LabelMatchers>>}) / sum(jvm_memory_max_bytes{<<.LabelMatchers>>}) * 100'
+
+---
+# HPA for Analytics Service
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: analytics-hpa
+  namespace: analytics-system
+  labels:
+    app: hospital-management-system
+    component: analytics
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: analytics-service
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  - type: Pods
+    pods:
+      metric:
+        name: http_requests_per_second
+      target:
+        type: AverageValue
+        averageValue: 100
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 10
+        periodSeconds: 60
+      - type: Pods
+        value: 1
+        periodSeconds: 60
+      selectPolicy: Min
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Percent
+        value: 50
+        periodSeconds: 60
+      - type: Pods
+        value: 2
+        periodSeconds: 60
+      selectPolicy: Max
+
+---
+# HPA for Mobile API Service
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: mobile-api-hpa
+  namespace: mobile-system
+  labels:
+    app: hospital-management-system
+    component: mobile
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: mobile-api
+  minReplicas: 3
+  maxReplicas: 20
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 60
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 75
+  - type: Pods
+    pods:
+      metric:
+        name: http_requests_per_second
+      target:
+        type: AverageValue
+        averageValue: 200
+  - type: External
+    external:
+      metric:
+        name: kafka_consumer_lag
+        selector:
+          matchLabels:
+            topic: mobile-events
+      target:
+        type: AverageValue
+        averageValue: 100
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 600
+      policies:
+      - type: Percent
+        value: 20
+        periodSeconds: 120
+      selectPolicy: Min
+    scaleUp:
+      stabilizationWindowSeconds: 120
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 60
+      - type: Pods
+        value: 5
+        periodSeconds: 60
+      selectPolicy: Max
+
+---
+# HPA for RBAC Service
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: rbac-hpa
+  namespace: security-system
+  labels:
+    app: hospital-management-system
+    component: security
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: rbac-service
+  minReplicas: 2
+  maxReplicas: 8
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 50
+  - type: Pods
+    pods:
+      metric:
+        name: http_requests_per_second
+      target:
+        type: AverageValue
+        averageValue: 50
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 900
+      policies:
+      - type: Percent
+        value: 25
+        periodSeconds: 300
+    scaleUp:
+      stabilizationWindowSeconds: 180
+      policies:
+      - type: Percent
+        value: 50
+        periodSeconds: 60
+
+---
+# HPA for GraphQL API
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: graphql-hpa
+  namespace: graphql-system
+  labels:
+    app: hospital-management-system
+    component: graphql
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: graphql-api
+  minReplicas: 3
+  maxReplicas: 15
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 65
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Pods
+    pods:
+      metric:
+        name: http_requests_per_second
+      target:
+        type: AverageValue
+        averageValue: 150
+  - type: External
+    external:
+      metric:
+        name: jvm_memory_usage_percent
+      target:
+        type: AverageValue
+        averageValue: 85
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 600
+      policies:
+      - type: Percent
+        value: 30
+        periodSeconds: 120
+    scaleUp:
+      stabilizationWindowSeconds: 90
+      policies:
+      - type: Percent
+        value: 75
+        periodSeconds: 60
+      - type: Pods
+        value: 3
+        periodSeconds: 60
+
+---
+# Vertical Pod Autoscaler for Resource Optimization
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: hms-vpa
+  namespace: ultimate-hms
+  labels:
+    app: hospital-management-system
+    component: hpa
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: kong-proxy
+  updatePolicy:
+    updateMode: "Auto"
+  resourcePolicy:
+    containerPolicies:
+    - containerName: proxy
+      minAllowed:
+        cpu: 100m
+        memory: 256Mi
+      maxAllowed:
+        cpu: 2
+        memory: 4Gi
+      controlledResources: ["cpu", "memory"]
+
+---
+# Cluster Autoscaler Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cluster-autoscaler-config
+  namespace: kube-system
+  labels:
+    app: hospital-management-system
+    component: hpa
+data:
+  scale-up-delay-after-add: "1m"
+  scale-down-delay-after-delete: "2m"
+  scale-down-delay-after-failure: "3m"
+  scale-down-unneeded-time: "10m"
+  scale-down-unready-time: "20m"
+  scale-down-utilization-threshold: "0.5"
+  scan-interval: "10s"
+  max-nodes-total: "100"
+  cores-total: "64:128"
+  memory-total: "128:256"
+  gpu-total: "0:0"
+  scale-up-from-zero: "true"
+  expendable-pods-priority-cutoff: "-10"
+  regional: "true"
+  new-pod-scale-up-delay: "0s"
+  ignore-taint: "ignore-taint.example.com"
+  balancing-ignore-label: "balancing-ignore-label.example.com"
+  aws-use-static-instance-list: "false"
+  aws-api-endpoint: ""
+  aws-region: "us-east-1"

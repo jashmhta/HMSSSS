@@ -12,22 +12,24 @@ spec:
   policyTypes:
   - Ingress
   - Egress
-  ingress:
-  - from:
-    - namespaceSelector:
-        matchLabels:
-          name: istio-system
-    - namespaceSelector:
-        matchLabels:
-          name: kube-system
-    - namespaceSelector:
-        matchLabels:
-          name: ultimate-hms
-    - namespaceSelector:
-        matchLabels:
-          name: monitoring
-    - podSelector: {}
-    ports:
+   ingress:
+   - from:
+     - namespaceSelector:
+         matchLabels:
+           name: istio-system
+     - namespaceSelector:
+         matchLabels:
+           name: kube-system
+     - namespaceSelector:
+         matchLabels:
+           name: ultimate-hms
+     - namespaceSelector:
+         matchLabels:
+           name: monitoring
+     - namespaceSelector:
+         matchLabels:
+           name: vault
+     ports:
     - protocol: TCP
       port: 8080
     - protocol: TCP
@@ -82,41 +84,111 @@ spec:
       port: 53
     - protocol: UDP
       port: 53
-  - to: []
+   - to: []
+     ports:
+     - protocol: TCP
+       port: 443
+     - protocol: TCP
+       port: 80
+     - protocol: TCP
+       port: 9200
+     - protocol: TCP
+       port: 9300
+     - protocol: TCP
+       port: 5432
+     - protocol: TCP
+       port: 27017
+     - protocol: TCP
+       port: 9092
+     - protocol: TCP
+       port: 5601
+     - protocol: TCP
+       port: 5044
+     - protocol: TCP
+       port: 8000
+     - protocol: TCP
+       port: 8001
+     - protocol: TCP
+       port: 2181
+     - protocol: TCP
+       port: 2379
+     - protocol: TCP
+       port: 2380
+     - protocol: TCP
+       port: 9114
+     - protocol: TCP
+       port: 9216
+     - protocol: TCP
+       port: 9090
+     - protocol: TCP
+       port: 3000
+---
+# Enhanced Security Network Policies
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: vault-access-policy
+  namespace: ultimate-hms
+spec:
+  podSelector:
+    matchLabels:
+      app: vault
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ultimate-hms
+    - namespaceSelector:
+        matchLabels:
+          name: istio-system
     ports:
     - protocol: TCP
-      port: 443
-    - protocol: TCP
-      port: 80
-    - protocol: TCP
-      port: 9200
-    - protocol: TCP
-      port: 9300
+      port: 8200
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: database-isolation
+  namespace: ultimate-hms
+spec:
+  podSelector:
+    matchLabels:
+      app: postgresql
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ultimate-hms
+    - podSelector:
+        matchLabels:
+          app: hms-backend
+    ports:
     - protocol: TCP
       port: 5432
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: restrict-backend-access
+  namespace: ultimate-hms
+spec:
+  podSelector:
+    matchLabels:
+      app: hms-backend
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: istio-system
+    - podSelector:
+        matchLabels:
+          app: nginx
+    ports:
     - protocol: TCP
-      port: 27017
-    - protocol: TCP
-      port: 9092
-    - protocol: TCP
-      port: 5601
-    - protocol: TCP
-      port: 5044
-    - protocol: TCP
-      port: 8000
-    - protocol: TCP
-      port: 8001
-    - protocol: TCP
-      port: 2181
-    - protocol: TCP
-      port: 2379
-    - protocol: TCP
-      port: 2380
-    - protocol: TCP
-      port: 9114
-    - protocol: TCP
-      port: 9216
-    - protocol: TCP
-      port: 9090
-    - protocol: TCP
-      port: 3000
+      port: 3001

@@ -54,6 +54,7 @@ export class TestUtils {
       phone: '+1234567890',
       role: UserRole.DOCTOR,
       isActive: true,
+      tenantId: 'test-tenant',
       ...overrides
     };
 
@@ -64,6 +65,7 @@ export class TestUtils {
     const patientData = {
       id: `patient-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       userId,
+      tenantId: 'test-tenant',
       mrn: `MRN${Date.now()}`,
       dateOfBirth: new Date('1990-01-01'),
       gender: Gender.MALE,
@@ -84,6 +86,7 @@ export class TestUtils {
     const labTestData = {
       id: `lab-test-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       patientId,
+      tenantId: 'test-tenant',
       testName: 'Complete Blood Count',
       testCode: 'CBC',
       category: 'HEMATOLOGY',

@@ -32,37 +32,65 @@ data:
       }
     }
 
-    filter {
-      if [kubernetes] {
-        mutate {
-          add_field => {
-            "container_name" => "%{[kubernetes][container][name]}"
-            "namespace" => "%{[kubernetes][namespace]}"
-            "pod_name" => "%{[kubernetes][pod][name]}"
-            "pod_ip" => "%{[kubernetes][pod][ip]}"
-          }
-        }
-      }
+     filter {
+       if [kubernetes] {
+         mutate {
+           add_field => {
+             "container_name" => "%{[kubernetes][container][name]}"
+             "namespace" => "%{[kubernetes][namespace]}"
+             "pod_name" => "%{[kubernetes][pod][name]}"
+             "pod_ip" => "%{[kubernetes][pod][ip]}"
+           }
+         }
+       }
 
-      if [log] {
-        mutate {
-          add_field => {
-            "log_level" => "%{[log][level]}"
-            "log_message" => "%{[log][message]}"
-            "log_timestamp" => "%{[log][timestamp]}"
-          }
-        }
-      }
+       if [log] {
+         mutate {
+           add_field => {
+             "log_level" => "%{[log][level]}"
+             "log_message" => "%{[log][message]}"
+             "log_timestamp" => "%{[log][timestamp]}"
+           }
+         }
+       }
 
-      date {
-        match => ["timestamp", "ISO8601", "yyyy-MM-dd HH:mm:ss,SSS", "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'"]
-        target => "@timestamp"
-      }
+       # Security Event Detection
+       if [message] =~ /authentication|login|logout|access|denied|unauthorized|forbidden|security|attack|intrusion|breach/i {
+         mutate {
+           add_tag => ["security"]
+           add_field => {
+             "event_type" => "security"
+             "severity" => "high"
+           }
+         }
+       }
 
-      mutate {
-        remove_field => ["beat", "prospector", "input", "offset", "source", "type"]
+       if [message] =~ /error|exception|fail/i {
+         mutate {
+           add_tag => ["error"]
+           add_field => {
+             "event_type" => "error"
+           }
+         }
+       }
+
+       # GeoIP for IP-based logs
+       if [client_ip] {
+         geoip {
+           source => "client_ip"
+           target => "geoip"
+         }
+       }
+
+       date {
+         match => ["timestamp", "ISO8601", "yyyy-MM-dd HH:mm:ss,SSS", "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'"]
+         target => "@timestamp"
+       }
+
+       mutate {
+         remove_field => ["beat", "prospector", "input", "offset", "source", "type"]
+       }
       }
-     }
 
      output {
        elasticsearch {

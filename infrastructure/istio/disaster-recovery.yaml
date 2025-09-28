@@ -1,0 +1,262 @@
+---
+# Disaster Recovery for Ultimate HMS
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: disaster-recovery
+  labels:
+    app: hospital-management-system
+    component: dr
+
+---
+# Velero for Backup and Restore
+apiVersion: velero.io/v1
+kind: BackupStorageLocation
+metadata:
+  name: hms-backup-location
+  namespace: disaster-recovery
+  labels:
+    app: hospital-management-system
+    component: dr
+spec:
+  provider: aws
+  objectStorage:
+    bucket: hms-disaster-recovery
+    prefix: backups
+  config:
+    region: us-east-1
+
+---
+# Scheduled Backups
+apiVersion: velero.io/v1
+kind: Schedule
+metadata:
+  name: hms-daily-backup
+  namespace: disaster-recovery
+  labels:
+    app: hospital-management-system
+    component: dr
+spec:
+  schedule: "0 2 * * *"
+  template:
+    includedNamespaces:
+    - ultimate-hms
+    - analytics-system
+    - mobile-system
+    - security-system
+    - graphql-system
+    - monitoring
+    ttl: 720h0m0s
+
+---
+# Backup for Critical Data
+apiVersion: velero.io/v1
+kind: Backup
+metadata:
+  name: hms-critical-data-backup
+  namespace: disaster-recovery
+  labels:
+    app: hospital-management-system
+    component: dr
+spec:
+  includedNamespaces:
+  - ultimate-hms
+  - security-system
+  includedResources:
+  - secrets
+  - configmaps
+  - persistentvolumeclaims
+  - persistentvolumes
+  ttl: 168h0m0s
+
+---
+# Disaster Recovery Plan ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: hms-dr-plan
+  namespace: disaster-recovery
+  labels:
+    app: hospital-management-system
+    component: dr
+data:
+  dr-plan.yaml: |
+    apiVersion: v1
+    kind: DisasterRecoveryPlan
+    metadata:
+      name: hms-dr-plan
+    spec:
+      primaryRegion: us-east-1
+      secondaryRegion: us-west-2
+      rto: 4h
+      rpo: 1h
+      services:
+      - name: database
+        priority: critical
+        backupFrequency: 1h
+        restoreTime: 2h
+      - name: api-gateway
+        priority: high
+        backupFrequency: 6h
+        restoreTime: 1h
+      - name: analytics
+        priority: medium
+        backupFrequency: 24h
+        restoreTime: 4h
+      - name: mobile-api
+        priority: high
+        backupFrequency: 6h
+        restoreTime: 1h
+
+---
+# Failover Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: hms-failover-config
+  namespace: disaster-recovery
+  labels:
+    app: hospital-management-system
+    component: dr
+data:
+  failover.sh: |
+    #!/bin/bash
+    # HMS Failover Script
+
+    set -e
+
+    echo "🚨 Initiating HMS Disaster Recovery Failover..."
+
+    # Check primary region health
+    if curl -f https://api.hms.local/health; then
+      echo "✅ Primary region is healthy"
+      exit 0
+    fi
+
+    echo "❌ Primary region is down, initiating failover..."
+
+    # Update DNS to point to secondary region
+    aws route53 change-resource-record-sets \
+      --hosted-zone-id $HOSTED_ZONE_ID \
+      --change-batch '{
+        "Changes": [{
+          "Action": "UPSERT",
+          "ResourceRecordSet": {
+            "Name": "api.hms.local",
+            "Type": "CNAME",
+            "TTL": 60,
+            "ResourceRecords": [{"Value": "api-dr.hms.local"}]
+          }
+        }]
+      }'
+
+    # Scale up secondary region services
+    kubectl config use-context hms-dr-cluster
+    kubectl scale deployment hms-api --replicas=10 -n ultimate-hms
+    kubectl scale deployment hms-database --replicas=3 -n ultimate-hms
+
+    # Restore from latest backup
+    velero restore create hms-emergency-restore \
+      --from-backup hms-critical-data-backup \
+      --namespace-mappings ultimate-hms:ultimate-hms-dr
+
+    echo "✅ Failover completed. Secondary region is now active."
+
+---
+# Health Check for DR Readiness
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: hms-dr-health-check
+  namespace: disaster-recovery
+  labels:
+    app: hospital-management-system
+    component: dr
+data:
+  health-check.sh: |
+    #!/bin/bash
+    # HMS DR Health Check Script
+
+    set -e
+
+    echo "🔍 Checking HMS Disaster Recovery Readiness..."
+
+    # Check backup status
+    BACKUP_COUNT=$(velero backup get | grep -c "Completed")
+    if [ "$BACKUP_COUNT" -lt 1 ]; then
+      echo "❌ No recent backups found"
+      exit 1
+    fi
+
+    # Check secondary region connectivity
+    if ! kubectl config get-contexts | grep -q hms-dr-cluster; then
+      echo "❌ Secondary cluster not configured"
+      exit 1
+    fi
+
+    # Check DNS failover capability
+    if ! aws route53 list-hosted-zones | grep -q hms.local; then
+      echo "❌ DNS failover not configured"
+      exit 1
+    fi
+
+    # Check monitoring alerts
+    ALERT_COUNT=$(curl -s https://monitoring.hms.local/api/v1/alerts | jq '.data | length')
+    if [ "$ALERT_COUNT" -gt 0 ]; then
+      echo "⚠️ Active alerts detected"
+    fi
+
+    echo "✅ Disaster Recovery is ready"
+
+---
+# Automated DR Testing Job
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: hms-dr-test
+  namespace: disaster-recovery
+  labels:
+    app: hospital-management-system
+    component: dr
+spec:
+  schedule: "0 6 * * 0"  # Weekly on Sunday
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: hms-admin
+          restartPolicy: OnFailure
+          containers:
+          - name: dr-test
+            image: alpine:latest
+            command:
+            - /bin/sh
+            - -c
+            - |
+              echo "🧪 Running HMS Disaster Recovery Test..."
+
+              # Simulate primary region failure
+              kubectl scale deployment hms-api --replicas=0 -n ultimate-hms
+
+              # Wait for failover detection
+              sleep 300
+
+              # Check if secondary region took over
+              if curl -f https://api-dr.hms.local/health; then
+                echo "✅ DR Test passed - Secondary region active"
+              else
+                echo "❌ DR Test failed - Secondary region not responding"
+                exit 1
+              fi
+
+              # Restore primary region
+              kubectl scale deployment hms-api --replicas=3 -n ultimate-hms
+
+              echo "✅ DR Test completed successfully"
+            resources:
+              requests:
+                cpu: 100m
+                memory: 128Mi
+              limits:
+                cpu: 200m
+                memory: 256Mi

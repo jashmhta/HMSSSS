@@ -44,22 +44,28 @@ export enum PainAssessment {
   UNBEARABLE = 'UNBEARABLE',
 }
 
-export enum GlasgowComaScale {
-  EYE_OPENING_SPONTANEOUS = 4,
-  EYE_OPENING_TO_VOICE = 3,
-  EYE_OPENING_TO_PAIN = 2,
-  EYE_OPENING_NONE = 1,
-  VERBAL_ORIENTED = 5,
-  VERBAL_CONFUSED = 4,
-  VERBAL_INAPPROPRIATE = 3,
-  VERBAL_INCOMPREHENSIBLE = 2,
-  VERBAL_NONE = 1,
-  MOTOR_OBEYS_COMMANDS = 6,
-  MOTOR_LOCALIZES_PAIN = 5,
-  MOTOR_WITHDRAWS_PAIN = 4,
-  MOTOR_ABNORMAL_FLEXION = 3,
-  MOTOR_EXTENSOR_RESPONSE = 2,
-  MOTOR_NONE = 1,
+export enum GlasgowEyeOpening {
+  SPONTANEOUS = 4,
+  TO_VOICE = 3,
+  TO_PAIN = 2,
+  NONE = 1,
+}
+
+export enum GlasgowVerbalResponse {
+  ORIENTED = 5,
+  CONFUSED = 4,
+  INAPPROPRIATE = 3,
+  INCOMPREHENSIBLE = 2,
+  NONE = 1,
+}
+
+export enum GlasgowMotorResponse {
+  OBEYS_COMMANDS = 6,
+  LOCALIZES_PAIN = 5,
+  WITHDRAWS_PAIN = 4,
+  ABNORMAL_FLEXION = 3,
+  EXTENSOR_RESPONSE = 2,
+  NONE = 1,
 }
 
 export class VentilatorSettingsDto {
@@ -183,25 +189,25 @@ export class VentilatorReadingDto {
 export class GlasgowComaScaleDto {
   @ApiProperty({
     description: 'Eye opening response',
-    enum: GlasgowComaScale,
-    enumName: 'GlasgowComaScale',
+    enum: GlasgowEyeOpening,
+    enumName: 'GlasgowEyeOpening',
   })
-  @IsEnum(GlasgowComaScale)
-  eyeOpening: GlasgowComaScale;
+  @IsEnum(GlasgowEyeOpening)
+  eyeOpening: GlasgowEyeOpening;
 
   @ApiProperty({
     description: 'Verbal response',
-    enum: GlasgowComaScale,
+    enum: GlasgowVerbalResponse,
   })
-  @IsEnum(GlasgowComaScale)
-  verbal: GlasgowComaScale;
+  @IsEnum(GlasgowVerbalResponse)
+  verbal: GlasgowVerbalResponse;
 
   @ApiProperty({
     description: 'Motor response',
-    enum: GlasgowComaScale,
+    enum: GlasgowMotorResponse,
   })
-  @IsEnum(GlasgowComaScale)
-  motor: GlasgowComaScale;
+  @IsEnum(GlasgowMotorResponse)
+  motor: GlasgowMotorResponse;
 
   @ApiProperty({
     description: 'Total GCS score (calculated)',

@@ -42,6 +42,7 @@ export const testUtils = {
 
     return prisma.user.create({
       data: {
+        tenantId: 'test-tenant',
         email: userData.email || 'test@example.com',
         password: hashedPassword,
         firstName: userData.firstName || 'Test',
@@ -57,10 +58,12 @@ export const testUtils = {
   async createTestPatient(userId: string, prisma: PrismaService) {
     return prisma.patient.create({
       data: {
+        tenantId: 'test-tenant',
         userId,
+        mrn: 'TEST123',
         dateOfBirth: new Date('1990-01-01'),
         gender: 'MALE',
-        bloodType: 'O+',
+        bloodType: 'O_POSITIVE',
         address: '123 Test St',
         emergencyContact: 'Emergency Contact',
         emergencyPhone: '9876543210',
@@ -74,20 +77,19 @@ export const testUtils = {
 
     return prisma.doctor.create({
       data: {
+        tenantId: 'test-tenant',
         userId: user.id,
         specialization: userData.specialization || 'General Medicine',
         licenseNumber: userData.licenseNumber || 'LIC123456',
         department: userData.department || 'General',
-        consultationFee: userData.consultationFee || 500,
-        availability:
-          userData.availability ||
-          JSON.stringify({
-            monday: ['9:00-17:00'],
-            tuesday: ['9:00-17:00'],
-            wednesday: ['9:00-17:00'],
-            thursday: ['9:00-17:00'],
-            friday: ['9:00-17:00'],
-          }),
+        qualifications: [],
+        schedule: userData.schedule || {
+          monday: ['9:00-17:00'],
+          tuesday: ['9:00-17:00'],
+          wednesday: ['9:00-17:00'],
+          thursday: ['9:00-17:00'],
+          friday: ['9:00-17:00'],
+        },
       },
     });
   },
@@ -167,13 +169,14 @@ export const testUtils = {
     patientId: string,
     orderedBy: string,
     prisma: PrismaService,
-    additionalData = {},
+    additionalData: any = {},
   ) {
     // First create a test catalog entry if it doesn't exist
     const testCatalog = await prisma.labTestCatalog.upsert({
       where: { id: additionalData.testCatalogId || 'test-catalog-id' },
       update: {},
       create: {
+        tenantId: 'test-tenant',
         id: additionalData.testCatalogId || 'test-catalog-id',
         testName: additionalData.testName || 'Complete Blood Count',
         testCode: additionalData.testCode || 'CBC',
@@ -189,8 +192,10 @@ export const testUtils = {
 
     return prisma.labTest.create({
       data: {
+        tenantId: 'test-tenant',
         patientId,
         testCatalogId: testCatalog.id,
+        orderNumber: `TEST-${Date.now()}`,
         orderedBy,
         clinicalInfo: additionalData.clinicalInfo || 'Routine test',
         diagnosis: additionalData.diagnosis || 'Checkup',
@@ -219,38 +224,18 @@ export const testUtils = {
     patientId: string,
     orderedBy: string,
     prisma: PrismaService,
-    additionalData = {},
+    additionalData: any = {},
   ) {
-    // First create a test radiology catalog entry if it doesn't exist
-    const testCatalog = await prisma.radiologyTestCatalog.upsert({
-      where: { id: additionalData.testCatalogId || 'test-radiology-catalog-id' },
-      update: {},
-      create: {
-        id: additionalData.testCatalogId || 'test-radiology-catalog-id',
-        testName: additionalData.testName || 'Chest X-Ray PA and Lateral',
-        testCode: additionalData.testCode || 'CXR',
-        category: additionalData.category || 'CHEST',
-        modality: additionalData.modality || 'XRAY',
-        description: additionalData.description || 'Standard chest X-ray examination',
-        preparation: additionalData.preparation || 'Remove clothing from waist up',
-        contraindications: additionalData.contraindications || 'Pregnancy - consult physician',
-        cost: additionalData.cost || 75.0,
-        estimatedDuration: additionalData.estimatedDuration || 15,
-        isActive: true,
-      },
-    });
-
     return prisma.radiologyTest.create({
       data: {
+        tenantId: 'test-tenant',
         patientId,
-        testCatalogId: testCatalog.id,
+        testName: additionalData.testName || 'Chest X-Ray PA and Lateral',
+        testCode: additionalData.testCode || 'CXR',
+        modality: additionalData.modality || 'XRAY',
         orderedBy,
         status: additionalData.status || 'ORDERED',
-        clinicalInfo: additionalData.clinicalInfo || 'Chest pain evaluation',
-        diagnosis: additionalData.diagnosis || 'Suspected pneumonia',
-        bodyPart: additionalData.bodyPart || 'CHEST',
-        modality: additionalData.modality || 'XRAY',
-        priority: additionalData.priority || 'ROUTINE',
+        urgent: additionalData.urgent || false,
       },
       include: {
         patient: {
@@ -264,7 +249,6 @@ export const testUtils = {
             },
           },
         },
-        testCatalog: true,
       },
     });
   },

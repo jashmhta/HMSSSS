@@ -1,0 +1,20 @@
+{{- if .Values.analytics.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "hms-phase3.fullname" . }}-analytics
+  namespace: analytics-system
+  labels:
+    {{- include "hms-phase3.labels" . | nindent 4 }}
+    component: analytics
+spec:
+  type: {{ .Values.analytics.service.type }}
+  ports:
+  - port: {{ .Values.analytics.service.port }}
+    targetPort: {{ .Values.analytics.service.targetPort }}
+    protocol: TCP
+    name: http
+  selector:
+    {{- include "hms-phase3.selectorLabels" . | nindent 4 }}
+    component: analytics
+{{- end }}

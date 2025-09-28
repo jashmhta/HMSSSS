@@ -41,7 +41,10 @@ export class AppointmentsController {
   @ApiOperation({ summary: 'Create a new appointment' })
   @ApiResponse({ status: 201, description: 'Appointment created successfully' })
   create(@Body() createAppointmentDto: any, @Request() req) {
-    return this.appointmentsService.create(createAppointmentDto);
+    return this.appointmentsService.create({
+      ...createAppointmentDto,
+      tenantId: req.user.tenantId,
+    });
   }
 
   /**

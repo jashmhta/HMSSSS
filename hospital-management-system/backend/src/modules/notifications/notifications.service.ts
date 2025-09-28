@@ -23,10 +23,12 @@ export class NotificationsService {
     message: string;
     type: NotificationType;
     metadata?: any;
+    tenantId: string;
   }) {
     return this.prisma.notification.create({
       data: {
         userId: data.userId,
+        tenantId: data.tenantId,
         title: data.title,
         message: data.message,
         type: data.type,

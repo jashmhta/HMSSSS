@@ -1,0 +1,13 @@
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: {{ include "hms-istio.fullname" . }}-peerauth
+  namespace: {{ .Values.hms.namespace }}
+  labels:
+    {{- include "hms-istio.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      app: hospital-management-system
+  mtls:
+    mode: {{ .Values.hms.security.mtls.mode }}

@@ -1,0 +1,137 @@
+# Default values for hms-istio
+global:
+  istioNamespace: istio-system
+  configValidation: true
+  defaultPodDisruptionBudget:
+    enabled: true
+  defaultResources:
+    requests:
+      cpu: 10m
+      memory: 128Mi
+  imagePullPolicy: IfNotPresent
+  logAsJson: true
+  logging:
+    level: default:info
+  omitSidecarInjectorConfigMap: false
+  oneNamespace: false
+  operatorManageWebhooks: false
+  pilotCertProvider: istiod
+  priorityClassName: ""
+  proxy:
+    image: proxyv2:1.20.0
+    clusterDomain: "cluster.local"
+    resources:
+      limits:
+        cpu: 2000m
+        memory: 1024Mi
+      requests:
+        cpu: 100m
+        memory: 128Mi
+    logLevel: warning
+    componentLogLevel: misc:error
+    privileged: false
+    enableCoreDump: false
+    statusPort: 15020
+    readinessInitialDelaySeconds: 1
+    readinessPeriodSeconds: 2
+    readinessFailureThreshold: 30
+    includeIPRanges: "*"
+    excludeIPRanges: ""
+    excludeOutboundPorts: ""
+    excludeInboundPorts: ""
+    kubevirtInterfaces: ""
+    vtuneEnabled: false
+    tracer: zipkin
+  proxy_init:
+    image: proxyv2:1.20.0
+    resources:
+      limits:
+        cpu: 2000m
+        memory: 1024Mi
+      requests:
+        cpu: 10m
+        memory: 10Mi
+  jwtPolicy: third-party-jwt
+
+istio-base:
+  enabled: true
+
+istiod:
+  enabled: true
+  pilot:
+    enabled: true
+    resources:
+      requests:
+        cpu: 500m
+        memory: 2048Mi
+    traceSampling: 100.0
+    env:
+      PILOT_TRACE_SAMPLING: "100"
+      PILOT_ENABLE_PROTOCOL_SNIFFING_FOR_OUTBOUND: "true"
+      PILOT_ENABLE_PROTOCOL_SNIFFING_FOR_INBOUND: "false"
+
+istio-ingress:
+  enabled: true
+  gateways:
+    istio-ingressgateway:
+      name: istio-ingressgateway
+      labels:
+        app: istio-ingressgateway
+        istio: ingressgateway
+      serviceAnnotations:
+        service.beta.kubernetes.io/aws-load-balancer-type: nlb
+        service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
+        service.beta.kubernetes.io/aws-load-balancer-backend-protocol: tcp
+      ports:
+      - name: status-port
+        port: 15021
+        targetPort: 15021
+      - name: http2
+        port: 80
+        targetPort: 8080
+      - name: https
+        port: 443
+        targetPort: 8443
+      - name: tls
+        port: 15443
+        targetPort: 15443
+      resources:
+        requests:
+          cpu: 100m
+          memory: 128Mi
+        limits:
+          cpu: 2000m
+          memory: 1024Mi
+
+# HMS-specific configurations
+hms:
+  namespace: ultimate-hms
+  tracing:
+    enabled: true
+    provider: jaeger
+    jaeger:
+      endpoint: "http://jaeger-collector.tracing-system.svc.cluster.local:14268/api/traces"
+  security:
+    mtls:
+      mode: STRICT
+    jwt:
+      enabled: true
+      issuer: "https://auth.hms.local/auth/realms/hms"
+  rateLimiting:
+    enabled: true
+    global:
+      requestsPerSecond: 1000
+    api:
+      requestsPerSecond: 100
+  circuitBreaker:
+    enabled: true
+    maxConnections: 100
+    maxRetries: 3
+  faultInjection:
+    enabled: false
+    delay:
+      percentage: 5
+      duration: 2s
+    abort:
+      percentage: 10
+      status: 503

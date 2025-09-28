@@ -310,10 +310,11 @@ export class BillingService {
     createdBy: string;
     dueDate?: Date;
     notes?: string;
+    tenantId: string;
   }) {
     // Validate patient exists
     const patient = await this.prisma.patient.findUnique({
-      where: { id: data.patientId },
+      where: { id: data.patientId, tenantId: data.tenantId },
       include: { user: true },
     });
 
@@ -333,6 +334,7 @@ export class BillingService {
     const bill = await this.prisma.bill.create({
       data: {
         patientId: data.patientId,
+        tenantId: data.tenantId,
         billNumber,
         billDate: new Date(),
         dueDate: data.dueDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
@@ -397,6 +399,7 @@ export class BillingService {
     packageBill: PackageBill;
     createdBy: string;
     insuranceInfo?: any;
+    tenantId: string;
   }) {
     const items: BillItem[] = data.packageBill.items.map(item => ({
       ...item,
@@ -409,6 +412,7 @@ export class BillingService {
       items,
       insuranceInfo: data.insuranceInfo,
       createdBy: data.createdBy,
+      tenantId: data.tenantId,
       notes: `Package: ${data.packageBill.packageName} (${data.packageBill.validityDays} days validity)`,
     });
   }

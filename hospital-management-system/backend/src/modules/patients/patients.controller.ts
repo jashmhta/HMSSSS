@@ -59,6 +59,7 @@ export class PatientsController {
       allergies: registrationData.allergies,
       registeredBy: req.user.id,
       registrationType: registrationData.registrationType,
+      tenantId: req.user.tenantId,
     });
   }
 
@@ -90,6 +91,7 @@ export class PatientsController {
   create(@Body() createPatientDto: CreatePatientDto, @Request() req) {
     return this.patientsService.create({
       userId: req.user.id,
+      tenantId: req.user.tenantId,
       mrn: createPatientDto.mrn,
       dateOfBirth: new Date(createPatientDto.dateOfBirth),
       gender: createPatientDto.gender,

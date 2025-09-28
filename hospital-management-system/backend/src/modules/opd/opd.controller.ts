@@ -147,7 +147,7 @@ export class OPDController {
   @ApiOperation({ summary: 'Start OPD consultation from appointment' })
   @ApiResponse({ status: 200, description: 'Consultation started successfully' })
   async startConsultation(@Param('appointmentId') appointmentId: string, @Request() req) {
-    return this.opdService.startConsultation(appointmentId, req.user.id);
+    return this.opdService.startConsultation(appointmentId, req.user.id, req.user.tenantId);
   }
 
   /**
@@ -158,10 +158,14 @@ export class OPDController {
   @ApiOperation({ summary: 'Complete OPD consultation' })
   @ApiResponse({ status: 200, description: 'Consultation completed successfully' })
   async completeConsultation(@Param('visitId') visitId: string, @Body() data: any, @Request() req) {
-    return this.opdService.completeConsultation(visitId, {
-      ...data,
-      completedBy: req.user.id,
-    });
+    return this.opdService.completeConsultation(
+      visitId,
+      {
+        ...data,
+        completedBy: req.user.id,
+      },
+      req.user.tenantId,
+    );
   }
 
   /**

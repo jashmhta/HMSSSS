@@ -1,0 +1,249 @@
+---
+# Chaos Engineering Setup for HMS using LitmusChaos
+apiVersion: litmuschaos.io/v1alpha1
+kind: ChaosEngine
+metadata:
+  name: hms-pod-failure-chaos
+  namespace: ultimate-hms
+spec:
+  chaosServiceAccount: litmus-admin
+  experiments:
+  - name: pod-delete
+    spec:
+      components:
+        env:
+        - name: TOTAL_CHAOS_DURATION
+          value: '30'
+        - name: CHAOS_INTERVAL
+          value: '10'
+        - name: FORCE
+          value: 'true'
+        - name: PODS_AFFECTED_PERC
+          value: '10'
+
+---
+apiVersion: litmuschaos.io/v1alpha1
+kind: ChaosEngine
+metadata:
+  name: hms-network-chaos
+  namespace: ultimate-hms
+spec:
+  chaosServiceAccount: litmus-admin
+  experiments:
+  - name: network-chaos
+    spec:
+      components:
+        env:
+        - name: TOTAL_CHAOS_DURATION
+          value: '60'
+        - name: NETWORK_INTERFACE
+          value: 'eth0'
+        - name: TARGET_CONTAINER
+          value: 'hms-backend'
+        - name: NETWORK_LATENCY
+          value: '2000ms'
+        - name: NETWORK_PACKET_LOSS
+          value: '5'
+        - name: PODS_AFFECTED_PERC
+          value: '20'
+
+---
+apiVersion: litmuschaos.io/v1alpha1
+kind: ChaosEngine
+metadata:
+  name: hms-db-chaos
+  namespace: ultimate-hms
+spec:
+  chaosServiceAccount: litmus-admin
+  experiments:
+  - name: stress-chaos
+    spec:
+      components:
+        env:
+        - name: TOTAL_CHAOS_DURATION
+          value: '120'
+        - name: STRESS_TYPE
+          value: 'memory-hog'
+        - name: MEMORY_CONSUMPTION
+          value: '500'
+        - name: NUMBER_OF_WORKERS
+          value: '2'
+        - name: TARGET_CONTAINER
+          value: 'postgres'
+
+---
+# Automated Chaos Schedule
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: hms-chaos-schedule
+  namespace: ultimate-hms
+spec:
+  schedule: "0 2 * * 1"  # Weekly on Monday at 2 AM
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: chaos-admin
+          containers:
+          - name: chaos-runner
+            image: litmuschaos/chaos-runner:latest
+            command: ["/bin/sh", "-c"]
+            args:
+            - |
+              # Run pod failure chaos
+              kubectl apply -f /chaos-experiments/pod-failure.yaml
+              sleep 300
+
+              # Run network chaos
+              kubectl apply -f /chaos-experiments/network-chaos.yaml
+              sleep 300
+
+              # Run database stress test
+              kubectl apply -f /chaos-experiments/db-stress.yaml
+              sleep 600
+
+              # Generate chaos report
+              chaos report --experiment=pod-failure,network-chaos,db-stress --format=html > /reports/chaos-report-$(date +%Y%m%d).html
+          volumeMounts:
+          - name: chaos-experiments
+            mountPath: /chaos-experiments
+          - name: chaos-reports
+            mountPath: /reports
+          restartPolicy: OnFailure
+      volumes:
+      - name: chaos-experiments
+        configMap:
+          name: hms-chaos-experiments
+      - name: chaos-reports
+        persistentVolumeClaim:
+          claimName: chaos-reports-pvc
+
+---
+# Chaos Experiments ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: hms-chaos-experiments
+  namespace: ultimate-hms
+data:
+  pod-failure.yaml: |
+    apiVersion: litmuschaos.io/v1alpha1
+    kind: ChaosEngine
+    metadata:
+      name: pod-failure-test
+    spec:
+      chaosServiceAccount: litmus-admin
+      experiments:
+      - name: pod-delete
+        spec:
+          components:
+            env:
+            - name: TOTAL_CHAOS_DURATION
+              value: '30'
+            - name: PODS_AFFECTED_PERC
+              value: '5'
+
+  network-chaos.yaml: |
+    apiVersion: litmuschaos.io/v1alpha1
+    kind: ChaosEngine
+    metadata:
+      name: network-chaos-test
+    spec:
+      chaosServiceAccount: litmus-admin
+      experiments:
+      - name: network-chaos
+        spec:
+          components:
+            env:
+            - name: TOTAL_CHAOS_DURATION
+              value: '30'
+            - name: NETWORK_LATENCY
+              value: '1000ms'
+            - name: PODS_AFFECTED_PERC
+              value: '10'
+
+  db-stress.yaml: |
+    apiVersion: litmuschaos.io/v1alpha1
+    kind: ChaosEngine
+    metadata:
+      name: db-stress-test
+    spec:
+      chaosServiceAccount: litmus-admin
+      experiments:
+      - name: stress-chaos
+        spec:
+          components:
+            env:
+            - name: TOTAL_CHAOS_DURATION
+              value: '60'
+            - name: STRESS_TYPE
+              value: 'cpu-hog'
+            - name: CPU_CORES
+              value: '2'
+            - name: TARGET_CONTAINER
+              value: 'postgres'
+
+---
+# Chaos Result Analysis
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: chaos-analysis
+  namespace: ultimate-hms
+data:
+  analyze-chaos.py: |
+    #!/usr/bin/env python3
+    import json
+    import sys
+    from datetime import datetime
+
+    def analyze_chaos_results(results_file):
+        with open(results_file, 'r') as f:
+            results = json.load(f)
+
+        analysis = {
+            'timestamp': datetime.now().isoformat(),
+            'experiments': [],
+            'overall_resilience_score': 0,
+            'recommendations': []
+        }
+
+        for experiment in results.get('experiments', []):
+            exp_analysis = {
+                'name': experiment['name'],
+                'status': experiment['status'],
+                'duration': experiment['duration'],
+                'impact': experiment.get('impact', {}),
+                'recovery_time': experiment.get('recovery_time', 0)
+            }
+
+            # Calculate resilience score
+            if experiment['status'] == 'completed':
+                exp_analysis['resilience_score'] = 100 - (exp_analysis['recovery_time'] / exp_analysis['duration'] * 100)
+            else:
+                exp_analysis['resilience_score'] = 0
+
+            analysis['experiments'].append(exp_analysis)
+
+        # Overall score
+        scores = [exp['resilience_score'] for exp in analysis['experiments']]
+        analysis['overall_resilience_score'] = sum(scores) / len(scores) if scores else 0
+
+        # Generate recommendations
+        if analysis['overall_resilience_score'] < 80:
+            analysis['recommendations'].append("Implement circuit breakers for critical services")
+        if any(exp['recovery_time'] > 300 for exp in analysis['experiments']):
+            analysis['recommendations'].append("Improve auto-scaling configuration")
+        if any(exp['status'] != 'completed' for exp in analysis['experiments']):
+            analysis['recommendations'].append("Add better error handling and retries")
+
+        return analysis
+
+    if __name__ == '__main__':
+        if len(sys.argv) != 2:
+            print("Usage: python analyze-chaos.py <results_file>")
+            sys.exit(1)
+
+        results = analyze_chaos_results(sys.argv[1])
+        print(json.dumps(results, indent=2))

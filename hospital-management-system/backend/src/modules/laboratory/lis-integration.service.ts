@@ -237,6 +237,7 @@ export class LISIntegrationService {
             isActive: test.isActive,
           },
           create: {
+            tenantId: 'default', // TODO: Get from context
             testCode: test.testCode,
             testName: test.testName,
             category: test.category,

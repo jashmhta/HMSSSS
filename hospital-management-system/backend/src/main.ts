@@ -5,12 +5,17 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import helmet from 'helmet';
 
 import { AppModule } from './app.module';
+import { VaultService } from './shared/vault/vault.service';
 
 /**
  *
  */
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+
+  // Initialize Vault for secrets management
+  const vaultService = app.get(VaultService);
+  await vaultService.initialize();
 
   // Security: Helmet middleware for HTTP security headers
   app.use(

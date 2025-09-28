@@ -1,59 +1,78 @@
-/*[object Object]*/
-import { Controller, Get, Post, Put, Param, Body, Query } from '@nestjs/common';
-import { UserRole } from '@prisma/client';
-
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Param,
+  Body,
+  Query,
+  UseGuards,
+  ValidationPipe,
+  ParseIntPipe,
+} from '@nestjs/common';
+import { UserRole, BloodType } from '@prisma/client';
 import { Roles } from '../../shared/decorators/roles.decorator';
-
+import { JwtAuthGuard } from '../../shared/guards/jwt-auth.guard';
+import { RolesGuard } from '../../shared/guards/roles.guard';
 import { BloodBankService } from './blood-bank.service';
+import {
+  CreateBloodDonationDto,
+  UpdateBloodDonationDto,
+  BloodDonationFilterDto,
+  BloodRequestDto,
+  BloodTransfusionDto,
+} from './dto/blood-donation.dto';
 
-/**
- *
- */
 @Controller('blood-bank')
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class BloodBankController {
-  /**
-   *
-   */
   constructor(private readonly bloodBankService: BloodBankService) {}
 
   /**
-   *
+   * Create a new blood donation
    */
-  @Post('donors')
+  @Post('donations')
   @Roles(UserRole.NURSE, UserRole.LAB_TECHNICIAN, UserRole.ADMIN)
-  async registerDonor(@Body() data: any) {
-    return this.bloodBankService.registerDonor(data);
+  async createDonation(@Body(ValidationPipe) data: CreateBloodDonationDto) {
+    return this.bloodBankService.createDonation(data);
   }
 
   /**
-   *
+   * Update blood donation status and screening
    */
-  @Get('donors')
+  @Put('donations/:id')
+  @Roles(UserRole.LAB_TECHNICIAN, UserRole.ADMIN)
+  async updateDonation(
+    @Param('id') id: string,
+    @Body(ValidationPipe) data: UpdateBloodDonationDto,
+  ) {
+    return this.bloodBankService.updateDonation(id, data);
+  }
+
+  /**
+   * Get blood donations with filtering
+   */
+  @Get('donations')
   @Roles(UserRole.DOCTOR, UserRole.NURSE, UserRole.LAB_TECHNICIAN, UserRole.ADMIN)
-  async getDonors() {
-    return this.bloodBankService.getDonors();
+  async getDonations(
+    @Query() filters: BloodDonationFilterDto,
+    @Query('page', ParseIntPipe) page: number = 1,
+    @Query('limit', ParseIntPipe) limit: number = 10,
+  ) {
+    return this.bloodBankService.getDonations(filters, page, limit);
   }
 
   /**
-   *
+   * Get blood donation by ID
    */
-  @Get('donors/:id')
+  @Get('donations/:id')
   @Roles(UserRole.DOCTOR, UserRole.NURSE, UserRole.LAB_TECHNICIAN, UserRole.ADMIN)
-  async getDonorById(@Param('id') id: string) {
-    return this.bloodBankService.getDonorById(id);
+  async getDonationById(@Param('id') id: string) {
+    return this.bloodBankService.getDonationById(id);
   }
 
   /**
-   *
-   */
-  @Post('donors/:id/donations')
-  @Roles(UserRole.NURSE, UserRole.LAB_TECHNICIAN)
-  async recordDonation(@Param('id') id: string, @Body() donationData: any) {
-    return this.bloodBankService.recordDonation(id, donationData);
-  }
-
-  /**
-   *
+   * Get blood inventory by blood type
    */
   @Get('inventory')
   @Roles(UserRole.DOCTOR, UserRole.NURSE, UserRole.LAB_TECHNICIAN, UserRole.ADMIN)
@@ -62,65 +81,42 @@ export class BloodBankController {
   }
 
   /**
-   *
+   * Check blood availability
    */
-  @Get('inventory/:bloodType')
+  @Get('availability/:bloodType')
   @Roles(UserRole.DOCTOR, UserRole.NURSE, UserRole.LAB_TECHNICIAN, UserRole.ADMIN)
-  async getBloodUnitsByType(@Param('bloodType') bloodType: string) {
-    return this.bloodBankService.getBloodUnitsByType(bloodType);
+  async checkBloodAvailability(
+    @Param('bloodType') bloodType: BloodType,
+    @Query('units', ParseIntPipe) units: number,
+  ) {
+    const available = await this.bloodBankService.checkBloodAvailability(bloodType, units);
+    return { available, bloodType, unitsRequired: units };
   }
 
   /**
-   *
+   * Create blood request
    */
-  @Post('crossmatch')
-  @Roles(UserRole.DOCTOR, UserRole.NURSE)
-  async requestBloodCrossmatch(@Body() data: any) {
-    return this.bloodBankService.requestBloodCrossmatch(data);
+  @Post('requests')
+  @Roles(UserRole.DOCTOR, UserRole.NURSE, UserRole.ADMIN)
+  async createBloodRequest(@Body(ValidationPipe) data: BloodRequestDto) {
+    return this.bloodBankService.createBloodRequest(data);
   }
 
   /**
-   *
+   * Record blood transfusion
    */
-  @Put('crossmatch/:id')
-  @Roles(UserRole.LAB_TECHNICIAN)
-  async performCrossmatch(@Param('id') id: string, @Body() result: any) {
-    return this.bloodBankService.performCrossmatch(id, result);
+  @Post('transfusions')
+  @Roles(UserRole.DOCTOR, UserRole.NURSE, UserRole.LAB_TECHNICIAN)
+  async recordTransfusion(@Body(ValidationPipe) data: BloodTransfusionDto) {
+    return this.bloodBankService.recordTransfusion(data);
   }
 
   /**
-   *
+   * Get blood bank statistics
    */
-  @Post('units/:id/issue')
-  @Roles(UserRole.NURSE, UserRole.LAB_TECHNICIAN)
-  async issueBloodUnit(@Param('id') id: string, @Body() body: { patientId: string }) {
-    return this.bloodBankService.issueBloodUnit(id, body.patientId, 'current-user-id');
-  }
-
-  /**
-   *
-   */
-  @Get('crossmatch/pending')
-  @Roles(UserRole.LAB_TECHNICIAN, UserRole.ADMIN)
-  async getCrossmatchRequests() {
-    return this.bloodBankService.getCrossmatchRequests();
-  }
-
-  /**
-   *
-   */
-  @Get('alerts/low-stock')
+  @Get('stats')
   @Roles(UserRole.ADMIN, UserRole.LAB_TECHNICIAN)
-  async getLowStockAlerts() {
-    return this.bloodBankService.getLowStockAlerts();
-  }
-
-  /**
-   *
-   */
-  @Get('alerts/expiring')
-  @Roles(UserRole.ADMIN, UserRole.LAB_TECHNICIAN)
-  async getExpiringUnits(@Query('days') days: string = '7') {
-    return this.bloodBankService.getExpiringUnits(parseInt(days));
+  async getBloodBankStats() {
+    return this.bloodBankService.getBloodBankStats();
   }
 }

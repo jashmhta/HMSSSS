@@ -1,5 +1,5 @@
-/*[object Object]*/
 import { registerAs } from '@nestjs/config';
+import { VaultService } from './vault.service';
 
 export default registerAs('database', () => ({
   // Primary Database URL
