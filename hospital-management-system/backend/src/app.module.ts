@@ -14,36 +14,36 @@ import { AuthModule } from './modules/auth/auth.module';
 // HMS Feature modules
 import { PatientsModule } from './modules/patients/patients.module';
 import { AppointmentsModule } from './modules/appointments/appointments.module';
-import { MedicalRecordsModule } from './modules/medical-records/medical-records.module';
-import { PharmacyModule } from './modules/pharmacy/pharmacy.module';
-import { LaboratoryModule } from './modules/laboratory/laboratory.module';
-import { RadiologyModule } from './modules/radiology/radiology.module';
-import { OPDModule } from './modules/opd/opd.module';
+// import { MedicalRecordsModule } from './modules/medical-records/medical-records.module';
+// import { PharmacyModule } from './modules/pharmacy/pharmacy.module';
+// import { LaboratoryModule } from './modules/laboratory/laboratory.module';
+// import { RadiologyModule } from './modules/radiology/radiology.module';
+// import { OPDModule } from './modules/opd/opd.module';
 import { IPDModule } from './modules/ipd/ipd.module';
-import { OTModule } from './modules/ot/ot.module';
+// import { OTModule } from './modules/ot/ot.module';
 import { EmergencyModule } from './modules/emergency/emergency.module';
-import { BloodBankModule } from './modules/blood-bank/blood-bank.module';
-import { BillingModule } from './modules/billing/billing.module';
+// import { BloodBankModule } from './modules/blood-bank/blood-bank.module';
+// import { BillingModule } from './modules/billing/billing.module';
 import { SuperadminModule } from './modules/superadmin/superadmin.module';
 import { PriceEstimatorModule } from './modules/price-estimator/price-estimator.module';
-import { AccountingModule } from './modules/accounting/accounting.module';
-import { StaffModule } from './modules/staff/staff.module';
-import { InventoryModule } from './modules/inventory/inventory.module';
-import { ReportsModule } from './modules/reports/reports.module';
-import { ComplianceModule } from './modules/compliance/compliance.module';
+// import { AccountingModule } from './modules/accounting/accounting.module';
+// import { StaffModule } from './modules/staff/staff.module';
+// import { InventoryModule } from './modules/inventory/inventory.module';
+// import { ReportsModule } from './modules/reports/reports.module';
+// import { ComplianceModule } from './modules/compliance/compliance.module';
 
 // Interoperability modules
-import { FhirHl7Module } from './modules/fhir-hl7/fhir-hl7.module';
-import { PacsModule } from './modules/pacs/pacs.module';
-import { GovernmentAPIModule } from './modules/government-apis/government-api.module';
-import { DrugInteractionsModule } from './modules/drug-interactions/drug-interactions.module';
+// import { FhirHl7Module } from './modules/fhir-hl7/fhir-hl7.module';
+// import { PacsModule } from './modules/pacs/pacs.module';
+// import { GovernmentAPIModule } from './modules/government-apis/government-api.module';
+// import { DrugInteractionsModule } from './modules/drug-interactions/drug-interactions.module';
 
 // Shared modules
-import { SharedModule } from './shared/shared.module';
+// import { SharedModule } from './shared/shared.module';
 
 // Vault service for secrets management
-import { VaultService } from './shared/vault/vault.service';
-import { VaultModule } from './shared/vault/vault.module';
+// import { VaultService } from './shared/vault/vault.service';
+// import { VaultModule } from './shared/vault/vault.module';
 
 /**
  *
@@ -91,35 +91,35 @@ import { VaultModule } from './shared/vault/vault.module';
     AuthModule,
 
     // HMS Feature modules
-    PatientsModule,
-    AppointmentsModule,
-    MedicalRecordsModule,
-    PharmacyModule,
-    LaboratoryModule,
-    RadiologyModule,
-    OPDModule,
-    IPDModule,
-    OTModule,
-    EmergencyModule,
-    BloodBankModule,
-    BillingModule,
+    // PatientsModule,
+    // AppointmentsModule,
+    // MedicalRecordsModule,
+    // PharmacyModule,
+    // LaboratoryModule,
+    // RadiologyModule,
+    // OPDModule,
+    // IPDModule,
+    // OTModule,
+    // EmergencyModule,
+    // BloodBankModule,
+    // BillingModule,
     SuperadminModule,
     PriceEstimatorModule,
-    AccountingModule,
-    StaffModule,
-    InventoryModule,
-    ReportsModule,
-    ComplianceModule,
+    // AccountingModule,
+    // StaffModule,
+    // InventoryModule,
+    // ReportsModule,
+    // ComplianceModule,
 
     // Interoperability modules
-    FhirHl7Module,
-    PacsModule,
-    GovernmentAPIModule,
-    DrugInteractionsModule,
+    // FhirHl7Module,
+    // PacsModule,
+    // GovernmentAPIModule,
+    // DrugInteractionsModule,
 
     // Shared utilities
-    SharedModule,
-    VaultModule,
+    // SharedModule,
+    // VaultModule,
   ],
   controllers: [],
   providers: [],

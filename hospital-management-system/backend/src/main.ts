@@ -5,7 +5,7 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import helmet from 'helmet';
 
 import { AppModule } from './app.module';
-import { VaultService } from './shared/vault/vault.service';
+// import { VaultService } from './shared/vault/vault.service';
 
 /**
  *
@@ -14,8 +14,8 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
   // Initialize Vault for secrets management
-  const vaultService = app.get(VaultService);
-  await vaultService.initialize();
+  // const vaultService = app.get(VaultService);
+  // await vaultService.initialize();
 
   // Security: Helmet middleware for HTTP security headers
   app.use(
@@ -96,11 +96,12 @@ async function bootstrap() {
   });
 
   const port = process.env.PORT || 3001;
-  await app.listen(port);
+  const host = process.env.HOST || '0.0.0.0';
+  await app.listen(port, host);
 
-  console.log(`🚀 HMS Backend running on: http://localhost:${port}`);
-  console.log(`📚 API Documentation: http://localhost:${port}/api-docs`);
-  console.log(`💚 Health Check: http://localhost:${port}/health`);
+  console.log(`🚀 HMS Backend running on: http://${host}:${port}`);
+  console.log(`📚 API Documentation: http://${host}:${port}/api-docs`);
+  console.log(`💚 Health Check: http://${host}:${port}/health`);
 }
 
 bootstrap();

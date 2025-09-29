@@ -1,7 +1,7 @@
 import { Injectable, Logger, HttpException, HttpStatus } from '@nestjs/common';
 import axios, { AxiosInstance, AxiosResponse } from 'axios';
 import * as https from 'https';
-import { CircuitBreaker } from 'opossum';
+import CircuitBreaker from 'opossum';
 
 interface GovernmentAPIConfig {
   name: string;

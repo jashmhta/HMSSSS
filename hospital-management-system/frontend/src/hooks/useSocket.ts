@@ -6,7 +6,7 @@ const useSocket = () => {
 
   useEffect(() => {
     // Connect to the backend socket server
-    socketRef.current = io(process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001', {
+    socketRef.current = io(process.env['NEXT_PUBLIC_BACKEND_URL'] || 'http://localhost:3001', {
       transports: ['websocket', 'polling'],
     });
 

@@ -485,7 +485,7 @@ export class RadiologyService {
   /**
    *
    */
-  private async validateStatusTransition(currentStatus: string, newStatus: string) {
+  private validateStatusTransition(currentStatus: string, newStatus: string) {
     const validTransitions = {
       ORDERED: ['SCHEDULED', 'CANCELLED'],
       SCHEDULED: ['IN_PROGRESS', 'CANCELLED'],

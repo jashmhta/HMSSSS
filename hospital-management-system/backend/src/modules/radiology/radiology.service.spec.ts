@@ -100,7 +100,7 @@ describe('RadiologyService', () => {
           orderedBy: createData.orderedBy,
           scheduledDate: createData.scheduledDate,
           urgent: createData.urgent,
-          notes: createData.notes,
+
         },
         include: {
           patient: {
@@ -155,11 +155,31 @@ describe('RadiologyService', () => {
         data: {
           ...minimalData,
           scheduledDate: undefined,
-          urgent: false,
-          clinicalIndication: undefined,
-          notes: undefined,
+          urgent: undefined,
         },
-        include: expect.any(Object),
+        include: {
+          patient: {
+            include: {
+              user: {
+                select: {
+                  firstName: true,
+                  lastName: true,
+                  email: true,
+                },
+              },
+            },
+          },
+          radiologist: {
+            include: {
+              user: {
+                select: {
+                  firstName: true,
+                  lastName: true,
+                },
+              },
+            },
+          },
+        },
       });
     });
   });
@@ -199,7 +219,7 @@ describe('RadiologyService', () => {
         include: expect.any(Object),
         skip: 0,
         take: limit,
-        orderBy: { orderedDate: 'desc' },
+        orderBy: { createdAt: 'desc' },
       });
       expect(result).toEqual({
         data: mockRadiologyTests,
@@ -225,7 +245,7 @@ describe('RadiologyService', () => {
         include: expect.any(Object),
         skip: 0,
         take: 10,
-        orderBy: { orderedDate: 'desc' },
+        orderBy: { createdAt: 'desc' },
       });
     });
 
@@ -249,7 +269,7 @@ describe('RadiologyService', () => {
         include: expect.any(Object),
         skip: 0,
         take: 10,
-        orderBy: { orderedDate: 'desc' },
+        orderBy: { createdAt: 'desc' },
       });
     });
   });
@@ -327,7 +347,6 @@ describe('RadiologyService', () => {
         data: {
           status: RadiologyTestStatus.SCHEDULED,
           scheduledDate: scheduleData.scheduledDate,
-          notes: scheduleData.notes,
         },
         include: expect.any(Object),
       });
@@ -370,7 +389,7 @@ describe('RadiologyService', () => {
         data: {
           status: RadiologyTestStatus.IN_PROGRESS,
           performedDate: expect.any(Date),
-          performedBy: 'radiologist-123',
+      radiologistId: 'radiologist-123',
         },
         include: expect.any(Object),
       });

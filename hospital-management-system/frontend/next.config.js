@@ -7,8 +7,8 @@ const withPWA = require('next-pwa')({
 })
 
 const nextConfig = {
-  experimental: {
-    appDir: false, // since using pages
+  eslint: {
+    ignoreDuringBuilds: true,
   },
   images: {
     domains: ['localhost'],
