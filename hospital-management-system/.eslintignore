@@ -1,0 +1,115 @@
+# ESLint ignore patterns for Hospital Management System
+# Enterprise-grade exclusion rules
+
+# Dependencies
+node_modules/
+**/node_modules/**
+
+# Build outputs
+dist/
+build/
+out/
+.next/
+.nuxt/
+.cache/
+
+# Coverage reports
+coverage/
+.nyc_output/
+test-results/
+
+# Temporary files
+*.tmp
+*.temp
+*.log
+*.pid
+*.seed
+*.pid.lock
+
+# Environment files
+.env*
+!.env.example
+
+# Database
+*.sqlite
+*.db
+prisma/migrations/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Test fixtures and mocks
+**/__mocks__/
+**/__fixtures__/
+**/*.test.js.snap
+**/*.test.tsx.snap
+
+# Generated files
+**/*.generated.ts
+**/*.generated.js
+**/generated/
+
+# Documentation
+docs/
+**/docs/
+*.md
+!README.md
+!CLAUDE.md
+
+# Docker
+.dockerignore
+Dockerfile*
+docker-compose*.yml
+
+# Kubernetes
+infra/
+k8s/
+*.yaml
+!*.config.yaml
+
+# Binary files
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.ico
+*.svg
+*.pdf
+*.zip
+*.tar.gz
+
+# Third-party libraries
+vendor/
+third-party/
+
+# Cache
+.cache/
+.parcel-cache/
+
+# Temporary deployment folders
+.deploy/
+.serverless/
+
+# Storybook
+.storybook/
+
+# Playwright
+test-results/
+playwright-report/
+playwright/.cache/
+
+# Jest
+jest.config.local.js

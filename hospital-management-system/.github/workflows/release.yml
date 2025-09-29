@@ -1,0 +1,118 @@
+name: Create Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          cd backend && npm ci
+          cd ../frontend && npm ci
+
+      - name: Run tests
+        run: |
+          npm run test
+          cd backend && npm run test
+          cd ../frontend && npm run test
+
+      - name: Build production artifacts
+        run: |
+          npm run build
+          cd backend && npm run build
+          cd ../frontend && npm run build
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          # Get the latest tag
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          CURRENT_TAG=${GITHUB_REF#refs/tags/}
+
+          # Generate changelog
+          echo "## What's Changed" > changelog.md
+          echo "" >> changelog.md
+
+          # Get commits since last tag
+          git log --pretty=format:"- %s (%h)" ${LATEST_TAG}..HEAD >> changelog.md
+
+          echo "" >> changelog.md
+          echo "**Full Changelog**: https://github.com/${GITHUB_REPOSITORY}/compare/${LATEST_TAG}...${CURRENT_TAG}" >> changelog.md
+
+          # Read changelog for GitHub release
+          {
+            echo 'CHANGELOG<<EOF'
+            cat changelog.md
+            echo EOF
+          } >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
+          body: ${{ steps.changelog.outputs.CHANGELOG }}
+          draft: false
+          prerelease: false
+
+      - name: Build and push Docker images
+        run: |
+          echo ${{ secrets.DOCKER_PASSWORD }} | docker login -u ${{ secrets.DOCKER_USERNAME }} --password-stdin
+
+          # Build and tag images with version
+          TAG=${GITHUB_REF#refs/tags/}
+          docker build -t hms/backend:${TAG} ./backend
+          docker build -t hms/frontend:${TAG} ./frontend
+          docker build -t hms/backup:${TAG} ./backup
+
+          # Push images
+          docker push hms/backend:${TAG}
+          docker push hms/frontend:${TAG}
+          docker push hms/backup:${TAG}
+
+          # Tag as latest if not a pre-release
+          if [[ ! $TAG =~ ^v.*-(alpha|beta|rc) ]]; then
+            docker tag hms/backend:${TAG} hms/backend:latest
+            docker tag hms/frontend:${TAG} hms/frontend:latest
+            docker tag hms/backup:${TAG} hms/backup:latest
+            docker push hms/backend:latest
+            docker push hms/frontend:latest
+            docker push hms/backup:latest
+          fi
+
+      - name: Deploy to production
+        if: ${{ !contains(github.ref, 'alpha') && !contains(github.ref, 'beta') && !contains(github.ref, 'rc') }}
+        run: |
+          echo "Triggering production deployment for release ${{ github.ref }}"
+
+          # This would typically trigger a deployment workflow
+          # For now, we'll just log the deployment trigger
+          echo "Production deployment triggered for version ${{ github.ref }}"
+
+      - name: Notify release
+        uses: 8398a7/action-slack@v3
+        with:
+          status: success
+          text: "🚀 HMS Release ${{ github.ref }} published successfully!"
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

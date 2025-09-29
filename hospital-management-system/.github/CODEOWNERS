@@ -1,0 +1,49 @@
+# HMS Code Owners
+# This file defines who is responsible for reviewing changes to different parts of the codebase
+
+# Global owners (must review all changes)
+* @your-username
+
+# Backend specific
+/backend/ @backend-team
+/backend/src/modules/ @backend-team
+/backend/src/database/ @database-team
+
+# Frontend specific
+/frontend/ @frontend-team
+/frontend/src/ @frontend-team
+
+# Infrastructure and DevOps
+/.github/ @devops-team
+/docker-compose*.yml @devops-team
+/Dockerfile* @devops-team
+/nginx/ @devops-team
+/monitoring/ @devops-team
+/deploy.sh @devops-team
+
+# Database
+/database/ @database-team
+**/schema.prisma @database-team
+
+# Testing
+/test/ @qa-team
+**/test*/ @qa-team
+**/*.test.* @qa-team
+**/*.spec.* @qa-team
+
+# Documentation
+README.md @tech-writers
+/docs/ @tech-writers
+**/*.md @tech-writers
+
+# Security related files
+**/*.key @security-team
+**/*.pem @security-team
+**/*.crt @security-team
+/.env* @security-team
+
+# Emergency contacts (for critical changes)
+# These users will be notified for critical changes
+**/main.tf @infrastructure-team
+**/deploy.sh @infrastructure-team
+/docker-compose.prod.yml @infrastructure-team

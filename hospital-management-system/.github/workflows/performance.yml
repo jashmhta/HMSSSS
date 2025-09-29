@@ -1,0 +1,226 @@
+name: Performance Testing
+
+on:
+  schedule:
+    # Run performance tests weekly
+    - cron: '0 3 * * 1'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to test'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+      duration:
+        description: 'Test duration in seconds'
+        required: false
+        default: '300'
+        type: string
+      vus:
+        description: 'Number of virtual users'
+        required: false
+        default: '50'
+        type: string
+
+jobs:
+  performance-test:
+    name: Performance Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup k6
+        run: |
+          curl https://github.com/grafana/k6/releases/download/v0.45.0/k6-v0.45.0-linux-amd64.tar.gz -L | tar xvz
+          sudo mv k6-v0.45.0-linux-amd64/k6 /usr/local/bin/
+
+      - name: Create k6 test script
+        run: |
+          cat > performance-test.js << 'EOF'
+          import http from 'k6/http';
+          import { check, sleep } from 'k6';
+          import { Rate, Trend } from 'k6/metrics';
+
+          // Custom metrics
+          const errorRate = new Rate('errors');
+          const responseTime = new Trend('response_time');
+
+          export const options = {
+            stages: [
+              { duration: '2m', target: ${{ github.event.inputs.vus || 50 }} }, // Ramp up
+              { duration: '${{ github.event.inputs.duration || 300 }}s', target: ${{ github.event.inputs.vus || 50 }} }, // Sustained load
+              { duration: '2m', target: 0 }, // Ramp down
+            ],
+            thresholds: {
+              http_req_duration: ['p(95)<2000'], // 95% of requests should be below 2s
+              http_req_failed: ['rate<0.1'], // Error rate should be below 10%
+            },
+          };
+
+          const BASE_URL = '${{ github.event.inputs.environment == ''production'' && ''https://api.hms.local'' || ''https://staging-api.hms.local'' }}';
+
+          export default function () {
+            // API Health Check
+            const healthResponse = http.get(`${BASE_URL}/health`);
+            check(healthResponse, {
+              'health check status is 200': (r) => r.status === 200,
+            });
+            errorRate.add(healthResponse.status !== 200);
+            responseTime.add(healthResponse.timings.duration);
+
+            // Patient List API
+            const patientsResponse = http.get(`${BASE_URL}/patients?limit=10`);
+            check(patientsResponse, {
+              'patients API status is 200': (r) => r.status === 200,
+              'patients response time < 1000ms': (r) => r.timings.duration < 1000,
+            });
+            errorRate.add(patientsResponse.status !== 200);
+            responseTime.add(patientsResponse.timings.duration);
+
+            // Appointments API
+            const appointmentsResponse = http.get(`${BASE_URL}/appointments?limit=10`);
+            check(appointmentsResponse, {
+              'appointments API status is 200': (r) => r.status === 200,
+              'appointments response time < 1000ms': (r) => r.timings.duration < 1000,
+            });
+            errorRate.add(appointmentsResponse.status !== 200);
+            responseTime.add(appointmentsResponse.timings.duration);
+
+            // Laboratory API
+            const labResponse = http.get(`${BASE_URL}/laboratory/tests?limit=10`);
+            check(labResponse, {
+              'laboratory API status is 200': (r) => r.status === 200,
+              'laboratory response time < 1500ms': (r) => r.timings.duration < 1500,
+            });
+            errorRate.add(labResponse.status !== 200);
+            responseTime.add(labResponse.timings.duration);
+
+            sleep(Math.random() * 2 + 1); // Random sleep between 1-3 seconds
+          }
+
+          export function handleSummary(data) {
+            return {
+              'stdout': textSummary(data, { indent: ' ', enableColors: true }),
+              'performance-report.json': JSON.stringify(data, null, 2),
+            };
+          }
+          EOF
+
+      - name: Run performance test
+        run: |
+          k6 run \
+            --out json=performance-results.json \
+            --out influxdb=http://influxdb:8086/k6 \
+            performance-test.js
+
+      - name: Upload performance results
+        uses: actions/upload-artifact@v3
+        with:
+          name: performance-results-${{ github.run_id }}
+          path: |
+            performance-results.json
+            summary.html
+
+      - name: Check performance thresholds
+        run: |
+          # Parse results and check thresholds
+          RESPONSE_TIME_95=$(jq '.metrics.http_req_duration."95th_percentile"' performance-results.json)
+          ERROR_RATE=$(jq '.metrics.http_req_failed.rate' performance-results.json)
+
+          echo "95th percentile response time: $RESPONSE_TIME_95 ms"
+          echo "Error rate: $ERROR_RATE"
+
+          # Check thresholds
+          if (( $(echo "$RESPONSE_TIME_95 > 2000" | bc -l) )); then
+            echo "❌ Performance test failed: Response time too high"
+            echo "PERFORMANCE_STATUS=failure" >> $GITHUB_ENV
+          elif (( $(echo "$ERROR_RATE > 0.1" | bc -l) )); then
+            echo "❌ Performance test failed: Error rate too high"
+            echo "PERFORMANCE_STATUS=failure" >> $GITHUB_ENV
+          else
+            echo "✅ Performance test passed"
+            echo "PERFORMANCE_STATUS=success" >> $GITHUB_ENV
+          fi
+
+      - name: Generate performance report
+        run: |
+          cat > performance-report.md << EOF
+          # Performance Test Report
+
+          ## Test Configuration
+          - Environment: ${{ github.event.inputs.environment }}
+          - Duration: ${{ github.event.inputs.duration || 300 }}s
+          - Virtual Users: ${{ github.event.inputs.vus || 50 }}
+          - Timestamp: $(date)
+
+          ## Results
+
+          ### Response Times
+          - 95th percentile: $(jq '.metrics.http_req_duration."95th_percentile"' performance-results.json) ms
+          - Average: $(jq '.metrics.http_req_duration.avg' performance-results.json) ms
+          - Median: $(jq '.metrics.http_req_duration.med' performance-results.json) ms
+
+          ### Error Rate
+          - Error rate: $(jq '.metrics.http_req_failed.rate * 100' performance-results.json)%
+
+          ### Throughput
+          - Requests per second: $(jq '.metrics.http_reqs.rate' performance-results.json)
+
+          ## Status
+          $([ "$PERFORMANCE_STATUS" = "success" ] && echo "✅ PASSED" || echo "❌ FAILED")
+          EOF
+
+      - name: Upload performance report
+        uses: actions/upload-artifact@v3
+        with:
+          name: performance-report-${{ github.run_id }}
+          path: performance-report.md
+
+      - name: Notify performance results
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ env.PERFORMANCE_STATUS }}
+          text: |
+            Performance test completed for ${{ github.event.inputs.environment }}
+            Status: ${{ env.PERFORMANCE_STATUS == 'success' && '✅ PASSED' || '❌ FAILED' }}
+            95th percentile: $(jq '.metrics.http_req_duration."95th_percentile"' performance-results.json)ms
+            Error rate: $(jq '.metrics.http_req_failed.rate * 100' performance-results.json)%
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Create performance issue
+        if: env.PERFORMANCE_STATUS == 'failure'
+        uses: actions/github-script@v6
+        with:
+          script: |
+            github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `⚡ Performance Degradation Detected`,
+              body: `
+            ## Performance Test Failure
+
+            **Environment:** ${{ github.event.inputs.environment }}
+            **Test Run:** ${{ github.run_id }}
+            **Timestamp:** ${new Date().toISOString()}
+
+            ### Performance Metrics
+            - 95th percentile response time: $(jq '.metrics.http_req_duration."95th_percentile"' performance-results.json)ms (threshold: 2000ms)
+            - Error rate: $(jq '.metrics.http_req_failed.rate * 100' performance-results.json)% (threshold: 10%)
+
+            ### Next Steps
+            1. Review performance results in artifacts
+            2. Check system resources and monitoring dashboards
+            3. Investigate slow endpoints
+            4. Optimize database queries if needed
+            5. Consider scaling resources
+
+            See attached performance report for detailed metrics.
+            `,
+              labels: ['performance', 'investigation-needed']
+            })
